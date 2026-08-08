@@ -11,14 +11,22 @@ import {
   ApiError,
   createBooking,
   getAvailability,
+  getPublicPaymentConfig,
   listCourts,
   type Availability,
   type AvailabilitySlot,
   type Court,
+  type PublicPaymentConfig,
 } from "@/lib/api-client";
 
 function hojeIso(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+// AC-003 (SPEC-006): monta o link wa.me a partir do whatsappNumero em
+// E.164 — wa.me só aceita dígitos (sem "+", espaços ou parênteses).
+function buildWhatsAppLink(numero: string): string {
+  return `https://wa.me/${numero.replace(/\D/g, "")}`;
 }
 
 // REQ-005 (SPEC-005): grade de disponibilidade + reserva. Alvo de toque
@@ -37,6 +45,7 @@ export function CourtBooking({ id }: { id: string }) {
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [bookingOk, setBookingOk] = useState(false);
+  const [paymentConfig, setPaymentConfig] = useState<PublicPaymentConfig | null>(null);
 
   useEffect(() => {
     listCourts()
@@ -51,6 +60,12 @@ export function CourtBooking({ id }: { id: string }) {
       .catch((err: unknown) => {
         setLoadError(err instanceof ApiError ? err.message : "Não foi possível carregar a quadra.");
       });
+    // REQ-002 (SPEC-006): meio de pagamento é exibido na confirmação de
+    // reserva — falha em buscar não deve travar o fluxo de reserva em si,
+    // por isso sem tratamento de erro dedicado (some da tela se faltar).
+    getPublicPaymentConfig()
+      .then(setPaymentConfig)
+      .catch(() => undefined);
   }, [id]);
 
   async function loadAvailability(targetData: string) {
@@ -171,8 +186,35 @@ export function CourtBooking({ id }: { id: string }) {
           ) : null}
 
           {bookingOk ? (
-            <div className="flex flex-col gap-2 rounded-[var(--radius)] border border-[var(--color-primary)] p-4">
+            <div className="flex flex-col gap-3 rounded-[var(--radius)] border border-[var(--color-primary)] p-4">
               <p className="text-sm font-medium text-foreground">Reserva confirmada!</p>
+
+              {paymentConfig?.linkPagamentoUrl || paymentConfig?.whatsappNumero ? (
+                <div className="flex flex-col gap-2">
+                  <p className="text-xs text-[var(--color-text-secondary)]">Para pagar:</p>
+                  {paymentConfig.linkPagamentoUrl ? (
+                    <a
+                      href={paymentConfig.linkPagamentoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="min-h-11 rounded-[var(--radius)] border border-[var(--color-primary)] px-3 py-2 text-center text-sm font-medium text-[var(--color-primary)]"
+                    >
+                      Abrir link de pagamento
+                    </a>
+                  ) : null}
+                  {paymentConfig.whatsappNumero ? (
+                    <a
+                      href={buildWhatsAppLink(paymentConfig.whatsappNumero)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="min-h-11 rounded-[var(--radius)] border border-border px-3 py-2 text-center text-sm font-medium text-foreground"
+                    >
+                      Falar no WhatsApp
+                    </a>
+                  ) : null}
+                </div>
+              ) : null}
+
               <Button type="button" variant="outline" size="sm" onClick={() => router.push("/reservas")}>
                 Ver minhas reservas
               </Button>

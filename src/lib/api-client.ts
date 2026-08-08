@@ -75,6 +75,11 @@ export interface MyClass {
   horaFim: string;
 }
 
+export interface PublicPaymentConfig {
+  linkPagamentoUrl: string | null;
+  whatsappNumero: string | null;
+}
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -163,4 +168,9 @@ export async function listMyBookings(): Promise<Paginated<Booking>> {
 
 export async function cancelBooking(id: string): Promise<void> {
   await authFetch(`/bookings/${id}/cancel`, { method: "POST" });
+}
+
+export async function getPublicPaymentConfig(): Promise<PublicPaymentConfig> {
+  const res = await authFetch("/payment-config/public");
+  return (await res.json()) as PublicPaymentConfig;
 }
