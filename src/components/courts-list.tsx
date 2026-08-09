@@ -56,7 +56,7 @@ export function CourtsList() {
                     className="relative flex h-[100px] items-end justify-start bg-[var(--color-primary-container)] p-3"
                     style={{
                       backgroundImage:
-                        "linear-gradient(rgba(0,156,63,0.12) 1.5px, transparent 1.5px), linear-gradient(90deg, rgba(0,156,63,0.12) 1.5px, transparent 1.5px)",
+                        "linear-gradient(color-mix(in srgb, var(--color-primary) 12%, transparent) 1.5px, transparent 1.5px), linear-gradient(90deg, color-mix(in srgb, var(--color-primary) 12%, transparent) 1.5px, transparent 1.5px)",
                       backgroundSize: "18px 18px",
                     }}
                   >

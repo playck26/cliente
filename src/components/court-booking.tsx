@@ -163,12 +163,12 @@ export function CourtBooking({ id }: { id: string }) {
               }}
               className={`flex h-[72px] min-w-[64px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl transition-all ${
                 selecionado
-                  ? "scale-105 bg-[var(--color-primary)] text-white shadow-[var(--shadow-elevated)]"
+                  ? "scale-105 bg-[var(--color-primary-strong)] text-white shadow-[var(--shadow-elevated)]"
                   : "bg-[var(--color-surface-container)] text-[var(--color-text-primary)] shadow-[var(--shadow-low)]"
               }`}
             >
               <span
-                className={`text-[11px] font-semibold tracking-wide uppercase ${selecionado ? "text-white/80" : "text-[var(--color-text-secondary)]"}`}
+                className={`text-[11px] font-semibold tracking-wide uppercase ${selecionado ? "text-white" : "text-[var(--color-text-secondary)]"}`}
               >
                 {dia}
               </span>

@@ -131,7 +131,7 @@ export function MyBookingsList() {
                       className={`flex h-6 shrink-0 items-center rounded-full px-3 text-xs font-semibold ${
                         pago
                           ? "bg-[var(--color-primary-container)] text-[var(--color-on-primary-container)]"
-                          : "bg-[#fdf6b2] text-[var(--color-warning)]"
+                          : "bg-[var(--color-warning)]/15 text-[var(--color-warning)]"
                       }`}
                     >
                       {STATUS_LABEL[booking.statusPagamento]}

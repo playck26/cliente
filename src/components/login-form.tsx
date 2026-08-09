@@ -36,17 +36,24 @@ export function LoginForm() {
 
   return (
     <Card className="relative w-full max-w-[420px] overflow-hidden rounded-2xl p-2 shadow-[var(--shadow-elevated)]">
-      {/* Textura decorativa "linhas de quadra" (SPEC-007) — CSS puro, sem asset. */}
+      {/* Textura decorativa "linhas de quadra" (SPEC-007) — CSS puro, sem
+          asset; grade 2x2 (não repetida em ladrilho), mais próxima da
+          referência do que um grid denso repetido. */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute top-0 right-0 h-32 w-32 opacity-5"
         style={{
           backgroundImage:
             "linear-gradient(currentColor 2px, transparent 2px), linear-gradient(90deg, currentColor 2px, transparent 2px)",
-          backgroundSize: "16px 16px",
+          backgroundSize: "64px 64px",
         }}
       />
-      <CardHeader className="items-center text-center">
+      {/* justify-items-center além de items-center: CardHeader é um CSS
+          grid (ver ui/card.tsx), então items-center só centraliza no eixo
+          vertical — sem justify-items-center, o ícone (largura fixa,
+          size-16) fica alinhado à esquerda da coluna do grid em vez de
+          centralizado (achado da validação cruzada, Codex). */}
+      <CardHeader className="items-center justify-items-center text-center">
         <div className="mb-2 flex size-16 items-center justify-center rounded-full bg-[var(--color-primary-container)] text-[var(--color-primary)]">
           <TennisBallIcon className="size-8" strokeWidth={1.75} aria-hidden="true" />
         </div>
@@ -119,6 +126,16 @@ export function LoginForm() {
             {loading ? "Entrando..." : "Entrar"}
             {!loading ? <ArrowRight className="size-4" /> : null}
           </Button>
+          {/* "Cadastre-se" é só visual nesta spec (SPEC-007, achado da
+              validação cruzada — Codex) — igual "Esqueceu a senha?", não
+              existe cadastro público de aluno no backend (aluno é criado
+              só pelo admin, sem senha inicial). Elemento presente pra
+              fidelidade com a referência, sem fingir uma feature que não
+              existe. */}
+          <p className="mt-2 text-center text-sm text-[var(--color-text-secondary)]">
+            Ainda não tem conta?{" "}
+            <span className="font-semibold text-[var(--color-primary)] opacity-60">Cadastre-se</span>
+          </p>
         </form>
       </CardContent>
     </Card>
