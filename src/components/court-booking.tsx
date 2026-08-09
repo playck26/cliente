@@ -32,9 +32,12 @@ function isoDeOffset(diasAPartirDeHoje: number): string {
 }
 
 // Seletor de data em chips (SPEC-007) — 30 dias a partir de hoje, rolagem
-// horizontal. Substitui o <input type="date"> nativo só na apresentação;
-// continua produzindo o mesmo formato ISO que `loadAvailability` sempre
-// esperou, sem reduzir o intervalo de datas que dava pra escolher antes.
+// horizontal, no lugar do <input type="date"> nativo (sem limite) do
+// AS-IS. Restringe de fato o intervalo de datas selecionáveis — decisão
+// de produto confirmada com o usuário após achado da validação cruzada
+// (spec.md, "Decisões Necessárias", item 8), não um efeito colateral não
+// percebido. Continua produzindo o mesmo formato ISO que
+// `loadAvailability` sempre esperou.
 const DATAS_DISPONIVEIS = Array.from({ length: 30 }, (_, i) => isoDeOffset(i));
 
 function labelDoDia(iso: string): { dia: string; numero: string } {
