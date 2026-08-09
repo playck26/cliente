@@ -2,11 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { ArrowLeft, ArrowRight, CheckCircle2, CreditCard, MessageCircle } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   ApiError,
   createBooking,
@@ -18,15 +17,30 @@ import {
   type Court,
   type PublicPaymentConfig,
 } from "@/lib/api-client";
+import { buildWhatsAppLink } from "@/lib/whatsapp";
+
+const DIAS_SEMANA_CURTO = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
 
 function hojeIso(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-// AC-003 (SPEC-006): monta o link wa.me a partir do whatsappNumero em
-// E.164 — wa.me só aceita dígitos (sem "+", espaços ou parênteses).
-function buildWhatsAppLink(numero: string): string {
-  return `https://wa.me/${numero.replace(/\D/g, "")}`;
+function isoDeOffset(diasAPartirDeHoje: number): string {
+  const data = new Date();
+  data.setDate(data.getDate() + diasAPartirDeHoje);
+  return data.toISOString().slice(0, 10);
+}
+
+// Seletor de data em chips (SPEC-007) — 30 dias a partir de hoje, rolagem
+// horizontal. Substitui o <input type="date"> nativo só na apresentação;
+// continua produzindo o mesmo formato ISO que `loadAvailability` sempre
+// esperou, sem reduzir o intervalo de datas que dava pra escolher antes.
+const DATAS_DISPONIVEIS = Array.from({ length: 30 }, (_, i) => isoDeOffset(i));
+
+function labelDoDia(iso: string): { dia: string; numero: string } {
+  const [ano, mes, dia] = iso.split("-").map(Number);
+  const data = new Date(Date.UTC(ano, mes - 1, dia));
+  return { dia: DIAS_SEMANA_CURTO[data.getUTCDay()], numero: String(dia).padStart(2, "0") };
 }
 
 // REQ-005 (SPEC-005): grade de disponibilidade + reserva. Alvo de toque
@@ -119,109 +133,163 @@ export function CourtBooking({ id }: { id: string }) {
   }
 
   return (
-    <main className="flex min-h-screen flex-col gap-4 bg-background p-4 pb-20">
-      <h1 className="text-2xl font-semibold text-foreground">{quadra?.nome ?? "Carregando..."}</h1>
+    <main className="flex min-h-screen flex-col gap-6 bg-background px-5 pt-4 pb-20">
+      <div className="flex items-center gap-3">
+        <button
+          type="button"
+          onClick={() => router.back()}
+          aria-label="Voltar"
+          className="-ml-2 flex size-9 items-center justify-center text-[var(--color-text-primary)]"
+        >
+          <ArrowLeft className="size-5" />
+        </button>
+        <h1 className="text-lg font-semibold text-[var(--color-primary)]">
+          {quadra?.nome ?? "Carregando..."}
+        </h1>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Disponibilidade</CardTitle>
-          <CardDescription>Toque num horário livre para reservar</CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="data">Data</Label>
-            <Input
-              id="data"
-              type="date"
-              value={data}
-              onChange={(e) => {
-                setData(e.target.value);
-                void loadAvailability(e.target.value);
+      {/* Seletor de data em chips (SPEC-007) */}
+      <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1">
+        {DATAS_DISPONIVEIS.map((iso) => {
+          const { dia, numero } = labelDoDia(iso);
+          const selecionado = iso === data;
+          return (
+            <button
+              key={iso}
+              type="button"
+              onClick={() => {
+                setData(iso);
+                void loadAvailability(iso);
               }}
-            />
-          </div>
+              className={`flex h-[72px] min-w-[64px] shrink-0 flex-col items-center justify-center gap-0.5 rounded-xl transition-all ${
+                selecionado
+                  ? "scale-105 bg-[var(--color-primary)] text-white shadow-[var(--shadow-elevated)]"
+                  : "bg-[var(--color-surface-container)] text-[var(--color-text-primary)] shadow-[var(--shadow-low)]"
+              }`}
+            >
+              <span
+                className={`text-[11px] font-semibold tracking-wide uppercase ${selecionado ? "text-white/80" : "text-[var(--color-text-secondary)]"}`}
+              >
+                {dia}
+              </span>
+              <span className="text-lg font-semibold">{numero}</span>
+            </button>
+          );
+        })}
+      </div>
 
-          {availError ? (
-            <p role="alert" className="text-sm text-[var(--color-error)]">
-              {availError}
-            </p>
-          ) : availLoading ? (
-            <p className="text-sm text-[var(--color-text-secondary)]">Carregando...</p>
-          ) : availability ? (
-            <div className="grid grid-cols-2 gap-2">
-              {availability.slots.map((slot) => (
-                <button
-                  key={slot.slot}
+      {!bookingOk ? (
+        <Card className="relative overflow-hidden rounded-2xl p-2 shadow-[var(--shadow-low)]">
+          <CardHeader>
+            <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">Horários</h2>
+            <p className="text-sm text-[var(--color-text-secondary)]">Toque num horário livre para reservar</p>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            {availError ? (
+              <p role="alert" className="text-sm text-[var(--color-error)]">
+                {availError}
+              </p>
+            ) : availLoading ? (
+              <p className="text-sm text-[var(--color-text-secondary)]">Carregando...</p>
+            ) : availability ? (
+              <div className="grid grid-cols-2 gap-3">
+                {availability.slots.map((slot) => {
+                  const livre = slot.status === "livre";
+                  const selecionado = selectedSlot?.slot === slot.slot;
+                  return (
+                    <button
+                      key={slot.slot}
+                      type="button"
+                      disabled={!livre}
+                      onClick={() => setSelectedSlot(slot)}
+                      className={`flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl border py-3 text-sm font-semibold transition-colors ${
+                        !livre
+                          ? "cursor-not-allowed border-transparent bg-[var(--color-surface-container-high)] text-[var(--color-text-secondary)] opacity-70"
+                          : selecionado
+                            ? "border-transparent bg-[var(--color-primary-container)] text-[var(--color-primary)]"
+                            : "border-[var(--color-primary-container)] bg-surface text-[var(--color-primary)] hover:bg-[var(--color-surface-container)]"
+                      }`}
+                    >
+                      {slot.slot.replace("-", " - ")}
+                      <span className="text-xs font-medium">
+                        {slot.status === "livre" ? "Livre" : slot.status === "ocupado_turma" ? "Turma" : "Reservado"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+
+            {selectedSlot ? (
+              <div className="flex flex-col gap-3">
+                {bookingError ? (
+                  <p role="alert" className="text-sm text-[var(--color-error)]">
+                    {bookingError}
+                  </p>
+                ) : null}
+                <Button
                   type="button"
-                  disabled={slot.status !== "livre"}
-                  onClick={() => setSelectedSlot(slot)}
-                  className={`min-h-11 rounded-[var(--radius)] border px-3 py-2 text-sm ${
-                    slot.status === "livre"
-                      ? "border-[var(--color-primary)] text-[var(--color-primary)]"
-                      : "cursor-not-allowed border-border bg-muted text-[var(--color-text-secondary)]"
-                  } ${selectedSlot?.slot === slot.slot ? "bg-[var(--color-primary)] text-white" : ""}`}
+                  disabled={bookingLoading}
+                  onClick={() => void handleConfirmar()}
+                  className="h-[52px] gap-2 text-base font-semibold"
                 >
-                  {slot.slot}
-                  <br />
-                  <span className="text-xs">
-                    {slot.status === "livre" ? "Livre" : slot.status === "ocupado_turma" ? "Turma" : "Reservado"}
-                  </span>
-                </button>
-              ))}
+                  {bookingLoading ? "Reservando..." : "Confirmar reserva"}
+                  {!bookingLoading ? <ArrowRight className="size-4" /> : null}
+                </Button>
+              </div>
+            ) : null}
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="rounded-2xl border-t-4 border-[var(--color-primary)] p-6 text-center shadow-[var(--shadow-elevated)]">
+          <div className="mx-auto mb-3 flex size-16 items-center justify-center rounded-full bg-[var(--color-primary-container)]">
+            <CheckCircle2 className="size-8 text-[var(--color-primary)]" />
+          </div>
+          <h2 className="text-xl font-bold text-[var(--color-primary)]">Reserva confirmada!</h2>
+          <p className="mt-1 mb-6 text-sm text-[var(--color-text-secondary)]">
+            Sua quadra foi reservada com sucesso.
+          </p>
+
+          {paymentConfig?.linkPagamentoUrl || paymentConfig?.whatsappNumero ? (
+            <div className="mb-6 rounded-xl bg-[var(--color-surface-container)] p-4 text-left">
+              <h3 className="mb-3 text-xs font-semibold tracking-wide text-[var(--color-text-secondary)] uppercase">
+                Para pagar:
+              </h3>
+              <div className="flex flex-col gap-2">
+                {paymentConfig.linkPagamentoUrl ? (
+                  <a
+                    href={paymentConfig.linkPagamentoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex min-h-11 items-center justify-center gap-2 rounded-lg bg-[var(--color-primary)] px-3 py-2 text-center text-sm font-semibold text-white"
+                  >
+                    <CreditCard className="size-4" /> Abrir link de pagamento
+                  </a>
+                ) : null}
+                {paymentConfig.whatsappNumero ? (
+                  <a
+                    href={buildWhatsAppLink(paymentConfig.whatsappNumero)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-center text-sm font-medium text-[var(--color-text-primary)]"
+                  >
+                    <MessageCircle className="size-4" /> Falar no WhatsApp
+                  </a>
+                ) : null}
+              </div>
             </div>
           ) : null}
 
-          {selectedSlot ? (
-            <div className="flex flex-col gap-3 rounded-[var(--radius)] border border-border p-4">
-              <p className="text-sm font-medium text-foreground">Reservar {selectedSlot.slot}</p>
-              {bookingError ? (
-                <p role="alert" className="text-sm text-[var(--color-error)]">
-                  {bookingError}
-                </p>
-              ) : null}
-              <Button type="button" disabled={bookingLoading} onClick={() => void handleConfirmar()}>
-                {bookingLoading ? "Reservando..." : "Confirmar reserva"}
-              </Button>
-            </div>
-          ) : null}
-
-          {bookingOk ? (
-            <div className="flex flex-col gap-3 rounded-[var(--radius)] border border-[var(--color-primary)] p-4">
-              <p className="text-sm font-medium text-foreground">Reserva confirmada!</p>
-
-              {paymentConfig?.linkPagamentoUrl || paymentConfig?.whatsappNumero ? (
-                <div className="flex flex-col gap-2">
-                  <p className="text-xs text-[var(--color-text-secondary)]">Para pagar:</p>
-                  {paymentConfig.linkPagamentoUrl ? (
-                    <a
-                      href={paymentConfig.linkPagamentoUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="min-h-11 rounded-[var(--radius)] border border-[var(--color-primary)] px-3 py-2 text-center text-sm font-medium text-[var(--color-primary)]"
-                    >
-                      Abrir link de pagamento
-                    </a>
-                  ) : null}
-                  {paymentConfig.whatsappNumero ? (
-                    <a
-                      href={buildWhatsAppLink(paymentConfig.whatsappNumero)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="min-h-11 rounded-[var(--radius)] border border-border px-3 py-2 text-center text-sm font-medium text-foreground"
-                    >
-                      Falar no WhatsApp
-                    </a>
-                  ) : null}
-                </div>
-              ) : null}
-
-              <Button type="button" variant="outline" size="sm" onClick={() => router.push("/reservas")}>
-                Ver minhas reservas
-              </Button>
-            </div>
-          ) : null}
-        </CardContent>
-      </Card>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.push("/reservas")}
+            className="h-[52px] w-full border-[var(--color-primary)] text-[var(--color-primary)]"
+          >
+            Ver minhas reservas
+          </Button>
+        </Card>
+      )}
 
       <BottomNav />
     </main>

@@ -17,7 +17,7 @@ describe("LoginForm", () => {
 
   it("renderiza os campos de email e senha", () => {
     render(<LoginForm />);
-    expect(screen.getByLabelText("Email")).toBeInTheDocument();
+    expect(screen.getByLabelText("E-mail")).toBeInTheDocument();
     expect(screen.getByLabelText("Senha")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Entrar" })).toBeInTheDocument();
   });
@@ -33,7 +33,7 @@ describe("LoginForm", () => {
     });
 
     render(<LoginForm />);
-    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "aluno@x.com" } });
+    fireEvent.change(screen.getByLabelText("E-mail"), { target: { value: "aluno@x.com" } });
     fireEvent.change(screen.getByLabelText("Senha"), { target: { value: "senha-valida" } });
     fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
 
@@ -48,7 +48,7 @@ describe("LoginForm", () => {
     });
 
     render(<LoginForm />);
-    fireEvent.change(screen.getByLabelText("Email"), { target: { value: "aluno@x.com" } });
+    fireEvent.change(screen.getByLabelText("E-mail"), { target: { value: "aluno@x.com" } });
     fireEvent.change(screen.getByLabelText("Senha"), { target: { value: "senha-errada" } });
     fireEvent.click(screen.getByRole("button", { name: "Entrar" }));
 
