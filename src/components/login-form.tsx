@@ -26,7 +26,12 @@ export function LoginForm() {
     try {
       const result = await login({ email, senha });
       saveAccessToken(result.accessToken);
-      router.push("/home");
+      // SPEC-009/AC-008: conta com senha temporária não acessa mais nada
+      // até trocá-la (INV-008). Mandar direto para a Home só produziria
+      // uma tela de erro; o servidor barraria tudo de qualquer forma.
+      router.push(
+        result.usuario.senhaTemporaria ? "/primeiro-acesso" : "/home",
+      );
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Não foi possível entrar. Tente de novo.");
     } finally {
