@@ -194,6 +194,13 @@ export function CourtBooking({ id }: { id: string }) {
               </p>
             ) : availLoading ? (
               <p className="text-sm text-[var(--color-text-secondary)]">Carregando...</p>
+            ) : availability?.estado === "fechado" ? (
+              /* SPEC-010/AC-008: "fechado" e "sem horário livre" produzem a
+                 mesma lista vazia — sem este caso, o aluno veria uma tela
+                 em branco e acharia que o app quebrou. */
+              <p className="rounded-lg bg-[var(--color-surface-variant)] p-4 text-center text-sm text-[var(--color-text-secondary)]">
+                A quadra não abre neste dia. Escolha outra data.
+              </p>
             ) : availability ? (
               <div className="grid grid-cols-2 gap-3">
                 {availability.slots.map((slot) => {

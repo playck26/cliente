@@ -60,6 +60,13 @@ export interface AvailabilitySlot {
 export interface Availability {
   quadraId: string;
   data: string;
+  /**
+   * SPEC-010/AC-008 — "fechado" e "aberto sem nada livre" produzem a mesma
+   * lista vazia depois que a tela filtra os slots ocupados. Sem este
+   * campo, os dois casos apareceriam como a mesma grade vazia sem
+   * explicação.
+   */
+  estado: "aberto" | "fechado";
   slots: AvailabilitySlot[];
 }
 

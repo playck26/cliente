@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>PlayCK - Home</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"on-error-container": "#93000a", "on-secondary": "#ffffff", "secondary-fixed-dim": "#47deaf", error: "#ba1a1a", "on-secondary-fixed": "#002116", "on-primary": "#ffffff", "inverse-surface": "#2f3131", "on-surface": "#1a1c1c", "on-surface-variant": "#414940", "secondary-container": "#66f8c7", secondary: "#006c51", "on-tertiary": "#ffffff", "surface-container-high": "#e8e8e8", "on-primary-container": "#75f38a", "on-secondary-container": "#007054", "surface-container-highest": "#e2e2e2", "surface-bright": "#f9f9f9", "tertiary-fixed": "#ffdad9", background: "#f9f9f9", "on-background": "#1a1c1c", tertiary: "#930024", "inverse-on-surface": "#f0f1f1", "error-container": "#ffdad6", primary: "#00531e", "on-tertiary-fixed-variant": "#920024", "on-primary-fixed-variant": "#00531e", "on-error": "#ffffff", "surface-tint": "#006e2a", "on-secondary-fixed-variant": "#00513c", "secondary-fixed": "#69fbca", "on-tertiary-fixed": "#40000a", "surface-container-lowest": "#ffffff", "outline-variant": "#c0c9bd", "tertiary-fixed-dim": "#ffb3b4", "inverse-primary": "#61df78", "surface-container-low": "#f3f3f4", "on-primary-fixed": "#002108", "surface-variant": "#e2e2e2", "on-tertiary-container": "#ffcece", surface: "#f9f9f9", "tertiary-container": "#c00032", "primary-container": "#006e2a", "primary-fixed-dim": "#61df78", "surface-container": "#eeeeee", outline: "#71796f", "primary-fixed": "#7efc92", "surface-dim": "#dadada"}, borderRadius: {DEFAULT: "0.25rem", lg: "0.5rem", xl: "0.75rem", full: "9999px"}, spacing: {sm: "12px", xs: "4px", xl: "32px", "margin-mobile": "20px", md: "16px", lg: "24px", base: "8px", "gutter-mobile": "16px"}, fontFamily: {"body-lg": ["Inter"], "title-lg": ["Inter"], "body-md": ["Inter"], "display-md": ["Inter"], "label-sm": ["Inter"], "label-md": ["Inter"], "display-lg": ["Inter"], "title-md": ["Inter"]}, fontSize: {"body-lg": ["16px", {lineHeight: "24px", fontWeight: "400"}], "title-lg": ["18px", {lineHeight: "24px", fontWeight: "600"}], "body-md": ["14px", {lineHeight: "20px", fontWeight: "400"}], "display-md": ["24px", {lineHeight: "30px", letterSpacing: "-0.01em", fontWeight: "700"}], "label-sm": ["12px", {lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "600"}], "label-md": ["13px", {lineHeight: "18px", letterSpacing: "0.01em", fontWeight: "500"}], "display-lg": ["28px", {lineHeight: "34px", letterSpacing: "-0.02em", fontWeight: "700"}], "title-md": ["16px", {lineHeight: "22px", fontWeight: "600"}]}}}};</script>
+<style>
+        .material-symbols-outlined {
+          font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .material-symbols-outlined[data-weight="fill"] {
+            font-variation-settings: 'FILL' 1;
+        }
+        /* Subtle thematic texture */
+        .court-texture {
+            background-image: 
+                linear-gradient(to right, rgba(208, 219, 212, 0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(208, 219, 212, 0.05) 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        .baseline-graphic {
+            background-image: linear-gradient(135deg, transparent 40%, rgba(208, 219, 212, 0.1) 40%, rgba(208, 219, 212, 0.1) 42%, transparent 42%, transparent 50%, rgba(208, 219, 212, 0.1) 50%, rgba(208, 219, 212, 0.1) 52%, transparent 52%);
+            background-size: 100px 100px;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-lg min-h-screen pb-[100px]">
+<!-- TopAppBar -->
+<header class="flex justify-between items-center w-full px-margin-mobile py-md max-w-7xl mx-auto docked full-width top-0 bg-surface text-primary flat no shadows">
+<div class="flex items-center gap-sm">
+<div class="w-10 h-10 rounded-full overflow-hidden bg-surface-container-high border border-outline-variant flex items-center justify-center">
+<span class="material-symbols-outlined text-on-surface-variant">person</span>
+</div>
+<span class="text-display-md font-display-md font-bold text-primary">PlayCK</span>
+</div>
+<button class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container transition-colors text-on-surface-variant">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+</header>
+<main class="px-margin-mobile max-w-7xl mx-auto mt-xl">
+<!-- Header Section -->
+<section class="mb-xl">
+<h1 class="text-display-lg font-display-lg text-on-surface mb-xs">Olá, Carlos!</h1>
+<p class="text-body-lg font-body-lg text-on-surface-variant">Suas aulas e reservas de quadra</p>
+</section>
+<!-- Featured Highlight Card -->
+<section class="mb-xl">
+<div class="relative bg-surface-container-lowest rounded-[24px] p-lg shadow-[0px_8px_24px_rgba(18,20,15,0.12)] overflow-hidden border border-outline-variant/30">
+<!-- Thematic Background -->
+<div class="absolute inset-0 baseline-graphic opacity-50 pointer-events-none"></div>
+<div class="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-bl-[100px] pointer-events-none"></div>
+<div class="relative z-10">
+<div class="flex items-center gap-2 mb-md">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span class="text-label-sm font-label-sm text-primary uppercase tracking-wider">Próxima aula</span>
+</div>
+<h2 class="text-title-lg font-title-lg text-on-surface mb-sm">Turma de Tênis Avançado</h2>
+<div class="flex flex-col gap-xs text-body-md font-body-md text-on-surface-variant">
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-[18px]">calendar_today</span>
+<span>Terça-feira, 12/08</span>
+</div>
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-[18px]">schedule</span>
+<span>18:00–19:00</span>
+</div>
+<div class="flex items-center gap-xs">
+<span class="material-symbols-outlined text-[18px]">sports_tennis</span>
+<span>Quadra 1</span>
+</div>
+</div>
+<div class="mt-lg">
+<button class="bg-primary text-on-primary w-full md:w-auto px-lg h-[52px] rounded-lg font-label-md text-label-md flex items-center justify-center gap-sm hover:bg-primary-container transition-colors shadow-[0px_4px_12px_rgba(18,20,15,0.06)]">
+                            Ver Detalhes
+                        </button>
+</div>
+</div>
+</div>
+</section>
+<!-- Quick Actions (Placeholder for Bento Grid style) -->
+<section class="grid grid-cols-2 md:grid-cols-4 gap-gutter-mobile mb-xl">
+<div class="bg-surface rounded-xl p-md shadow-[0px_4px_12px_rgba(18,20,15,0.06)] border border-outline-variant/20 flex flex-col items-center justify-center gap-sm hover:bg-surface-container transition-colors cursor-pointer group">
+<div class="w-12 h-12 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined">add</span>
+</div>
+<span class="text-label-md font-label-md text-on-surface">Nova Reserva</span>
+</div>
+<div class="bg-surface rounded-xl p-md shadow-[0px_4px_12px_rgba(18,20,15,0.06)] border border-outline-variant/20 flex flex-col items-center justify-center gap-sm hover:bg-surface-container transition-colors cursor-pointer group">
+<div class="w-12 h-12 rounded-full bg-surface-container-highest text-on-surface flex items-center justify-center group-hover:scale-110 transition-transform">
+<span class="material-symbols-outlined">group</span>
+</div>
+<span class="text-label-md font-label-md text-on-surface">Minhas Turmas</span>
+</div>
+</section>
+</main>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-safe bg-surface border-t border-[#E8E7E0] shadow-lg h-[80px] md:hidden">
+<!-- Active Item: Home -->
+<a class="flex flex-col items-center justify-center text-primary font-semibold w-16 opacity-80 scale-95 transition-all" href="#">
+<span class="material-symbols-outlined text-[24px]" data-weight="fill">home</span>
+<span class="text-label-sm font-label-sm mt-1">Home</span>
+</a>
+<!-- Inactive Items -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant w-16 hover:bg-surface-container-highest/10 transition-colors" href="#">
+<span class="material-symbols-outlined text-[24px]">sports_tennis</span>
+<span class="text-label-sm font-label-sm mt-1">Aulas</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant w-16 hover:bg-surface-container-highest/10 transition-colors" href="#">
+<span class="material-symbols-outlined text-[24px]">stadium</span>
+<span class="text-label-sm font-label-sm mt-1">Quadras</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant w-16 hover:bg-surface-container-highest/10 transition-colors" href="#">
+<span class="material-symbols-outlined text-[24px]">event_available</span>
+<span class="text-label-sm font-label-sm mt-1">Reservas</span>
+</a>
+</nav>
+</body></html>
