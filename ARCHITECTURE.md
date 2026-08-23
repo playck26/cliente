@@ -52,8 +52,9 @@ page.tsx (server component, fino)
 
 | Rota | Componente | Papel |
 |---|---|---|
-| `/login` | `login-form` | entrada; leva a `/primeiro-acesso` se a senha for temporária |
+| `/login` | `login-form` | entrada; leva a `/primeiro-acesso` se a senha for temporária. **DEF-003**: "Cadastre-se" virou link real para `/cadastro` (era `<span>` morto desde a SPEC-007) e "Esqueceu a senha?" passou a dizer o caminho que existe hoje |
 | `/primeiro-acesso` | `primeiro-acesso-form` | troca obrigatória da senha temporária (INV-008) |
+| `/cadastro` | `escolher-clube-form` | **DEF-003**: pede o código do clube e redireciona para `/cadastro/<slug>`. Existe porque o login não sabe de qual clube a pessoa é; não valida o código aqui (o limite de 10/15min do endpoint público trancaria quem errasse duas vezes) |
 | `/cadastro/[slug]` | `cadastro-publico-form` | auto-cadastro pelo link público da empresa |
 | `/convite/[token]` | `aceitar-convite-form` | aceite de convite |
 | `/home` | `home-view` | próximas aulas e atalhos |

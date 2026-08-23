@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { TennisBallIcon } from "@/components/icons/tennis-ball-icon";
@@ -19,6 +20,7 @@ export function LoginForm() {
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [ajudaSenha, setAjudaSenha] = useState(false);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -117,13 +119,27 @@ export function LoginForm() {
                 {mostrarSenha ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
             </div>
-            {/* "Esqueceu a senha?" é só visual nesta spec (SPEC-007) — não
-                existe fluxo de recuperação de senha no backend ainda; mesmo
-                tratamento dado ao sino de notificação (elemento presente,
-                sem ação real, não finge uma feature que não existe). */}
-            <span className="mt-1 self-end text-xs font-medium text-[var(--color-primary)] opacity-60">
+            {/* DEF-003 — continua não existindo recuperação automática de
+                senha (GAP-004, e-mail transacional). O que mudou é que o
+                elemento parou de ser decorativo: em vez de não fazer nada,
+                ele diz à pessoa qual é o caminho que existe hoje. Texto
+                morto e caminho real levam ao mesmo lugar visualmente, e a
+                pessoa não tem como saber qual é qual. */}
+            <button
+              type="button"
+              onClick={() => setAjudaSenha((v) => !v)}
+              aria-expanded={ajudaSenha}
+              className="mt-1 self-end text-xs font-medium text-[var(--color-primary)] hover:underline"
+            >
               Esqueceu a senha?
-            </span>
+            </button>
+            {ajudaSenha ? (
+              <p className="mt-1 rounded-lg bg-[var(--color-primary-container)]/40 p-3 text-xs text-[var(--color-text-secondary)]">
+                Ainda não enviamos e-mail de recuperação. Peça ao seu clube
+                para gerar uma senha nova — ela chega por WhatsApp e você
+                troca no primeiro acesso.
+              </p>
+            ) : null}
           </div>
           {error ? (
             <p role="alert" className="text-sm text-[var(--color-error)]">
@@ -134,15 +150,20 @@ export function LoginForm() {
             {loading ? "Entrando..." : "Entrar"}
             {!loading ? <ArrowRight className="size-4" /> : null}
           </Button>
-          {/* "Cadastre-se" é só visual nesta spec (SPEC-007, achado da
-              validação cruzada — Codex) — igual "Esqueceu a senha?", não
-              existe cadastro público de aluno no backend (aluno é criado
-              só pelo admin, sem senha inicial). Elemento presente pra
-              fidelidade com a referência, sem fingir uma feature que não
-              existe. */}
+          {/* DEF-003 — este texto era um `<span>` morto desde a SPEC-007, e
+              o comentário que o justificava dizia que não existia cadastro
+              público de aluno. Era verdade quando foi escrito; deixou de
+              ser em 22/08, quando a SPEC-009 subiu os três caminhos de
+              criação de conta. Ninguém voltou aqui, e o usuário tocava num
+              texto que não levava a lugar nenhum. */}
           <p className="mt-2 text-center text-sm text-[var(--color-text-secondary)]">
             Ainda não tem conta?{" "}
-            <span className="font-semibold text-[var(--color-primary)] opacity-60">Cadastre-se</span>
+            <Link
+              href="/cadastro"
+              className="font-semibold text-[var(--color-primary)] hover:underline"
+            >
+              Cadastre-se
+            </Link>
           </p>
         </form>
       </CardContent>
