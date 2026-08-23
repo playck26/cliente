@@ -160,12 +160,23 @@ export function MyBookingsList() {
                       <Button type="button" variant="outline" disabled={cancelingId === booking.id} onClick={() => void handleCancel(booking.id)} className="h-11 rounded-2xl font-extrabold">
                         {cancelingId === booking.id ? "Cancelando..." : "Cancelar"}
                       </Button>
-                      {!pago && temMeioDePagamento ? (
+                      {/* DEF-005 — este ternário tinha dois ramos para três
+                          casos. A condição era `!pago && temMeioDePagamento`, e
+                          o `else` dizia "Pagamento ok" — verdade para quem
+                          pagou, **mentira para quem deve numa empresa que não
+                          cadastrou meio de pagamento**. O cartão chegava a se
+                          contradizer: a tarja de status dizia "Pagamento
+                          pendente" três linhas acima. Nunca diga a alguém que
+                          a dívida dela está quitada porque falta configuração
+                          do outro lado. */}
+                      {pago ? (
+                        <span className="flex h-11 items-center justify-center rounded-2xl bg-[var(--color-secondary-container)] text-[13px] font-extrabold text-[var(--color-primary-strong)]">Pagamento ok</span>
+                      ) : temMeioDePagamento ? (
                         <Button type="button" onClick={() => setPagamentoAbertoId(pagamentoAberto ? null : booking.id)} className="h-11 rounded-2xl font-extrabold">
                           <WalletCards className="size-4" aria-hidden="true" /> Pagar agora
                         </Button>
                       ) : (
-                        <span className="flex h-11 items-center justify-center rounded-2xl bg-[var(--color-secondary-container)] text-[13px] font-extrabold text-[var(--color-primary-strong)]">Pagamento ok</span>
+                        <span className="flex h-11 items-center justify-center rounded-2xl bg-[var(--color-surface-container)] px-2 text-center text-[12px] font-bold text-[var(--color-text-secondary)]">Combine o pagamento com o clube</span>
                       )}
                     </div>
 
