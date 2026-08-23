@@ -89,10 +89,15 @@ export function MinhaTurmaDetalheView({ id }: { id: string }) {
                   <Landmark className="size-4" aria-hidden="true" />
                   {turma.quadraNome}
                 </span>
+                {/* Sem prefixo "Nível": o nome vem do cadastro do gestor e
+                    costuma já conter a palavra — na primeira empresa real o
+                    nível se chama "Nivel 1", e a tela mostrava "Nível Nivel
+                    1". Rótulo que a gente inventa em cima de texto do
+                    usuário duplica no primeiro dado de verdade. */}
                 {turma.nivelNome ? (
                   <span className="inline-flex items-center gap-2">
                     <Users className="size-4" aria-hidden="true" />
-                    Nível {turma.nivelNome}
+                    {turma.nivelNome}
                   </span>
                 ) : null}
               </CardContent>
