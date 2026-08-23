@@ -273,14 +273,24 @@ export async function getAvailability(quadraId: string, data: string): Promise<A
   return (await res.json()) as Availability;
 }
 
+/**
+ * SPEC-011 — reserva de um ou mais horários no mesmo dia.
+ *
+ * Slots contíguos viram **uma** reserva com o valor somado; separados
+ * viram reservas independentes. O agrupamento é decidido pelo servidor: se
+ * cada tela decidisse, o app e o painel poderiam divergir sobre o que é
+ * "uma reserva".
+ */
 export async function createBooking(dto: {
   quadraId: string;
   data: string;
-  horaInicio: string;
-  horaFim: string;
-}): Promise<Booking> {
-  const res = await authFetch("/bookings", { method: "POST", body: JSON.stringify(dto) });
-  return (await res.json()) as Booking;
+  slots: { horaInicio: string; horaFim: string }[];
+}): Promise<{ reservas: Booking[] }> {
+  const res = await authFetch("/bookings", {
+    method: "POST",
+    body: JSON.stringify(dto),
+  });
+  return (await res.json()) as { reservas: Booking[] };
 }
 
 export async function listMyBookings(): Promise<Paginated<Booking>> {

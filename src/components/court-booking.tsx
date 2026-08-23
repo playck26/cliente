@@ -13,7 +13,6 @@ import {
   getPublicPaymentConfig,
   listCourts,
   type Availability,
-  type AvailabilitySlot,
   type Court,
   type PublicPaymentConfig,
 } from "@/lib/api-client";
@@ -58,7 +57,10 @@ export function CourtBooking({ id }: { id: string }) {
   const [availLoading, setAvailLoading] = useState(true);
   const [availError, setAvailError] = useState<string | null>(null);
 
-  const [selectedSlot, setSelectedSlot] = useState<AvailabilitySlot | null>(null);
+  // SPEC-011: seleção múltipla. Guardamos os rótulos ("09:00-10:00") em
+  // vez dos objetos: eles são estáveis entre recargas da grade, e a grade
+  // recarrega depois de cada reserva.
+  const [slotsSelecionados, setSlotsSelecionados] = useState<string[]>([]);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [bookingOk, setBookingOk] = useState(false);
@@ -88,7 +90,7 @@ export function CourtBooking({ id }: { id: string }) {
   async function loadAvailability(targetData: string) {
     setAvailLoading(true);
     setAvailError(null);
-    setSelectedSlot(null);
+    setSlotsSelecionados([]);
     setBookingOk(false);
     try {
       const result = await getAvailability(id, targetData);
@@ -106,14 +108,29 @@ export function CourtBooking({ id }: { id: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  function alternarSlot(rotulo: string) {
+    setSlotsSelecionados((atual) =>
+      atual.includes(rotulo)
+        ? atual.filter((s) => s !== rotulo)
+        : [...atual, rotulo],
+    );
+  }
+
   async function handleConfirmar() {
-    if (!selectedSlot) return;
+    if (slotsSelecionados.length === 0) return;
     setBookingError(null);
     setBookingLoading(true);
     try {
-      const [horaInicio, horaFim] = selectedSlot.slot.split("-");
-      await createBooking({ quadraId: id, data, horaInicio, horaFim });
+      await createBooking({
+        quadraId: id,
+        data,
+        slots: slotsSelecionados.map((rotulo) => {
+          const [horaInicio, horaFim] = rotulo.split("-");
+          return { horaInicio, horaFim };
+        }),
+      });
       setBookingOk(true);
+      setSlotsSelecionados([]);
       await loadAvailability(data);
     } catch (err) {
       setBookingError(
@@ -205,13 +222,13 @@ export function CourtBooking({ id }: { id: string }) {
               <div className="grid grid-cols-2 gap-3">
                 {availability.slots.map((slot) => {
                   const livre = slot.status === "livre";
-                  const selecionado = selectedSlot?.slot === slot.slot;
+                  const selecionado = slotsSelecionados.includes(slot.slot);
                   return (
                     <button
                       key={slot.slot}
                       type="button"
                       disabled={!livre}
-                      onClick={() => setSelectedSlot(slot)}
+                      onClick={() => alternarSlot(slot.slot)}
                       className={`flex min-h-11 flex-col items-center justify-center gap-1 rounded-xl border py-3 text-sm font-semibold transition-colors ${
                         !livre
                           ? "cursor-not-allowed border-transparent bg-[var(--color-surface-container-high)] text-[var(--color-text-secondary)] opacity-70"
@@ -230,8 +247,25 @@ export function CourtBooking({ id }: { id: string }) {
               </div>
             ) : null}
 
-            {selectedSlot ? (
+            {slotsSelecionados.length > 0 ? (
               <div className="flex flex-col gap-3">
+                {/*
+                  SPEC-011/AC-003 — o total aparece **antes** de confirmar.
+                  Uma reserva de 2h cobra o dobro, e descobrir isso depois
+                  de confirmar é o tipo de surpresa que gera reclamação.
+                */}
+                <div className="flex items-center justify-between rounded-xl bg-[var(--color-surface-variant)] px-4 py-3">
+                  <span className="text-sm text-[var(--color-text-secondary)]">
+                    {slotsSelecionados.length}{" "}
+                    {slotsSelecionados.length === 1 ? "horário" : "horários"}
+                  </span>
+                  <span className="text-lg font-semibold">
+                    {new Intl.NumberFormat("pt-BR", {
+                      style: "currency",
+                      currency: "BRL",
+                    }).format(slotsSelecionados.length * (quadra?.precoHora ?? 0))}
+                  </span>
+                </div>
                 {bookingError ? (
                   <p role="alert" className="text-sm text-[var(--color-error)]">
                     {bookingError}

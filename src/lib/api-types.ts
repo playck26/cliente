@@ -500,6 +500,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/agenda": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AgendaController_resumo"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/agenda/{data}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["AgendaController_dia"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/classes": {
         parameters: {
             query?: never;
@@ -739,14 +771,27 @@ export interface components {
         DefinirHorariosDto: {
             dias: components["schemas"]["DiaHorarioDto"][];
         };
+        SlotDto: {
+            /** @example 09:00 */
+            horaInicio: string;
+            /** @example 10:00 */
+            horaFim: string;
+        };
         CreateBookingDto: {
             quadraId: string;
             /** @example 2026-08-20 */
             data: string;
-            /** @example 14:00 */
-            horaInicio: string;
-            /** @example 15:00 */
-            horaFim: string;
+            slots?: components["schemas"]["SlotDto"][];
+            /**
+             * @deprecated
+             * @example 14:00
+             */
+            horaInicio?: string;
+            /**
+             * @deprecated
+             * @example 15:00
+             */
+            horaFim?: string;
             alunoId?: string;
         };
         CreateClassDto: {
@@ -1692,6 +1737,45 @@ export interface operations {
                 "application/json": components["schemas"]["DefinirHorariosDto"];
             };
         };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AgendaController_resumo: {
+        parameters: {
+            query?: {
+                /** @description AAAA-MM */
+                mes?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AgendaController_dia: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                data: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             200: {
                 headers: {
