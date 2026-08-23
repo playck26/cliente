@@ -317,6 +317,15 @@ export interface Chamada {
    * mesma chamada se sobrescrevem em silêncio.
    */
   versao: string;
+  /**
+   * SPEC-015/DEF-002/INV-027 — completude declarada pelo cabeçalho da
+   * chamada. **Opcional de propósito:** esta tela é publicada antes do
+   * backend que passa a mandar o campo (a sequência de deploy exige a tela
+   * primeiro), então durante essa janela ele chega `undefined`. Ausente
+   * significa "backend antigo", não "completa" — e por isso o aviso só
+   * aparece no valor explícito.
+   */
+  completude?: "completa" | "desconhecida";
   alunos: {
     alunoId: string;
     nome: string;

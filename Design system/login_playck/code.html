@@ -1,127 +1,146 @@
 <!DOCTYPE html>
-
-<html lang="en"><head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>PlayCK - Entrar</title>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"on-error-container": "#93000a", "on-secondary": "#ffffff", "secondary-fixed-dim": "#47deaf", error: "#ba1a1a", "on-secondary-fixed": "#002116", "on-primary": "#ffffff", "inverse-surface": "#2f3131", "on-surface": "#1a1c1c", "on-surface-variant": "#414940", "secondary-container": "#66f8c7", secondary: "#006c51", "on-tertiary": "#ffffff", "surface-container-high": "#e8e8e8", "on-primary-container": "#75f38a", "on-secondary-container": "#007054", "surface-container-highest": "#e2e2e2", "surface-bright": "#f9f9f9", "tertiary-fixed": "#ffdad9", background: "#f9f9f9", "on-background": "#1a1c1c", tertiary: "#930024", "inverse-on-surface": "#f0f1f1", "error-container": "#ffdad6", primary: "#00531e", "on-tertiary-fixed-variant": "#920024", "on-primary-fixed-variant": "#00531e", "on-error": "#ffffff", "surface-tint": "#006e2a", "on-secondary-fixed-variant": "#00513c", "secondary-fixed": "#69fbca", "on-tertiary-fixed": "#40000a", "surface-container-lowest": "#ffffff", "outline-variant": "#c0c9bd", "tertiary-fixed-dim": "#ffb3b4", "inverse-primary": "#61df78", "surface-container-low": "#f3f3f4", "on-primary-fixed": "#002108", "surface-variant": "#e2e2e2", "on-tertiary-container": "#ffcece", surface: "#f9f9f9", "tertiary-container": "#c00032", "primary-container": "#006e2a", "primary-fixed-dim": "#61df78", "surface-container": "#eeeeee", outline: "#71796f", "primary-fixed": "#7efc92", "surface-dim": "#dadada"}, borderRadius: {DEFAULT: "0.25rem", lg: "0.5rem", xl: "0.75rem", full: "9999px"}, spacing: {sm: "12px", xs: "4px", xl: "32px", "margin-mobile": "20px", md: "16px", lg: "24px", base: "8px", "gutter-mobile": "16px"}, fontFamily: {"body-lg": ["Inter"], "title-lg": ["Inter"], "body-md": ["Inter"], "display-md": ["Inter"], "label-sm": ["Inter"], "label-md": ["Inter"], "display-lg": ["Inter"], "title-md": ["Inter"]}, fontSize: {"body-lg": ["16px", {lineHeight: "24px", fontWeight: "400"}], "title-lg": ["18px", {lineHeight: "24px", fontWeight: "600"}], "body-md": ["14px", {lineHeight: "20px", fontWeight: "400"}], "display-md": ["24px", {lineHeight: "30px", letterSpacing: "-0.01em", fontWeight: "700"}], "label-sm": ["12px", {lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "600"}], "label-md": ["13px", {lineHeight: "18px", letterSpacing: "0.01em", fontWeight: "500"}], "display-lg": ["28px", {lineHeight: "34px", letterSpacing: "-0.02em", fontWeight: "700"}], "title-md": ["16px", {lineHeight: "22px", fontWeight: "600"}]}}}};</script>
-<style>
-        body {
-            background-color: #F7F6F1; /* Warm off-white requested */
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+  <title>PlayCK - Entrar</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com" rel="preconnect" />
+  <link crossorigin href="https://fonts.gstatic.com" rel="preconnect" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            background: "#f7f8f5",
+            surface: "#ffffff",
+            "surface-soft": "#eef4ed",
+            "text-primary": "#12160f",
+            "text-secondary": "#4e5951",
+            primary: "#00763a",
+            secondary: "#00bd90",
+            tertiary: "#ed0040",
+            border: "#dde6db"
+          },
+          boxShadow: {
+            soft: "0 8px 24px rgba(18, 20, 15, 0.08)",
+            lift: "0 18px 44px rgba(18, 20, 15, 0.16)",
+            glow: "0 16px 40px rgba(0, 156, 63, 0.22)"
+          }
         }
-        
-        /* Subtle tennis court lines background pattern */
-        .court-pattern {
-            background-image: linear-gradient(rgba(20, 82, 36, 0.05) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(20, 82, 36, 0.05) 1px, transparent 1px);
-            background-size: 40px 40px;
-            background-position: center center;
-        }
-
-        .card-shadow {
-            box-shadow: 0px 8px 24px rgba(18, 20, 15, 0.12);
-        }
-
-        /* Input focus transitions */
-        .input-transition {
-            transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
-        }
-    </style>
-<style>
-    body {
-      min-height: max(884px, 100dvh);
+      }
+    };
+  </script>
+  <style>
+    html { font-family: Inter, system-ui, sans-serif; }
+    body { min-height: max(884px, 100dvh); -webkit-tap-highlight-color: transparent; }
+    .material-symbols-outlined { font-variation-settings: "FILL" 0, "wght" 500, "GRAD" 0, "opsz" 24; }
+    .material-symbols-outlined[data-fill="true"] { font-variation-settings: "FILL" 1, "wght" 650, "GRAD" 0, "opsz" 24; }
+    .court-bg {
+      background: radial-gradient(circle at 78% 20%, rgba(0, 189, 144, 0.3) 0 16%, transparent 17%), linear-gradient(145deg, #0a6a37, #05391f);
     }
-  </style>
-<style>
-    body {
-      min-height: max(884px, 100dvh);
+    .court-bg::before,
+    .court-bg::after {
+      content: "";
+      position: absolute;
+      inset: 18px;
+      z-index: 0;
+      border-radius: 22px;
+      pointer-events: none;
     }
+    .court-bg::before { border: 2px solid rgba(255,255,255,0.18); }
+    .court-bg::after {
+      background: linear-gradient(90deg, transparent calc(50% - 1px), rgba(255,255,255,0.14) calc(50% - 1px), rgba(255,255,255,0.14) calc(50% + 1px), transparent calc(50% + 1px)), linear-gradient(0deg, transparent calc(50% - 1px), rgba(255,255,255,0.12) calc(50% - 1px), rgba(255,255,255,0.12) calc(50% + 1px), transparent calc(50% + 1px));
+    }
+    .tennis-ball {
+      background: radial-gradient(circle at 30% 26%, #d9ff4f 0 12%, transparent 13%), radial-gradient(circle at 50% 50%, #baff2a 0 58%, #85d61f 59% 100%);
+    }
+    .tennis-ball::before,
+    .tennis-ball::after {
+      content: "";
+      position: absolute;
+      top: 10%;
+      width: 38%;
+      height: 80%;
+      border: 2px solid rgba(255,255,255,0.78);
+      border-top-color: transparent;
+      border-bottom-color: transparent;
+      border-radius: 50%;
+      transform: rotate(-18deg);
+    }
+    .tennis-ball::before { left: 8%; }
+    .tennis-ball::after { right: 8%; }
   </style>
-  </head>
-<body class="min-h-screen flex items-center justify-center p-margin-mobile relative overflow-hidden text-on-surface">
-<!-- Ambient Background Elements -->
-<div class="absolute inset-0 court-pattern pointer-events-none z-0"></div>
-<div class="absolute top-0 left-0 w-full h-64 bg-gradient-to-b from-primary-fixed/20 to-transparent pointer-events-none z-0"></div>
-<!-- Login Card -->
-<main class="w-full max-w-[420px] bg-surface-container-lowest rounded-xl card-shadow p-xl relative z-10 overflow-hidden">
-<!-- Decorative Thematic Element inside card -->
-<div class="absolute top-0 right-0 w-32 h-32 opacity-5 pointer-events-none">
-<svg fill="none" viewbox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-<path d="M10 10 H90 V90 H10 Z" stroke="currentColor" stroke-width="4"></path>
-<path d="M10 50 H90" stroke="currentColor" stroke-width="4"></path>
-<path d="M50 10 V90" stroke="currentColor" stroke-width="2"></path>
-</svg>
-</div>
-<!-- Header -->
-<div class="text-center mb-xl">
-<!-- Brand Logo/Name -->
-<div class="inline-flex items-center justify-center w-16 h-16 bg-primary-container text-on-primary-container rounded-full mb-md shadow-md">
-<span class="material-symbols-outlined text-display-lg" style="font-variation-settings: 'FILL' 1;">
-                    sports_tennis
-                </span>
-</div>
-<h1 class="text-display-md font-display-md text-primary mb-xs">Entrar</h1>
-<p class="text-body-md font-body-md text-on-surface-variant">Suas aulas e reservas de quadra — PlayCK</p>
-</div>
-<!-- Form -->
-<form action="#" class="space-y-md" method="POST">
-<!-- Email Field -->
-<div>
-<label class="block text-label-md font-label-md text-on-surface-variant mb-xs" for="email">E-mail</label>
-<div class="relative">
-<div class="absolute inset-y-0 left-0 pl-sm flex items-center pointer-events-none text-outline">
-<span class="material-symbols-outlined text-[20px]">mail</span>
-</div>
-<input class="block w-full pl-[40px] pr-sm py-sm text-body-lg font-body-lg text-on-surface bg-surface border border-[#D1D1CB] rounded focus:outline-none focus:ring-0 focus:border-primary focus:border-2 input-transition placeholder:text-outline-variant" id="email" name="email" placeholder="seu@email.com" required="" type="email"/>
-</div>
-</div>
-<!-- Password Field -->
-<div>
-<label class="block text-label-md font-label-md text-on-surface-variant mb-xs" for="password">Senha</label>
-<div class="relative">
-<div class="absolute inset-y-0 left-0 pl-sm flex items-center pointer-events-none text-outline">
-<span class="material-symbols-outlined text-[20px]">lock</span>
-</div>
-<input class="block w-full pl-[40px] pr-[40px] py-sm text-body-lg font-body-lg text-on-surface bg-surface border border-[#D1D1CB] rounded focus:outline-none focus:ring-0 focus:border-primary focus:border-2 input-transition placeholder:text-outline-variant" id="password" name="password" placeholder="••••••••" required="" type="password"/>
-<!-- Password Toggle -->
-<button class="absolute inset-y-0 right-0 pr-sm flex items-center text-outline hover:text-primary transition-colors focus:outline-none" id="togglePassword" type="button">
-<span class="material-symbols-outlined text-[20px]" id="toggleIcon">visibility</span>
-</button>
-</div>
-<!-- Forgot Password Link -->
-<div class="flex justify-end mt-xs">
-<a class="text-label-sm font-label-sm text-primary hover:text-primary-container transition-colors" href="#">Esqueceu a senha?</a>
-</div>
-</div>
-<!-- Submit Button -->
-<button class="w-full bg-[#2F6B3A] text-on-primary text-title-md font-title-md h-[52px] rounded-lg mt-lg flex items-center justify-center gap-xs hover:bg-primary transition-all duration-200 active:scale-[0.98] shadow-md hover:shadow-lg" type="submit">
-                Entrar
-                <span class="material-symbols-outlined text-[20px]">arrow_forward</span>
-</button>
-</form>
-<!-- Footer / Sign Up Prompt -->
-<div class="mt-lg text-center">
-<p class="text-body-md font-body-md text-on-surface-variant">
-                Ainda não tem conta? 
-                <a class="text-primary font-semibold hover:underline decoration-2 underline-offset-2" href="#">Cadastre-se</a>
-</p>
-</div>
-</main>
-<script>
-        // Simple password visibility toggle
-        const togglePassword = document.getElementById('togglePassword');
-        const passwordInput = document.getElementById('password');
-        const toggleIcon = document.getElementById('toggleIcon');
+</head>
+<body class="bg-background text-text-primary">
+  <main class="mx-auto flex min-h-screen w-full max-w-[430px] flex-col justify-between overflow-hidden bg-background px-5 py-6 shadow-[0_0_60px_rgba(18,20,15,0.08)]">
+    <section class="relative overflow-hidden rounded-3xl court-bg p-5 text-white shadow-lift">
+      <div class="relative z-10 min-h-[260px]">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="flex size-12 items-center justify-center rounded-2xl bg-white text-primary">
+              <span class="material-symbols-outlined" data-fill="true">sports_tennis</span>
+            </div>
+            <div>
+              <p class="text-[11px] font-bold uppercase tracking-[0.16em] text-white/70">PlayCK Club</p>
+              <h1 class="text-[24px] font-extrabold leading-none">PlayCK</h1>
+            </div>
+          </div>
+          <div class="relative flex size-[58px] items-center justify-center rounded-3xl bg-white/10">
+            <div class="tennis-ball relative size-[42px] rounded-full shadow-glow"></div>
+          </div>
+        </div>
 
-        togglePassword.addEventListener('click', function () {
-            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
-            passwordInput.setAttribute('type', type);
-            
-            toggleIcon.textContent = type === 'password' ? 'visibility' : 'visibility_off';
-        });
-    </script>
-</body></html>
+        <div class="mt-12">
+          <div class="mb-3 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white/80">
+            <span class="size-2 rounded-full bg-secondary"></span>
+            Área do aluno
+          </div>
+          <h2 class="text-[34px] font-extrabold leading-[1.02]">Entre no seu clube.</h2>
+          <p class="mt-3 max-w-[280px] text-[14px] font-semibold leading-5 text-white/70">Acompanhe aulas, reserve quadras e mantenha seu ritmo de treino.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="-mt-8 rounded-3xl bg-surface p-5 shadow-lift ring-1 ring-border">
+      <div class="mb-5">
+        <p class="text-[12px] font-extrabold uppercase tracking-[0.12em] text-primary">Login</p>
+        <h3 class="mt-1 text-[24px] font-extrabold">Bem-vindo de volta</h3>
+      </div>
+      <form class="space-y-4">
+        <label class="block">
+          <span class="mb-2 block text-[13px] font-extrabold text-text-primary">E-mail</span>
+          <div class="flex h-[52px] items-center gap-3 rounded-2xl bg-surface-soft px-4 ring-1 ring-border">
+            <span class="material-symbols-outlined text-[20px] text-primary">mail</span>
+            <input class="h-[52px] min-w-0 flex-1 border-0 bg-transparent p-0 text-[15px] font-semibold text-text-primary placeholder:text-text-secondary focus:ring-0" placeholder="voce@email.com" type="email" />
+          </div>
+        </label>
+        <label class="block">
+          <span class="mb-2 block text-[13px] font-extrabold text-text-primary">Senha</span>
+          <div class="flex h-[52px] items-center gap-3 rounded-2xl bg-surface-soft px-4 ring-1 ring-border">
+            <span class="material-symbols-outlined text-[20px] text-primary">lock</span>
+            <input class="h-[52px] min-w-0 flex-1 border-0 bg-transparent p-0 text-[15px] font-semibold text-text-primary placeholder:text-text-secondary focus:ring-0" placeholder="Sua senha" type="password" />
+            <button type="button" class="flex size-9 items-center justify-center rounded-xl text-text-secondary" aria-label="Mostrar senha">
+              <span class="material-symbols-outlined text-[20px]">visibility</span>
+            </button>
+          </div>
+        </label>
+        <div class="flex items-center justify-between">
+          <label class="flex items-center gap-2 text-[13px] font-bold text-text-secondary">
+            <input class="size-4 rounded border-border text-primary focus:ring-primary" type="checkbox" />
+            Lembrar
+          </label>
+          <a class="text-[13px] font-extrabold text-primary" href="#">Esqueci a senha</a>
+        </div>
+        <button class="h-12 w-full rounded-2xl bg-primary text-[15px] font-extrabold text-white shadow-glow" type="submit">Entrar</button>
+      </form>
+      <p class="mt-5 text-center text-[13px] font-bold text-text-secondary">
+        Primeiro acesso?
+        <a class="text-primary" href="#">Ativar conta</a>
+      </p>
+    </section>
+  </main>
+</body>
+</html>

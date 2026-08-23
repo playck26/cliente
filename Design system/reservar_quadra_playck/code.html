@@ -1,239 +1,145 @@
 <!DOCTYPE html>
-
-<html class="light" lang="en"><head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
-<title>PlayCK - Reservar Quadra</title>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"on-error-container": "#93000a", "on-secondary": "#ffffff", "secondary-fixed-dim": "#47deaf", error: "#ba1a1a", "on-secondary-fixed": "#002116", "on-primary": "#ffffff", "inverse-surface": "#2f3131", "on-surface": "#1a1c1c", "on-surface-variant": "#414940", "secondary-container": "#66f8c7", secondary: "#006c51", "on-tertiary": "#ffffff", "surface-container-high": "#e8e8e8", "on-primary-container": "#75f38a", "on-secondary-container": "#007054", "surface-container-highest": "#e2e2e2", "surface-bright": "#f9f9f9", "tertiary-fixed": "#ffdad9", background: "#f9f9f9", "on-background": "#1a1c1c", tertiary: "#930024", "inverse-on-surface": "#f0f1f1", "error-container": "#ffdad6", primary: "#00531e", "on-tertiary-fixed-variant": "#920024", "on-primary-fixed-variant": "#00531e", "on-error": "#ffffff", "surface-tint": "#006e2a", "on-secondary-fixed-variant": "#00513c", "secondary-fixed": "#69fbca", "on-tertiary-fixed": "#40000a", "surface-container-lowest": "#ffffff", "outline-variant": "#c0c9bd", "tertiary-fixed-dim": "#ffb3b4", "inverse-primary": "#61df78", "surface-container-low": "#f3f3f4", "on-primary-fixed": "#002108", "surface-variant": "#e2e2e2", "on-tertiary-container": "#ffcece", surface: "#f9f9f9", "tertiary-container": "#c00032", "primary-container": "#006e2a", "primary-fixed-dim": "#61df78", "surface-container": "#eeeeee", outline: "#71796f", "primary-fixed": "#7efc92", "surface-dim": "#dadada"}, borderRadius: {DEFAULT: "0.25rem", lg: "0.5rem", xl: "0.75rem", full: "9999px"}, spacing: {sm: "12px", xs: "4px", xl: "32px", "margin-mobile": "20px", md: "16px", lg: "24px", base: "8px", "gutter-mobile": "16px"}, fontFamily: {"body-lg": ["Inter"], "title-lg": ["Inter"], "body-md": ["Inter"], "display-md": ["Inter"], "label-sm": ["Inter"], "label-md": ["Inter"], "display-lg": ["Inter"], "title-md": ["Inter"]}, fontSize: {"body-lg": ["16px", {lineHeight: "24px", fontWeight: "400"}], "title-lg": ["18px", {lineHeight: "24px", fontWeight: "600"}], "body-md": ["14px", {lineHeight: "20px", fontWeight: "400"}], "display-md": ["24px", {lineHeight: "30px", letterSpacing: "-0.01em", fontWeight: "700"}], "label-sm": ["12px", {lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "600"}], "label-md": ["13px", {lineHeight: "18px", letterSpacing: "0.01em", fontWeight: "500"}], "display-lg": ["28px", {lineHeight: "34px", letterSpacing: "-0.02em", fontWeight: "700"}], "title-md": ["16px", {lineHeight: "22px", fontWeight: "600"}]}}}};</script>
-<style>
-        /* Kinetic Energy Accent */
-        .kinetic-border {
-            border-color: #a8e9ac; /* Volt Lime essence */
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+  <title>PlayCK - Reservar Quadra</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com" rel="preconnect" />
+  <link crossorigin href="https://fonts.gstatic.com" rel="preconnect" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            background: "#f7f8f5",
+            surface: "#ffffff",
+            "surface-soft": "#eef4ed",
+            "text-primary": "#12160f",
+            "text-secondary": "#4e5951",
+            primary: "#00763a",
+            secondary: "#00bd90",
+            tertiary: "#ed0040",
+            clay: "#b9673b",
+            border: "#dde6db"
+          },
+          boxShadow: {
+            soft: "0 8px 24px rgba(18, 20, 15, 0.08)",
+            lift: "0 18px 44px rgba(18, 20, 15, 0.16)",
+            glow: "0 16px 40px rgba(0, 156, 63, 0.22)"
+          }
         }
-        .kinetic-bg {
-            background-color: #a8e9ac;
-        }
-        
-        /* Thematic Pattern */
-        .court-pattern {
-            background-image: linear-gradient(rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.95)), 
-                              repeating-linear-gradient(0deg, transparent, transparent 19px, rgba(47, 107, 58, 0.05) 19px, rgba(47, 107, 58, 0.05) 20px),
-                              repeating-linear-gradient(90deg, transparent, transparent 19px, rgba(47, 107, 58, 0.05) 19px, rgba(47, 107, 58, 0.05) 20px);
-        }
-
-        /* Ambient Shadows */
-        .shadow-ambient-1 {
-            box-shadow: 0px 4px 12px rgba(18, 20, 15, 0.06);
-        }
-        .shadow-ambient-2 {
-            box-shadow: 0px 8px 24px rgba(18, 20, 15, 0.12);
-        }
-
-        .hide-scrollbar::-webkit-scrollbar {
-            display: none;
-        }
-        .hide-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-    </style>
-<style>
-    body {
-      min-height: max(884px, 100dvh);
+      }
+    };
+  </script>
+  <style>
+    html { font-family: Inter, system-ui, sans-serif; }
+    body { min-height: max(884px, 100dvh); -webkit-tap-highlight-color: transparent; }
+    .material-symbols-outlined { font-variation-settings: "FILL" 0, "wght" 500, "GRAD" 0, "opsz" 24; }
+    .material-symbols-outlined[data-fill="true"] { font-variation-settings: "FILL" 1, "wght" 650, "GRAD" 0, "opsz" 24; }
+    .court-lines {
+      background: linear-gradient(90deg, transparent 18%, rgba(255,255,255,0.48) 18% 19%, transparent 19% 81%, rgba(255,255,255,0.48) 81% 82%, transparent 82%), linear-gradient(0deg, transparent 26%, rgba(255,255,255,0.45) 26% 27%, transparent 27% 73%, rgba(255,255,255,0.45) 73% 74%, transparent 74%), linear-gradient(90deg, transparent 49.5%, rgba(255,255,255,0.34) 49.5% 50.5%, transparent 50.5%);
     }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
-<style>
-    body {
-      min-height: max(884px, 100dvh);
-    }
-  </style>
-  </head>
-<body class="bg-background text-on-background font-body-md antialiased pb-[100px] md:pb-0">
-<!-- Top App Bar (Shared Component - Web Only for this intent, but since it's a detail screen, we adapt) -->
-<header class="hidden md:flex justify-between items-center w-full px-margin-mobile py-md max-w-7xl mx-auto bg-surface dark:bg-surface-dim flat no shadows sticky top-0 z-40">
-<div class="flex items-center gap-md">
-<button class="text-on-surface hover:bg-surface-container transition-colors p-2 rounded-full">
-<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
-</button>
-<h1 class="text-display-md font-display-md font-bold text-primary">PlayCK</h1>
-</div>
-<div class="flex items-center gap-md">
-<button class="text-on-surface-variant hover:bg-surface-container transition-colors p-2 rounded-full">
-<span class="material-symbols-outlined" data-icon="notifications">notifications</span>
-</button>
-<div class="w-10 h-10 rounded-full bg-surface-container overflow-hidden">
-<img class="w-full h-full object-cover" data-alt="A close up profile picture of an athletic person in athletic wear, smiling against a clear blue sky background. High resolution, bright lighting, fitness lifestyle aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCWlM7eMDbwiLzHCz4s1NPe935hHG5Mdkp4fknzjnVHLpPXt7KH1TJOBkKtjor93aWXPggCJbOUVblmuQ3yc_Zkw7BDSaGZ4xqKucl_KeBtsPr7NVtKgOTNoP4Nnz0s9ofnphc728XPKSljbM-aQ68zUjHK_VleYd_M5NpR0a-es4hJpDPYnBZTN3H6Jp-IkCJQLmGuSEbhy5NdO7fImIWR7E0dNF-YhEdfSJuY8ayzl86Q3eHZk0oV_w"/>
-</div>
-</div>
-</header>
-<!-- Mobile Header (Back button + Title) -->
-<div class="md:hidden flex items-center gap-md px-margin-mobile py-md sticky top-0 bg-background/80 backdrop-blur-md z-40">
-<button class="text-on-surface p-2 -ml-2">
-<span class="material-symbols-outlined" data-icon="arrow_back">arrow_back</span>
-</button>
-<h1 class="text-title-lg font-title-lg text-primary">Quadra 1 - Saibro</h1>
-</div>
-<main class="max-w-7xl mx-auto px-margin-mobile md:px-xl py-md md:py-xl flex flex-col gap-xl">
-<!-- Desktop Title (Hidden on Mobile) -->
-<div class="hidden md:block">
-<h1 class="text-display-lg font-display-lg text-on-surface">Quadra 1 - Saibro</h1>
-<p class="text-body-lg font-body-lg text-on-surface-variant mt-xs">Escolha o horário para sua partida.</p>
-</div>
-<!-- Date Selector -->
-<section>
-<div class="flex gap-sm overflow-x-auto hide-scrollbar pb-2">
-<button class="flex flex-col items-center justify-center min-w-[64px] h-[72px] rounded-xl bg-surface-container border border-transparent shadow-ambient-1">
-<span class="text-label-sm font-label-sm text-on-surface-variant uppercase">Sex</span>
-<span class="text-title-lg font-title-lg text-on-surface">12</span>
-</button>
-<button class="flex flex-col items-center justify-center min-w-[64px] h-[72px] rounded-xl bg-primary text-on-primary shadow-ambient-2 transform scale-105 transition-transform">
-<span class="text-label-sm font-label-sm text-on-primary/80 uppercase">Sáb</span>
-<span class="text-title-lg font-title-lg text-on-primary">13</span>
-</button>
-<button class="flex flex-col items-center justify-center min-w-[64px] h-[72px] rounded-xl bg-surface-container border border-transparent shadow-ambient-1">
-<span class="text-label-sm font-label-sm text-on-surface-variant uppercase">Dom</span>
-<span class="text-title-lg font-title-lg text-on-surface">14</span>
-</button>
-<button class="flex flex-col items-center justify-center min-w-[64px] h-[72px] rounded-xl bg-surface-container border border-transparent shadow-ambient-1">
-<span class="text-label-sm font-label-sm text-on-surface-variant uppercase">Seg</span>
-<span class="text-title-lg font-title-lg text-on-surface">15</span>
-</button>
-<button class="flex flex-col items-center justify-center min-w-[64px] h-[72px] rounded-xl bg-surface-container border border-transparent shadow-ambient-1">
-<span class="text-label-sm font-label-sm text-on-surface-variant uppercase">Ter</span>
-<span class="text-title-lg font-title-lg text-on-surface">16</span>
-</button>
-</div>
-</section>
-<!-- Availability Card / Timeslots -->
-<section class="bg-surface rounded-2xl shadow-ambient-1 p-lg court-pattern relative overflow-hidden" id="booking-section">
-<div class="mb-md">
-<h2 class="text-title-lg font-title-lg text-on-surface">Horários</h2>
-<p class="text-body-md font-body-md text-on-surface-variant">Toque num horário livre para reservar</p>
-</div>
-<div class="grid grid-cols-2 gap-md">
-<!-- Slot 1: Turma (Disabled) -->
-<button class="flex flex-col items-center justify-center py-md rounded-xl bg-surface-container-high border border-transparent opacity-70 cursor-not-allowed" disabled="">
-<span class="text-title-md font-title-md text-on-surface-variant">08:00 - 09:00</span>
-<span class="text-label-sm font-label-sm text-outline mt-1">Turma</span>
-</button>
-<!-- Slot 2: Livre (Clickable) -->
-<button class="time-slot flex flex-col items-center justify-center py-md rounded-xl bg-surface border border-primary-container text-primary-container hover:bg-surface-container transition-colors" onclick="selectSlot(this)">
-<span class="text-title-md font-title-md">09:00 - 10:00</span>
-<span class="text-label-sm font-label-sm mt-1">Livre</span>
-</button>
-<!-- Slot 3: Reservado (Disabled) -->
-<button class="flex flex-col items-center justify-center py-md rounded-xl bg-surface-container-high border border-transparent opacity-70 cursor-not-allowed" disabled="">
-<span class="text-title-md font-title-md text-on-surface-variant">10:00 - 11:00</span>
-<span class="text-label-sm font-label-sm text-outline mt-1">Reservado</span>
-</button>
-<!-- Slot 4: Livre (Clickable) -->
-<button class="time-slot flex flex-col items-center justify-center py-md rounded-xl bg-surface border border-primary-container text-primary-container hover:bg-surface-container transition-colors" onclick="selectSlot(this)">
-<span class="text-title-md font-title-md">11:00 - 12:00</span>
-<span class="text-label-sm font-label-sm mt-1">Livre</span>
-</button>
-</div>
-<!-- Sticky Action Button (Appears when slot selected) -->
-<div class="hidden mt-xl flex-col gap-sm animate-fade-in-up" id="confirm-action">
-<button class="w-full h-[52px] rounded-lg bg-primary text-on-primary text-title-md font-title-md shadow-ambient-2 flex items-center justify-center gap-2" onclick="confirmBooking()">
-                    Confirmar reserva
-                    <span class="material-symbols-outlined text-sm" data-icon="arrow_forward">arrow_forward</span>
-</button>
-</div>
-</section>
-<!-- Success State (Initially Hidden) -->
-<section class="hidden bg-surface rounded-2xl shadow-ambient-2 p-xl text-center border-t-4 border-primary" id="success-section">
-<div class="w-16 h-16 bg-secondary-container rounded-full flex items-center justify-center mx-auto mb-md">
-<span class="material-symbols-outlined text-primary text-3xl" data-icon="check_circle">check_circle</span>
-</div>
-<h2 class="text-display-md font-display-md text-primary mb-xs">Reserva confirmada!</h2>
-<p class="text-body-md font-body-md text-on-surface-variant mb-xl">Sua quadra foi reservada com sucesso para Sábado, 13, às 09:00.</p>
-<div class="bg-surface-container rounded-xl p-md text-left mb-xl">
-<h3 class="text-label-md font-label-md text-on-surface-variant uppercase mb-md">Para pagar:</h3>
-<div class="flex flex-col gap-sm">
-<button class="w-full h-[48px] rounded-lg bg-on-primary-container text-on-secondary-fixed text-title-md font-title-md flex items-center justify-center gap-2">
-<span class="material-symbols-outlined text-sm" data-icon="payment">payment</span>
-                        Abrir link de pagamento
-                    </button>
-<button class="w-full h-[48px] rounded-lg bg-transparent border border-outline text-on-surface text-title-md font-title-md flex items-center justify-center gap-2">
-<span class="material-symbols-outlined text-sm" data-icon="chat">chat</span>
-                        Falar no WhatsApp
-                    </button>
-</div>
-</div>
-<button class="w-full h-[52px] rounded-lg bg-transparent border border-primary text-primary text-title-md font-title-md hover:bg-surface-container transition-colors">
-                Ver minhas reservas
-            </button>
-</section>
-</main>
-<!-- Bottom Navigation Bar (Shared Component - Mobile Only) -->
-<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-safe bg-surface dark:bg-surface-container-low border-t border-[#E8E7E0] dark:border-outline-variant shadow-lg h-[80px]">
-<button class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline w-16 group hover:bg-surface-container-highest/10 dark:hover:bg-primary/10 rounded-xl py-1 transition-colors">
-<span class="material-symbols-outlined mb-1 group-active:scale-90 duration-150 ease-in-out" data-icon="home">home</span>
-<span class="text-label-sm font-label-sm">Home</span>
-</button>
-<button class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline w-16 group hover:bg-surface-container-highest/10 dark:hover:bg-primary/10 rounded-xl py-1 transition-colors">
-<span class="material-symbols-outlined mb-1 group-active:scale-90 duration-150 ease-in-out" data-icon="sports_tennis">sports_tennis</span>
-<span class="text-label-sm font-label-sm">Aulas</span>
-</button>
-<!-- Active Tab: Quadras -->
-<button class="flex flex-col items-center justify-center text-primary dark:text-primary-fixed-dim font-semibold w-16 group hover:bg-surface-container-highest/10 dark:hover:bg-primary/10 rounded-xl py-1 transition-colors scale-90 duration-150 ease-in-out">
-<div class="px-3 py-1 rounded-full bg-secondary-container mb-1">
-<span class="material-symbols-outlined" data-icon="stadium" data-weight="fill" style="font-variation-settings: 'FILL' 1;">stadium</span>
-</div>
-<span class="text-label-sm font-label-sm">Quadras</span>
-</button>
-<button class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline w-16 group hover:bg-surface-container-highest/10 dark:hover:bg-primary/10 rounded-xl py-1 transition-colors">
-<span class="material-symbols-outlined mb-1 group-active:scale-90 duration-150 ease-in-out" data-icon="event_available">event_available</span>
-<span class="text-label-sm font-label-sm">Reservas</span>
-</button>
-</nav>
-<script>
-        function selectSlot(element) {
-            // Reset all slots
-            document.querySelectorAll('.time-slot').forEach(slot => {
-                slot.classList.remove('bg-primary-container', 'text-on-primary');
-                slot.classList.add('bg-surface', 'text-primary-container');
-            });
+</head>
+<body class="bg-background text-text-primary">
+  <div class="mx-auto min-h-screen w-full max-w-[430px] overflow-hidden bg-background pb-36 shadow-[0_0_60px_rgba(18,20,15,0.08)]">
+    <header class="flex items-center justify-between px-5 pb-3 pt-4">
+      <button class="flex size-11 items-center justify-center rounded-2xl bg-surface text-text-secondary shadow-soft ring-1 ring-border" aria-label="Voltar">
+        <span class="material-symbols-outlined">arrow_back</span>
+      </button>
+      <div class="text-center">
+        <p class="text-[11px] font-bold uppercase tracking-[0.16em] text-text-secondary">Reserva</p>
+        <h1 class="text-[18px] font-extrabold leading-none text-primary">Quadra 1</h1>
+      </div>
+      <button class="flex size-11 items-center justify-center rounded-2xl bg-surface text-text-secondary shadow-soft ring-1 ring-border" aria-label="Compartilhar">
+        <span class="material-symbols-outlined">ios_share</span>
+      </button>
+    </header>
 
-            // Select clicked slot
-            element.classList.remove('bg-surface', 'text-primary-container');
-            element.classList.add('bg-primary-container', 'text-on-primary');
+    <main class="space-y-5 px-5">
+      <section class="overflow-hidden rounded-3xl bg-surface shadow-lift ring-1 ring-border">
+        <div class="relative h-[160px] bg-clay text-white">
+          <div class="court-lines absolute inset-0"></div>
+          <div class="absolute left-4 top-4 rounded-full bg-white px-3 py-1.5 text-[12px] font-extrabold text-clay">Saibro coberta</div>
+          <div class="absolute inset-x-4 bottom-4 flex items-end justify-between">
+            <div>
+              <p class="text-[11px] font-extrabold uppercase tracking-[0.14em] text-white/75">Pronta para jogo</p>
+              <h2 class="mt-1 text-[28px] font-extrabold">Quadra 1</h2>
+            </div>
+            <div class="rounded-2xl bg-white/20 px-4 py-3 text-right backdrop-blur">
+              <p class="text-[20px] font-extrabold">R$ 80</p>
+              <p class="text-[11px] font-bold text-white/75">por hora</p>
+            </div>
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-2 p-4">
+          <div class="rounded-2xl bg-surface-soft p-3"><p class="text-[11px] font-bold text-text-secondary">Cobertura</p><p class="text-[13px] font-extrabold">Sim</p></div>
+          <div class="rounded-2xl bg-surface-soft p-3"><p class="text-[11px] font-bold text-text-secondary">Iluminação</p><p class="text-[13px] font-extrabold">LED</p></div>
+          <div class="rounded-2xl bg-surface-soft p-3"><p class="text-[11px] font-bold text-text-secondary">Piso</p><p class="text-[13px] font-extrabold">Saibro</p></div>
+        </div>
+      </section>
 
-            // Show confirm button
-            const confirmBtn = document.getElementById('confirm-action');
-            confirmBtn.classList.remove('hidden');
-            confirmBtn.classList.add('flex');
-        }
+      <section>
+        <div class="mb-3 flex items-center justify-between">
+          <div>
+            <p class="text-[12px] font-extrabold uppercase tracking-[0.12em] text-primary">Dia</p>
+            <h3 class="text-[20px] font-extrabold">Escolha a data</h3>
+          </div>
+          <button class="flex size-10 items-center justify-center rounded-2xl bg-surface text-primary shadow-soft ring-1 ring-border">
+            <span class="material-symbols-outlined">calendar_month</span>
+          </button>
+        </div>
+        <div class="flex gap-2 overflow-x-auto pb-1 no-scrollbar">
+          <button class="w-[72px] shrink-0 rounded-2xl bg-primary px-3 py-3 text-white shadow-glow"><p class="text-[11px] font-bold">Hoje</p><p class="mt-1 text-[22px] font-extrabold">12</p></button>
+          <button class="w-[72px] shrink-0 rounded-2xl bg-surface px-3 py-3 text-text-primary shadow-soft ring-1 ring-border"><p class="text-[11px] font-bold text-text-secondary">Qua</p><p class="mt-1 text-[22px] font-extrabold">13</p></button>
+          <button class="w-[72px] shrink-0 rounded-2xl bg-surface px-3 py-3 text-text-primary shadow-soft ring-1 ring-border"><p class="text-[11px] font-bold text-text-secondary">Qui</p><p class="mt-1 text-[22px] font-extrabold">14</p></button>
+          <button class="w-[72px] shrink-0 rounded-2xl bg-surface px-3 py-3 text-text-primary shadow-soft ring-1 ring-border"><p class="text-[11px] font-bold text-text-secondary">Sex</p><p class="mt-1 text-[22px] font-extrabold">15</p></button>
+        </div>
+      </section>
 
-        function confirmBooking() {
-            // Hide booking section
-            document.getElementById('booking-section').classList.add('hidden');
-            
-            // Show success section
-            const successSection = document.getElementById('success-section');
-            successSection.classList.remove('hidden');
-            
-            // Scroll to top
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-        }
-    </script>
-<style>
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(10px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-        .animate-fade-in-up {
-            animation: fadeInUp 0.3s ease-out forwards;
-        }
-    </style>
-</body></html>
+      <section class="rounded-3xl bg-surface p-4 shadow-soft ring-1 ring-border">
+        <div class="mb-4 flex items-center justify-between">
+          <div>
+            <p class="text-[12px] font-extrabold uppercase tracking-[0.12em] text-primary">Horários</p>
+            <h3 class="text-[20px] font-extrabold">Disponíveis hoje</h3>
+          </div>
+          <span class="rounded-full bg-[#e2fff5] px-3 py-1.5 text-[12px] font-extrabold text-primary">6 livres</span>
+        </div>
+        <div class="grid grid-cols-3 gap-2">
+          <button class="h-12 rounded-2xl bg-surface-soft text-[14px] font-extrabold text-text-secondary">14:00</button>
+          <button class="h-12 rounded-2xl bg-primary text-[14px] font-extrabold text-white shadow-glow">16:00</button>
+          <button class="h-12 rounded-2xl bg-surface-soft text-[14px] font-extrabold text-text-secondary">17:00</button>
+          <button class="h-12 rounded-2xl bg-surface-soft text-[14px] font-extrabold text-text-secondary">18:00</button>
+          <button class="h-12 rounded-2xl bg-[#e5e8e2] text-[14px] font-extrabold text-text-secondary opacity-50">19:00</button>
+          <button class="h-12 rounded-2xl bg-surface-soft text-[14px] font-extrabold text-text-secondary">20:00</button>
+        </div>
+      </section>
+
+      <section class="rounded-3xl bg-[#11160f] p-4 text-white shadow-lift">
+        <p class="text-[12px] font-extrabold uppercase tracking-[0.12em] text-secondary">Resumo</p>
+        <div class="mt-3 flex items-center justify-between">
+          <div>
+            <h3 class="text-[20px] font-extrabold">Hoje, 16:00</h3>
+            <p class="mt-1 text-[13px] font-semibold text-white/70">Quadra 1 • 1 hora</p>
+          </div>
+          <p class="text-[24px] font-extrabold">R$ 80</p>
+        </div>
+        <button class="mt-4 h-12 w-full rounded-2xl bg-white text-[14px] font-extrabold text-[#11160f]">Confirmar reserva</button>
+      </section>
+    </main>
+
+    <nav class="fixed inset-x-0 bottom-4 z-50 mx-auto grid h-[78px] max-w-[390px] grid-cols-5 items-center gap-1 rounded-[28px] bg-[#11160f]/95 p-2 text-white shadow-[0_18px_48px_rgba(18,20,15,0.28)] ring-1 ring-white/10 backdrop-blur-xl">
+      <a class="flex h-full flex-col items-center justify-center gap-1 rounded-[22px] text-white/60" href="#"><span class="material-symbols-outlined text-[23px]">home</span><span class="text-[10px] font-bold">Home</span></a>
+      <a class="flex h-full flex-col items-center justify-center gap-1 rounded-[22px] text-white/60" href="#"><span class="material-symbols-outlined text-[23px]">sports_tennis</span><span class="text-[10px] font-bold">Aulas</span></a>
+      <a class="-mt-8 flex flex-col items-center justify-center gap-1 text-white" href="#" aria-label="Reservar quadra"><span class="flex size-16 items-center justify-center rounded-[24px] bg-gradient-to-br from-primary to-secondary text-white shadow-glow ring-4 ring-background"><span class="material-symbols-outlined text-[28px]" data-fill="true">add</span></span><span class="text-[10px] font-extrabold">Reservar</span></a>
+      <a class="flex h-full flex-col items-center justify-center gap-1 rounded-[22px] text-white/60" href="#"><span class="material-symbols-outlined text-[23px]">stadium</span><span class="text-[10px] font-bold">Quadras</span></a>
+      <a class="flex h-full flex-col items-center justify-center gap-1 rounded-[22px] text-white/60" href="#"><span class="material-symbols-outlined text-[23px]">event_available</span><span class="text-[10px] font-bold">Reservas</span></a>
+    </nav>
+  </div>
+</body>
+</html>

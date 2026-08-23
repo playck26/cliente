@@ -1,129 +1,143 @@
 <!DOCTYPE html>
-
-<html class="light" lang="en"><head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>PlayCK - Minhas Reservas</title>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"on-error-container": "#93000a", "on-secondary": "#ffffff", "secondary-fixed-dim": "#47deaf", error: "#ba1a1a", "on-secondary-fixed": "#002116", "on-primary": "#ffffff", "inverse-surface": "#2f3131", "on-surface": "#1a1c1c", "on-surface-variant": "#414940", "secondary-container": "#66f8c7", secondary: "#006c51", "on-tertiary": "#ffffff", "surface-container-high": "#e8e8e8", "on-primary-container": "#75f38a", "on-secondary-container": "#007054", "surface-container-highest": "#e2e2e2", "surface-bright": "#f9f9f9", "tertiary-fixed": "#ffdad9", background: "#f9f9f9", "on-background": "#1a1c1c", tertiary: "#930024", "inverse-on-surface": "#f0f1f1", "error-container": "#ffdad6", primary: "#00531e", "on-tertiary-fixed-variant": "#920024", "on-primary-fixed-variant": "#00531e", "on-error": "#ffffff", "surface-tint": "#006e2a", "on-secondary-fixed-variant": "#00513c", "secondary-fixed": "#69fbca", "on-tertiary-fixed": "#40000a", "surface-container-lowest": "#ffffff", "outline-variant": "#c0c9bd", "tertiary-fixed-dim": "#ffb3b4", "inverse-primary": "#61df78", "surface-container-low": "#f3f3f4", "on-primary-fixed": "#002108", "surface-variant": "#e2e2e2", "on-tertiary-container": "#ffcece", surface: "#f9f9f9", "tertiary-container": "#c00032", "primary-container": "#006e2a", "primary-fixed-dim": "#61df78", "surface-container": "#eeeeee", outline: "#71796f", "primary-fixed": "#7efc92", "surface-dim": "#dadada"}, borderRadius: {DEFAULT: "0.25rem", lg: "0.5rem", xl: "0.75rem", full: "9999px"}, spacing: {sm: "12px", xs: "4px", xl: "32px", "margin-mobile": "20px", md: "16px", lg: "24px", base: "8px", "gutter-mobile": "16px"}, fontFamily: {"body-lg": ["Inter"], "title-lg": ["Inter"], "body-md": ["Inter"], "display-md": ["Inter"], "label-sm": ["Inter"], "label-md": ["Inter"], "display-lg": ["Inter"], "title-md": ["Inter"]}, fontSize: {"body-lg": ["16px", {lineHeight: "24px", fontWeight: "400"}], "title-lg": ["18px", {lineHeight: "24px", fontWeight: "600"}], "body-md": ["14px", {lineHeight: "20px", fontWeight: "400"}], "display-md": ["24px", {lineHeight: "30px", letterSpacing: "-0.01em", fontWeight: "700"}], "label-sm": ["12px", {lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "600"}], "label-md": ["13px", {lineHeight: "18px", letterSpacing: "0.01em", fontWeight: "500"}], "display-lg": ["28px", {lineHeight: "34px", letterSpacing: "-0.02em", fontWeight: "700"}], "title-md": ["16px", {lineHeight: "22px", fontWeight: "600"}]}}}};</script>
-<style>
-        .court-texture {
-            background-image: linear-gradient(rgba(20, 82, 36, 0.03) 1px, transparent 1px),
-                              linear-gradient(90deg, rgba(20, 82, 36, 0.03) 1px, transparent 1px);
-            background-size: 20px 20px;
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+  <title>PlayCK - Minhas Reservas</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com" rel="preconnect" />
+  <link crossorigin href="https://fonts.gstatic.com" rel="preconnect" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            background: "#f7f8f5",
+            surface: "#ffffff",
+            "surface-soft": "#eef4ed",
+            "text-primary": "#12160f",
+            "text-secondary": "#4e5951",
+            primary: "#00763a",
+            secondary: "#00bd90",
+            tertiary: "#ed0040",
+            court: "#0b6f38",
+            clay: "#b9673b",
+            border: "#dde6db"
+          },
+          boxShadow: {
+            soft: "0 8px 24px rgba(18, 20, 15, 0.08)",
+            lift: "0 18px 44px rgba(18, 20, 15, 0.16)",
+            glow: "0 16px 40px rgba(0, 156, 63, 0.22)"
+          }
         }
-        .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
-    </style>
-<style>
-    body {
-      min-height: max(884px, 100dvh);
+      }
+    };
+  </script>
+  <style>
+    html { font-family: Inter, system-ui, sans-serif; }
+    body { min-height: max(884px, 100dvh); -webkit-tap-highlight-color: transparent; }
+    .material-symbols-outlined { font-variation-settings: "FILL" 0, "wght" 500, "GRAD" 0, "opsz" 24; }
+    .material-symbols-outlined[data-fill="true"] { font-variation-settings: "FILL" 1, "wght" 650, "GRAD" 0, "opsz" 24; }
+    .court-bg { background: radial-gradient(circle at 82% 12%, rgba(0, 189, 144, 0.24) 0 16%, transparent 17%), linear-gradient(145deg, #0a6a37, #05391f); }
+    .court-lines::before,
+    .court-lines::after {
+      content: "";
+      position: absolute;
+      inset: 14px;
+      z-index: 0;
+      border-radius: 22px;
+      pointer-events: none;
+    }
+    .court-lines::before { border: 2px solid rgba(255,255,255,0.18); }
+    .court-lines::after {
+      background: linear-gradient(90deg, transparent calc(50% - 1px), rgba(255,255,255,0.14) calc(50% - 1px), rgba(255,255,255,0.14) calc(50% + 1px), transparent calc(50% + 1px)), linear-gradient(0deg, transparent calc(50% - 1px), rgba(255,255,255,0.12) calc(50% - 1px), rgba(255,255,255,0.12) calc(50% + 1px), transparent calc(50% + 1px));
+    }
+    .mini-court {
+      background: linear-gradient(90deg, transparent 22%, rgba(255,255,255,0.42) 22% 23%, transparent 23% 77%, rgba(255,255,255,0.42) 77% 78%, transparent 78%), linear-gradient(0deg, transparent 28%, rgba(255,255,255,0.4) 28% 29%, transparent 29% 71%, rgba(255,255,255,0.4) 71% 72%, transparent 72%);
     }
   </style>
-<style>
-    body {
-      min-height: max(884px, 100dvh);
-    }
-  </style>
-  </head>
-<body class="bg-surface text-on-surface font-body-lg min-h-screen court-texture flex flex-col relative pb-[100px]">
-<!-- TopAppBar -->
-<header class="flex justify-between items-center w-full px-margin-mobile py-md max-w-7xl mx-auto docked full-width top-0 bg-surface dark:bg-surface-dim flat no shadows z-40 sticky">
-<div class="flex items-center gap-sm">
-<img alt="User Profile Picture" class="w-10 h-10 rounded-full object-cover shadow-sm" data-alt="A small circular avatar profile picture of an athletic person, well lit, against a clean light background, professional sports club aesthetic, minimalist and modern." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAB4QewCmps9Q2x8HZi-b3QDmJrw9fh_DqWa96Khg2HdY97889atmP_2OGsyI_y0qSh6HqKj3hecRIIZStJvDopJ9jN4mTIqFRPlzmVojyfIyIoqqZZ2bp1qpLNsLFpVTF3wCM6hGxsY6_z406qi-hFAcaKGvLkkGJtp7DZZKOZLbA_iZttWfk_gboNQJrBDbkg5uK23-BzIHPKRBQhnYxQYiDgbOcVMFehWEQKU4cdGle3-1Ps8H2a1g"/>
-</div>
-<div class="text-display-md font-display-md font-bold text-primary dark:text-primary-fixed">
-            PlayCK
+</head>
+<body class="bg-background text-text-primary">
+  <div class="mx-auto min-h-screen w-full max-w-[430px] overflow-hidden bg-background pb-36 shadow-[0_0_60px_rgba(18,20,15,0.08)]">
+    <header class="flex items-center justify-between px-5 pb-3 pt-4">
+      <div class="flex items-center gap-3">
+        <div class="relative flex size-12 items-center justify-center rounded-2xl bg-surface shadow-soft ring-1 ring-border">
+          <span class="material-symbols-outlined text-primary" data-fill="true">sports_tennis</span>
+          <span class="absolute -right-1 -top-1 size-3 rounded-full bg-secondary ring-2 ring-background"></span>
         </div>
-<button class="w-10 h-10 flex items-center justify-center text-primary dark:text-primary-fixed hover:bg-surface-container dark:hover:bg-surface-container-high transition-colors rounded-full" data-icon="notifications">
-<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">notifications</span>
-</button>
-</header>
-<!-- Main Content -->
-<main class="flex-grow w-full max-w-7xl mx-auto px-margin-mobile pt-lg pb-xl flex flex-col gap-xl">
-<!-- Header Section -->
-<section class="flex flex-col gap-xs">
-<h1 class="text-display-lg font-display-lg text-primary">Minhas Reservas</h1>
-<p class="text-body-md font-body-md text-on-surface-variant">Gerencie seus horários de jogo e pagamentos.</p>
-</section>
-<!-- Bookings List -->
-<section class="flex flex-col gap-md">
-<!-- Card 1: Pago -->
-<div class="bg-surface-container-lowest rounded-xl p-margin-mobile flex flex-col gap-md relative overflow-hidden" style="box-shadow: 0px 4px 12px rgba(18, 20, 15, 0.06);">
-<!-- Decorative subtle corner accent -->
-<div class="absolute -top-6 -right-6 w-24 h-24 border-2 border-primary opacity-5 rounded-lg transform rotate-12"></div>
-<div class="flex justify-between items-start">
-<div class="flex flex-col gap-xs">
-<h2 class="text-title-lg font-title-lg text-primary">Quadra 1</h2>
-<div class="flex items-center gap-xs text-on-surface-variant text-body-md font-body-md">
-<span class="material-symbols-outlined text-sm" style="font-size: 16px;">calendar_today</span>
-                            Sexta-feira, 15/08 · 19:00–20:00
-                        </div>
-</div>
-<!-- Status Badge: Pago -->
-<div class="h-6 px-3 rounded-full flex items-center justify-center bg-secondary-container text-on-secondary-container text-label-sm font-label-sm">
-                        Pago
-                    </div>
-</div>
-<hr class="border-outline-variant opacity-50"/>
-<div class="flex justify-end">
-<button class="px-md py-sm rounded-lg text-primary text-label-md font-label-md hover:bg-surface-container transition-colors focus:ring-2 focus:ring-primary outline-none">
-                        Cancelar
-                    </button>
-</div>
-</div>
-<!-- Card 2: Pagamento Pendente -->
-<div class="bg-surface-container-lowest rounded-xl p-margin-mobile flex flex-col gap-md relative overflow-hidden" style="box-shadow: 0px 4px 12px rgba(18, 20, 15, 0.06);">
-<!-- Decorative subtle corner accent -->
-<div class="absolute -top-6 -right-6 w-24 h-24 border-2 border-tertiary opacity-5 rounded-lg transform rotate-12"></div>
-<div class="flex justify-between items-start">
-<div class="flex flex-col gap-xs">
-<h2 class="text-title-lg font-title-lg text-primary">Quadra 3</h2>
-<div class="flex items-center gap-xs text-on-surface-variant text-body-md font-body-md">
-<span class="material-symbols-outlined text-sm" style="font-size: 16px;">calendar_today</span>
-                            Sábado, 16/08 · 10:00–11:00
-                        </div>
-</div>
-<!-- Status Badge: Pendente -->
-<div class="h-6 px-3 rounded-full flex items-center justify-center bg-[#FDF6B2] text-[#B8862E] text-label-sm font-label-sm">
-                        Pagamento pendente
-                    </div>
-</div>
-<hr class="border-outline-variant opacity-50"/>
-<div class="flex justify-end gap-sm">
-<button class="px-md py-sm rounded-lg text-on-surface-variant text-label-md font-label-md hover:bg-surface-container transition-colors focus:ring-2 focus:ring-primary outline-none">
-                        Cancelar
-                    </button>
-<button class="px-md py-sm rounded-lg bg-primary text-on-primary text-label-md font-label-md hover:opacity-90 transition-opacity focus:ring-2 focus:ring-offset-2 focus:ring-primary outline-none shadow-sm">
-                        Pagar Agora
-                    </button>
-</div>
-</div>
-</section>
-</main>
-<!-- BottomNavBar (Mobile Only shell anchor) -->
-<nav class="md:hidden fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-safe bg-surface dark:bg-surface-container-low h-[80px] shadow-lg border-t border-[#E8E7E0] dark:border-outline-variant">
-<!-- Inactive: Home -->
-<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline w-16 h-full hover:bg-surface-container-highest/10 dark:hover:bg-primary/10 transition-colors" data-icon="home" href="#">
-<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 0;">home</span>
-<span class="text-label-sm font-label-sm">Home</span>
-</a>
-<!-- Inactive: Aulas -->
-<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline w-16 h-full hover:bg-surface-container-highest/10 dark:hover:bg-primary/10 transition-colors" data-icon="sports_tennis" href="#">
-<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 0;">sports_tennis</span>
-<span class="text-label-sm font-label-sm">Aulas</span>
-</a>
-<!-- Inactive: Quadras -->
-<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline w-16 h-full hover:bg-surface-container-highest/10 dark:hover:bg-primary/10 transition-colors" data-icon="stadium" href="#">
-<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 0;">stadium</span>
-<span class="text-label-sm font-label-sm">Quadras</span>
-</a>
-<!-- Active: Reservas -->
-<a class="flex flex-col items-center justify-center text-primary dark:text-primary-fixed-dim font-semibold w-16 h-full hover:bg-surface-container-highest/10 dark:hover:bg-primary/10 transition-colors scale-90 duration-150 ease-in-out" data-icon="event_available" href="#">
-<span class="material-symbols-outlined mb-1" style="font-variation-settings: 'FILL' 1;">event_available</span>
-<span class="text-label-sm font-label-sm text-primary">Reservas</span>
-</a>
-</nav>
-</body></html>
+        <div>
+          <p class="text-[11px] font-bold uppercase tracking-[0.16em] text-text-secondary">PlayCK Club</p>
+          <h1 class="text-[24px] font-extrabold leading-none text-primary">PlayCK</h1>
+        </div>
+      </div>
+      <button class="relative flex size-11 items-center justify-center rounded-2xl bg-surface text-text-secondary shadow-soft ring-1 ring-border" aria-label="Notificações">
+        <span class="material-symbols-outlined">notifications</span>
+      </button>
+    </header>
+
+    <main class="space-y-5 px-5">
+      <section class="court-bg court-lines relative overflow-hidden rounded-3xl p-4 text-white shadow-lift">
+        <div class="relative z-10">
+          <div class="mb-4 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white/80">
+            <span class="size-2 rounded-full bg-secondary"></span>
+            Minhas reservas
+          </div>
+          <h2 class="text-[28px] font-extrabold leading-[1.04]">Quadras na sua agenda</h2>
+          <p class="mt-1.5 text-[13px] font-semibold text-white/75">2 reservas confirmadas • 1 pendente</p>
+          <div class="mt-4 grid grid-cols-2 gap-2">
+            <button class="h-11 rounded-2xl bg-white text-[14px] font-extrabold text-primary shadow-soft">Ver próximas</button>
+            <button class="h-11 rounded-2xl bg-white/10 text-[14px] font-extrabold text-white ring-1 ring-white/20">Histórico</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="space-y-3">
+        <article class="overflow-hidden rounded-3xl bg-surface shadow-soft ring-1 ring-border">
+          <div class="relative h-[118px] bg-clay text-white">
+            <div class="mini-court absolute inset-0"></div>
+            <div class="absolute inset-x-4 bottom-4 flex items-end justify-between">
+              <div>
+                <p class="text-[11px] font-extrabold uppercase tracking-[0.14em] text-white/75">Hoje • 16:00</p>
+                <h3 class="mt-1 text-[22px] font-extrabold">Quadra 2</h3>
+              </div>
+              <span class="rounded-full bg-white px-3 py-1.5 text-[12px] font-extrabold text-clay">Confirmada</span>
+            </div>
+          </div>
+          <div class="p-4">
+            <div class="grid grid-cols-3 gap-2">
+              <div class="rounded-2xl bg-surface-soft p-3"><p class="text-[11px] font-bold text-text-secondary">Piso</p><p class="text-[13px] font-extrabold">Saibro</p></div>
+              <div class="rounded-2xl bg-surface-soft p-3"><p class="text-[11px] font-bold text-text-secondary">Duração</p><p class="text-[13px] font-extrabold">1 hora</p></div>
+              <div class="rounded-2xl bg-surface-soft p-3"><p class="text-[11px] font-bold text-text-secondary">Valor</p><p class="text-[13px] font-extrabold">R$ 80</p></div>
+            </div>
+            <button class="mt-4 h-11 w-full rounded-2xl bg-primary text-[14px] font-extrabold text-white shadow-glow">Abrir reserva</button>
+          </div>
+        </article>
+
+        <article class="rounded-3xl bg-surface p-4 shadow-soft ring-1 ring-border">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <p class="text-[11px] font-extrabold uppercase tracking-[0.14em] text-tertiary">Amanhã • 18:30</p>
+              <h3 class="mt-1 text-[20px] font-extrabold">Quadra 4 rápida</h3>
+              <p class="mt-1 text-[13px] font-semibold text-text-secondary">Pagamento pendente até 14:00</p>
+            </div>
+            <span class="flex size-12 items-center justify-center rounded-2xl bg-[#ffd9e1] text-tertiary">
+              <span class="material-symbols-outlined">payments</span>
+            </span>
+          </div>
+          <button class="mt-4 h-11 w-full rounded-2xl bg-[#11160f] text-[14px] font-extrabold text-white">Resolver pagamento</button>
+        </article>
+      </section>
+    </main>
+
+    <nav class="fixed inset-x-0 bottom-4 z-50 mx-auto grid h-[78px] max-w-[390px] grid-cols-5 items-center gap-1 rounded-[28px] bg-[#11160f]/95 p-2 text-white shadow-[0_18px_48px_rgba(18,20,15,0.28)] ring-1 ring-white/10 backdrop-blur-xl">
+      <a class="flex h-full flex-col items-center justify-center gap-1 rounded-[22px] text-white/60" href="#"><span class="material-symbols-outlined text-[23px]">home</span><span class="text-[10px] font-bold">Home</span></a>
+      <a class="flex h-full flex-col items-center justify-center gap-1 rounded-[22px] text-white/60" href="#"><span class="material-symbols-outlined text-[23px]">sports_tennis</span><span class="text-[10px] font-bold">Aulas</span></a>
+      <a class="-mt-8 flex flex-col items-center justify-center gap-1 text-white" href="#" aria-label="Reservar quadra"><span class="flex size-16 items-center justify-center rounded-[24px] bg-gradient-to-br from-primary to-secondary text-white shadow-glow ring-4 ring-background"><span class="material-symbols-outlined text-[28px]">add</span></span><span class="text-[10px] font-extrabold">Reservar</span></a>
+      <a class="flex h-full flex-col items-center justify-center gap-1 rounded-[22px] text-white/60" href="#"><span class="material-symbols-outlined text-[23px]">stadium</span><span class="text-[10px] font-bold">Quadras</span></a>
+      <a class="flex h-full flex-col items-center justify-center gap-1 rounded-[22px] bg-white text-primary shadow-soft" href="#"><span class="material-symbols-outlined text-[23px]" data-fill="true">event_available</span><span class="text-[10px] font-extrabold">Reservas</span></a>
+    </nav>
+  </div>
+</body>
+</html>

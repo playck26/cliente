@@ -1,195 +1,148 @@
 <!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+  <title>PlayCK - Quadras</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link href="https://fonts.googleapis.com" rel="preconnect" />
+  <link crossorigin href="https://fonts.gstatic.com" rel="preconnect" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            background: "#f7f8f5",
+            surface: "#ffffff",
+            "surface-soft": "#eef4ed",
+            "text-primary": "#12160f",
+            "text-secondary": "#4e5951",
+            primary: "#00763a",
+            secondary: "#00bd90",
+            tertiary: "#ed0040",
+            court: "#0b6f38",
+            clay: "#b9673b",
+            bluecourt: "#2367aa",
+            border: "#dde6db"
+          },
+          boxShadow: {
+            soft: "0 8px 24px rgba(18, 20, 15, 0.08)",
+            lift: "0 18px 44px rgba(18, 20, 15, 0.16)",
+            glow: "0 16px 40px rgba(0, 156, 63, 0.22)"
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    html { font-family: Inter, system-ui, sans-serif; }
+    body { min-height: max(884px, 100dvh); -webkit-tap-highlight-color: transparent; }
+    .material-symbols-outlined { font-variation-settings: "FILL" 0, "wght" 500, "GRAD" 0, "opsz" 24; }
+    .material-symbols-outlined[data-fill="true"] { font-variation-settings: "FILL" 1, "wght" 650, "GRAD" 0, "opsz" 24; }
+    .court-lines {
+      background: linear-gradient(90deg, transparent 18%, rgba(255,255,255,0.5) 18% 19%, transparent 19% 81%, rgba(255,255,255,0.5) 81% 82%, transparent 82%), linear-gradient(0deg, transparent 26%, rgba(255,255,255,0.45) 26% 27%, transparent 27% 73%, rgba(255,255,255,0.45) 73% 74%, transparent 74%), linear-gradient(90deg, transparent 49.5%, rgba(255,255,255,0.36) 49.5% 50.5%, transparent 50.5%);
+    }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="bg-background text-text-primary">
+  <div class="mx-auto min-h-screen w-full max-w-[430px] overflow-hidden bg-background pb-36 shadow-[0_0_60px_rgba(18,20,15,0.08)]">
+    <header class="flex items-center justify-between px-5 pb-3 pt-4">
+      <div class="flex items-center gap-3">
+        <div class="relative flex size-12 items-center justify-center rounded-2xl bg-surface shadow-soft ring-1 ring-border">
+          <span class="material-symbols-outlined text-primary" data-fill="true">sports_tennis</span>
+          <span class="absolute -right-1 -top-1 size-3 rounded-full bg-secondary ring-2 ring-background"></span>
+        </div>
+        <div>
+          <p class="text-[11px] font-bold uppercase tracking-[0.16em] text-text-secondary">PlayCK Club</p>
+          <h1 class="text-[24px] font-extrabold leading-none text-primary">PlayCK</h1>
+        </div>
+      </div>
+      <button class="flex size-11 items-center justify-center rounded-2xl bg-surface text-text-secondary shadow-soft ring-1 ring-border" aria-label="Filtrar">
+        <span class="material-symbols-outlined">tune</span>
+      </button>
+    </header>
 
-<html lang="en"><head>
-<meta charset="utf-8"/>
-<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>PlayCK - Quadras</title>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com" rel="preconnect"/>
-<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script id="tailwind-config">tailwind.config = {darkMode: "class", theme: {extend: {colors: {"on-error-container": "#93000a", "on-secondary": "#ffffff", "secondary-fixed-dim": "#47deaf", error: "#ba1a1a", "on-secondary-fixed": "#002116", "on-primary": "#ffffff", "inverse-surface": "#2f3131", "on-surface": "#1a1c1c", "on-surface-variant": "#414940", "secondary-container": "#66f8c7", secondary: "#006c51", "on-tertiary": "#ffffff", "surface-container-high": "#e8e8e8", "on-primary-container": "#75f38a", "on-secondary-container": "#007054", "surface-container-highest": "#e2e2e2", "surface-bright": "#f9f9f9", "tertiary-fixed": "#ffdad9", background: "#f9f9f9", "on-background": "#1a1c1c", tertiary: "#930024", "inverse-on-surface": "#f0f1f1", "error-container": "#ffdad6", primary: "#00531e", "on-tertiary-fixed-variant": "#920024", "on-primary-fixed-variant": "#00531e", "on-error": "#ffffff", "surface-tint": "#006e2a", "on-secondary-fixed-variant": "#00513c", "secondary-fixed": "#69fbca", "on-tertiary-fixed": "#40000a", "surface-container-lowest": "#ffffff", "outline-variant": "#c0c9bd", "tertiary-fixed-dim": "#ffb3b4", "inverse-primary": "#61df78", "surface-container-low": "#f3f3f4", "on-primary-fixed": "#002108", "surface-variant": "#e2e2e2", "on-tertiary-container": "#ffcece", surface: "#f9f9f9", "tertiary-container": "#c00032", "primary-container": "#006e2a", "primary-fixed-dim": "#61df78", "surface-container": "#eeeeee", outline: "#71796f", "primary-fixed": "#7efc92", "surface-dim": "#dadada"}, borderRadius: {DEFAULT: "0.25rem", lg: "0.5rem", xl: "0.75rem", full: "9999px"}, spacing: {sm: "12px", xs: "4px", xl: "32px", "margin-mobile": "20px", md: "16px", lg: "24px", base: "8px", "gutter-mobile": "16px"}, fontFamily: {"body-lg": ["Inter"], "title-lg": ["Inter"], "body-md": ["Inter"], "display-md": ["Inter"], "label-sm": ["Inter"], "label-md": ["Inter"], "display-lg": ["Inter"], "title-md": ["Inter"]}, fontSize: {"body-lg": ["16px", {lineHeight: "24px", fontWeight: "400"}], "title-lg": ["18px", {lineHeight: "24px", fontWeight: "600"}], "body-md": ["14px", {lineHeight: "20px", fontWeight: "400"}], "display-md": ["24px", {lineHeight: "30px", letterSpacing: "-0.01em", fontWeight: "700"}], "label-sm": ["12px", {lineHeight: "16px", letterSpacing: "0.05em", fontWeight: "600"}], "label-md": ["13px", {lineHeight: "18px", letterSpacing: "0.01em", fontWeight: "500"}], "display-lg": ["28px", {lineHeight: "34px", letterSpacing: "-0.02em", fontWeight: "700"}], "title-md": ["16px", {lineHeight: "22px", fontWeight: "600"}]}, boxShadow: {"level-1": "0px 4px 12px rgba(18, 20, 15, 0.06)", "level-2": "0px 8px 24px rgba(18, 20, 15, 0.12)"}, backgroundImage: {"court-texture": "url(\"data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 0h100v100H0z' fill='none'/%3E%3Cpath d='M90 10v80M10 90h80M10 10h80M10 50h80M50 10v80' stroke='%23145224' stroke-width='2' stroke-opacity='0.05'/%3E%3C/svg%3E\")"}}}};</script>
-<style>
-        body {
-            -webkit-tap-highlight-color: transparent;
-        }
-        .court-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0px 8px 24px rgba(18, 20, 15, 0.12);
-        }
-    </style>
-<style>
-    body {
-      min-height: max(884px, 100dvh);
-    }
-  </style>
-<style>
-    body {
-      min-height: max(884px, 100dvh);
-    }
-  </style>
-  </head>
-<body class="bg-surface text-on-surface min-h-screen pb-[100px]">
-<!-- TopAppBar -->
-<header class="flex justify-between items-center w-full px-margin-mobile py-md max-w-7xl mx-auto bg-surface dark:bg-surface-dim sticky top-0 z-40">
-<div class="flex items-center gap-sm">
-<div class="w-10 h-10 rounded-full bg-surface-container-highest overflow-hidden">
-<img alt="User Profile" class="w-full h-full object-cover" data-alt="A close up portrait of an athletic user for a profile avatar in a sports app. The lighting is bright and modern, creating a professional and active lifestyle mood. High resolution, clear facial features, set against a neutral light background to match the high-performance UI aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBkTXmdcGThmtyz47HWX3J2UYunD2JGfpWF4y0PSoDfnGAnovwthPrTNp-06QXx5tE6cxZENt0BhvX9nkEFr4cJvKwF6oNldZhmLcPHyMlaeimbj99ewthVcDblZhpCWg_NmMRqV79p0IFftR_LIizJJ-TD2aIsngVxP09kINNuOdnaYdWPNKqIKy13pSHCneKtL-UBwgXwmmncVkrbni5VqYrRrxxeNBum9XgnEauTelReBsKXeX7T8g"/>
-</div>
-<h1 class="text-display-md font-display-md font-bold text-primary dark:text-primary-fixed tracking-tight">PlayCK</h1>
-</div>
-<button class="w-10 h-10 flex items-center justify-center rounded-full text-primary dark:text-primary-fixed hover:bg-surface-container dark:hover:bg-surface-container-high transition-colors">
-<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">notifications</span>
-</button>
-</header>
-<!-- Main Content -->
-<main class="px-margin-mobile max-w-7xl mx-auto mt-xl">
-<div class="mb-lg flex justify-between items-end">
-<div>
-<h2 class="text-display-lg font-display-lg text-on-surface">Quadras</h2>
-<p class="text-body-md font-body-md text-on-surface-variant mt-xs">Selecione uma quadra para reservar</p>
-</div>
-<button class="w-12 h-12 flex items-center justify-center rounded-xl border border-outline-variant text-on-surface hover:bg-surface-container-low transition-colors">
-<span class="material-symbols-outlined">filter_list</span>
-</button>
-</div>
-<!-- Filters (Chips) -->
-<div class="flex gap-sm overflow-x-auto pb-sm mb-lg no-scrollbar -mx-margin-mobile px-margin-mobile md:mx-0 md:px-0">
-<button class="whitespace-nowrap px-lg py-xs rounded-full bg-primary text-on-primary text-label-md font-label-md h-[40px] flex items-center shrink-0 shadow-level-1">
-                Todas as Quadras
-            </button>
-<button class="whitespace-nowrap px-lg py-xs rounded-full bg-surface-container border border-outline-variant text-on-surface-variant text-label-md font-label-md h-[40px] flex items-center shrink-0 hover:bg-surface-container-high transition-colors">
-                Saibro
-            </button>
-<button class="whitespace-nowrap px-lg py-xs rounded-full bg-surface-container border border-outline-variant text-on-surface-variant text-label-md font-label-md h-[40px] flex items-center shrink-0 hover:bg-surface-container-high transition-colors">
-                Rápida
-            </button>
-<button class="whitespace-nowrap px-lg py-xs rounded-full bg-surface-container border border-outline-variant text-on-surface-variant text-label-md font-label-md h-[40px] flex items-center shrink-0 hover:bg-surface-container-high transition-colors">
-                Grama
-            </button>
-</div>
-<!-- Court List -->
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-md md:gap-lg">
-<!-- Court Card 1 -->
-<a class="court-card block bg-surface-container-lowest rounded-xl shadow-level-1 overflow-hidden transition-all duration-300 relative border border-transparent hover:border-primary/20" href="#">
-<div class="h-[140px] w-full relative bg-surface-container-high">
-<img alt="Quadra 1 - Saibro" class="w-full h-full object-cover" data-alt="A professional clay tennis court (Saibro) viewed from a slightly elevated angle. The red clay surface is pristine, with clear white lines. The lighting is bright daytime, creating a high-performance, athletic mood suitable for a premium sports booking app. Minimalist background." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCR-gAdwnmx4s6eb7Ro8RBnVkDbPx_fgPlf8sWkiAVnBf1d6fGC36RoqWhZfVutSK8si_r95wwuR9R9kYsWU-QrPCz0OaJ0j2ZAz25ZT7BPfevqlfFjNEUHyYSwgqcXPvpz_IqjH_gc4FP_CLJRhz5WMjxQ2nVgp7L_YRB64VfHnTXZ7fMdS8euC9oex4FNqChYYzkxHV4OzHAN_P_rkNQQh3LeUADSUEfheJ_0fzgd2jaW4qe_Ak3tBg"/>
-<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-<div class="absolute top-sm right-sm bg-surface-container-lowest/90 backdrop-blur-sm px-sm py-xs rounded-full flex items-center gap-xs">
-<span class="w-2 h-2 rounded-full bg-[#4ade80]"></span>
-<span class="text-label-sm font-label-sm text-on-surface">Livre Agora</span>
-</div>
-<div class="absolute bottom-sm left-md right-md flex justify-between items-end">
-<span class="bg-surface-container-lowest/20 backdrop-blur-md border border-white/20 text-white px-sm py-xs rounded-full text-label-sm font-label-sm flex items-center gap-xs">
-<span class="material-symbols-outlined text-[14px]">sports_tennis</span> Tênis
-                        </span>
-</div>
-</div>
-<div class="p-md relative bg-court-texture bg-right-top bg-no-repeat" style="background-size: 80px;">
-<div class="flex justify-between items-start mb-sm">
-<div>
-<h3 class="text-title-lg font-title-lg text-on-surface">Quadra 1 - Saibro</h3>
-<p class="text-body-md font-body-md text-on-surface-variant flex items-center gap-xs mt-xs">
-<span class="material-symbols-outlined text-[16px]">location_on</span> Coberta
-                            </p>
-</div>
-<div class="text-right">
-<span class="text-title-lg font-title-lg text-primary-container block">R$ 80</span>
-<span class="text-label-sm font-label-sm text-on-surface-variant">/ hora</span>
-</div>
-</div>
-<div class="flex items-center gap-sm mt-md pt-sm border-t border-outline-variant/30">
-<div class="flex -space-x-2">
-<div class="w-6 h-6 rounded-full bg-surface-container-highest border border-surface-container-lowest overflow-hidden">
-<img alt="Player" class="w-full h-full object-cover" data-alt="A small avatar image showing a young male athlete smiling, used in a sports booking UI to show recent players." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBlbIurqCZ4j5MX2S6TkIign2dxT28Arq4V8A7QYviKqHsUjW2-IU4Imf2V7Ff6AzF1HkjjkOGZv7SYY8uLJ5SQE4EFwUepm_UMc0EVKJE_sT-gqqCviTMXahxHN6YPAd7TS2GTvA4bB5M9dsz7ZSIeaScZQOWfcXh8UxWkrbcazXii36RRSl7xVicf41dWtGLeVwGBTY6Ky8z5qRNkz22-5asQIAHRbcQ9EIVwitFqGvEQ6GgyoaLN2g"/>
-</div>
-<div class="w-6 h-6 rounded-full bg-surface-container-highest border border-surface-container-lowest overflow-hidden">
-<img alt="Player" class="w-full h-full object-cover" data-alt="A small avatar image showing a female tennis player looking focused, used in a UI to represent active users." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDp5MMQT-eP3-47c6WhtWYPi4QQMXQkQW13rQfTj8Tuxjnr2VHBFQAQMj_HAaaUxOVEtTDmlQhfFtt8opdIO6zHkuOgdtZ_e3NSHgJqU3e5qsA5xqa1OLNWGZKJZ5iG_4fWA1VH55AaMpsW3HHDD6yWRRHyDe92_LXaWLBYHkxgXlde9FQ1fW_6Eil1c9RL9t0HlDbITapOwXZ-tOLMs0m9hfurgYbL2XgK-ePq5iUujemlqE9lf8-Vhw"/>
-</div>
-</div>
-<span class="text-label-sm font-label-sm text-on-surface-variant">3 horários disponíveis hoje</span>
-</div>
-</div>
-</a>
-<!-- Court Card 2 -->
-<a class="court-card block bg-surface-container-lowest rounded-xl shadow-level-1 overflow-hidden transition-all duration-300 relative border border-transparent hover:border-primary/20" href="#">
-<div class="h-[140px] w-full relative bg-surface-container-high">
-<img alt="Quadra 2 - Rápida" class="w-full h-full object-cover" data-alt="A professional hard tennis court (Rápida) with a vibrant blue and green surface. The white lines are sharp and clear. Bright, even lighting highlights the modern, high-speed nature of the court, fitting a premium, athletic design system." src="https://lh3.googleusercontent.com/aida-public/AB6AXuB0pt9rpUrAmdJbuuJeYy3PwRyzdka_3gbv9nJxUnl4hcfvKUM8qKxrbs5vTEUAOhjv9NZ5-K_Q3efWseub1yYRsuUI0YU9C0uoFwAIXhq_q5HzxfXusng6iqll05BfQDWkyt9LcLwTlkw-St9lsEZr-08bxzZQlouTEg-2FznMwWEe7L7WrxvmvSLHCUqctH4tL7bNqb8c_xocDfxkC4-hU0xcvpDdVtoD4pwT9nHaBnJBNRXIOD-iIg"/>
-<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-<div class="absolute bottom-sm left-md right-md flex justify-between items-end">
-<span class="bg-surface-container-lowest/20 backdrop-blur-md border border-white/20 text-white px-sm py-xs rounded-full text-label-sm font-label-sm flex items-center gap-xs">
-<span class="material-symbols-outlined text-[14px]">sports_tennis</span> Tênis
-                        </span>
-</div>
-</div>
-<div class="p-md relative bg-court-texture bg-right-top bg-no-repeat" style="background-size: 80px;">
-<div class="flex justify-between items-start mb-sm">
-<div>
-<h3 class="text-title-lg font-title-lg text-on-surface">Quadra 2 - Rápida</h3>
-<p class="text-body-md font-body-md text-on-surface-variant flex items-center gap-xs mt-xs">
-<span class="material-symbols-outlined text-[16px]">wb_sunny</span> Descoberta
-                            </p>
-</div>
-<div class="text-right">
-<span class="text-title-lg font-title-lg text-primary-container block">R$ 90</span>
-<span class="text-label-sm font-label-sm text-on-surface-variant">/ hora</span>
-</div>
-</div>
-<div class="flex items-center gap-sm mt-md pt-sm border-t border-outline-variant/30">
-<span class="text-label-sm font-label-sm text-on-surface-variant">Próximo horário: 14:00</span>
-</div>
-</div>
-</a>
-<!-- Court Card 3 -->
-<a class="court-card block bg-surface-container-lowest rounded-xl shadow-level-1 overflow-hidden transition-all duration-300 relative border border-transparent hover:border-primary/20" href="#">
-<div class="h-[140px] w-full relative bg-surface-container-high">
-<img alt="Quadra 3 - Grama" class="w-full h-full object-cover" data-alt="A well-maintained grass tennis court (Grama). The lush green surface is freshly cut with crisp white boundary lines. The setting suggests a premium, classic tennis club environment under bright natural sunlight." src="https://lh3.googleusercontent.com/aida-public/AB6AXuD7qB2alKL-cfzM95yV3KdbLcpBLJ4OOPYPMIh2gTHFdozA9Dm8nRT6wBvg7HkV-MKz8cACKYRXCCc0f5bftYCqfn4RnVKBEtVjf4ZzdkkKhbmiUxBbelcArn53ACTchvSBmq2PUlMDSyiLfyjvLUs6DqIM54IvjqUq_U3JfRxJ45b7PL8NQBvJU87pfMqx0nr4oo6s-W4brP4JEWlUQZ-s9_5JmhR1pLikrIYmZlifF-ZTpmBhw0LfUw"/>
-<div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-<div class="absolute bottom-sm left-md right-md flex justify-between items-end">
-<span class="bg-surface-container-lowest/20 backdrop-blur-md border border-white/20 text-white px-sm py-xs rounded-full text-label-sm font-label-sm flex items-center gap-xs">
-<span class="material-symbols-outlined text-[14px]">sports_tennis</span> Tênis
-                        </span>
-</div>
-</div>
-<div class="p-md relative bg-court-texture bg-right-top bg-no-repeat" style="background-size: 80px;">
-<div class="flex justify-between items-start mb-sm">
-<div>
-<h3 class="text-title-lg font-title-lg text-on-surface">Quadra 3 - Grama</h3>
-<p class="text-body-md font-body-md text-on-surface-variant flex items-center gap-xs mt-xs">
-<span class="material-symbols-outlined text-[16px]">wb_sunny</span> Descoberta
-                            </p>
-</div>
-<div class="text-right">
-<span class="text-title-lg font-title-lg text-primary-container block">R$ 120</span>
-<span class="text-label-sm font-label-sm text-on-surface-variant">/ hora</span>
-</div>
-</div>
-<div class="flex items-center gap-sm mt-md pt-sm border-t border-outline-variant/30">
-<span class="text-label-sm font-label-sm text-on-surface-variant">Disponível amanhã a partir das 08:00</span>
-</div>
-</div>
-</a>
-</div>
-</main>
-<!-- BottomNavBar -->
-<nav class="fixed bottom-0 left-0 w-full z-50 flex justify-around items-center px-4 pb-safe bg-surface dark:bg-surface-container-low shadow-lg md:hidden border-t-0" style="height: 80px;">
-<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline hover:bg-surface-container-highest/10 dark:hover:bg-primary/10 transition-colors rounded-lg p-2 w-[70px]" href="#">
-<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">home</span>
-<span class="text-label-sm font-label-sm mt-1">Home</span>
-</a>
-<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline hover:bg-surface-container-highest/10 dark:hover:bg-primary/10 transition-colors rounded-lg p-2 w-[70px]" href="#">
-<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">sports_tennis</span>
-<span class="text-label-sm font-label-sm mt-1">Aulas</span>
-</a>
-<a class="flex flex-col items-center justify-center text-primary dark:text-primary-fixed-dim font-semibold scale-90 duration-150 ease-in-out bg-surface-container-highest/10 dark:bg-primary/10 rounded-lg p-2 w-[70px]" href="#">
-<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">stadium</span>
-<span class="text-label-sm font-label-sm mt-1">Quadras</span>
-</a>
-<a class="flex flex-col items-center justify-center text-on-surface-variant dark:text-outline hover:bg-surface-container-highest/10 dark:hover:bg-primary/10 transition-colors rounded-lg p-2 w-[70px]" href="#">
-<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0;">event_available</span>
-<span class="text-label-sm font-label-sm mt-1">Reservas</span>
-</a>
-</nav>
-</body></html>
+    <main class="space-y-5 px-5">
+      <section class="rounded-3xl bg-[#11160f] p-4 text-white shadow-lift">
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <div class="mb-2 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-white/80">
+              <span class="size-2 rounded-full bg-secondary"></span>
+              Quadras
+            </div>
+            <h2 class="text-[28px] font-extrabold leading-[1.04]">Escolha sua superfície</h2>
+            <p class="mt-1.5 text-[13px] font-semibold text-white/70">6 horários livres hoje no clube</p>
+          </div>
+          <div class="flex size-14 items-center justify-center rounded-3xl bg-secondary text-[#003d2e]">
+            <span class="material-symbols-outlined text-[28px]">stadium</span>
+          </div>
+        </div>
+        <div class="mt-4 flex gap-2 overflow-x-auto no-scrollbar">
+          <button class="h-10 shrink-0 rounded-full bg-white px-4 text-[13px] font-extrabold text-primary">Todas</button>
+          <button class="h-10 shrink-0 rounded-full bg-white/10 px-4 text-[13px] font-bold text-white ring-1 ring-white/20">Saibro</button>
+          <button class="h-10 shrink-0 rounded-full bg-white/10 px-4 text-[13px] font-bold text-white ring-1 ring-white/20">Rápida</button>
+          <button class="h-10 shrink-0 rounded-full bg-white/10 px-4 text-[13px] font-bold text-white ring-1 ring-white/20">Coberta</button>
+        </div>
+      </section>
+
+      <section class="space-y-4">
+        <a class="block overflow-hidden rounded-3xl bg-surface shadow-soft ring-1 ring-border" href="#">
+          <div class="relative h-[142px] bg-clay text-white">
+            <div class="court-lines absolute inset-0"></div>
+            <div class="absolute left-4 top-4 rounded-full bg-white px-3 py-1.5 text-[12px] font-extrabold text-clay">Livre agora</div>
+            <div class="absolute inset-x-4 bottom-4 flex items-end justify-between">
+              <div>
+                <p class="text-[11px] font-extrabold uppercase tracking-[0.14em] text-white/75">Saibro coberta</p>
+                <h3 class="mt-1 text-[24px] font-extrabold">Quadra 1</h3>
+              </div>
+              <div class="text-right">
+                <p class="text-[22px] font-extrabold">R$ 80</p>
+                <p class="text-[11px] font-bold text-white/75">por hora</p>
+              </div>
+            </div>
+          </div>
+          <div class="grid grid-cols-[1fr_auto] items-center gap-3 p-4">
+            <div class="flex gap-2">
+              <span class="rounded-full bg-surface-soft px-3 py-1.5 text-[12px] font-bold text-text-secondary">16:00</span>
+              <span class="rounded-full bg-surface-soft px-3 py-1.5 text-[12px] font-bold text-text-secondary">17:00</span>
+              <span class="rounded-full bg-surface-soft px-3 py-1.5 text-[12px] font-bold text-text-secondary">20:00</span>
+            </div>
+            <span class="flex size-11 items-center justify-center rounded-2xl bg-primary text-white">
+              <span class="material-symbols-outlined">arrow_forward</span>
+            </span>
+          </div>
+        </a>
+
+        <a class="block overflow-hidden rounded-3xl bg-surface shadow-soft ring-1 ring-border" href="#">
+          <div class="relative h-[132px] bg-bluecourt text-white">
+            <div class="court-lines absolute inset-0"></div>
+            <div class="absolute inset-x-4 bottom-4 flex items-end justify-between">
+              <div>
+                <p class="text-[11px] font-extrabold uppercase tracking-[0.14em] text-white/75">Rápida descoberta</p>
+                <h3 class="mt-1 text-[24px] font-extrabold">Quadra 3</h3>
+              </div>
+              <span class="rounded-full bg-white/20 px-3 py-1.5 text-[12px] font-extrabold">18:30</span>
+            </div>
+          </div>
+          <div class="flex items-center justify-between p-4">
+            <p class="text-[13px] font-bold text-text-secondary">Próximo horário disponível</p>
+            <p class="text-[18px] font-extrabold text-primary">R$ 90</p>
+          </div>
+        </a>
+      </section>
+    </main>
+
+    <nav class="fixed inset-x-0 bottom-4 z-50 mx-auto grid h-[78px] max-w-[390px] grid-cols-5 items-center gap-1 rounded-[28px] bg-[#11160f]/95 p-2 text-white shadow-[0_18px_48px_rgba(18,20,15,0.28)] ring-1 ring-white/10 backdrop-blur-xl">
+      <a class="flex h-full flex-col items-center justify-center gap-1 rounded-[22px] text-white/60" href="#"><span class="material-symbols-outlined text-[23px]">home</span><span class="text-[10px] font-bold">Home</span></a>
+      <a class="flex h-full flex-col items-center justify-center gap-1 rounded-[22px] text-white/60" href="#"><span class="material-symbols-outlined text-[23px]">sports_tennis</span><span class="text-[10px] font-bold">Aulas</span></a>
+      <a class="-mt-8 flex flex-col items-center justify-center gap-1 text-white" href="#" aria-label="Reservar quadra"><span class="flex size-16 items-center justify-center rounded-[24px] bg-gradient-to-br from-primary to-secondary text-white shadow-glow ring-4 ring-background"><span class="material-symbols-outlined text-[28px]">add</span></span><span class="text-[10px] font-extrabold">Reservar</span></a>
+      <a class="flex h-full flex-col items-center justify-center gap-1 rounded-[22px] bg-white text-primary shadow-soft" href="#"><span class="material-symbols-outlined text-[23px]" data-fill="true">stadium</span><span class="text-[10px] font-extrabold">Quadras</span></a>
+      <a class="flex h-full flex-col items-center justify-center gap-1 rounded-[22px] text-white/60" href="#"><span class="material-symbols-outlined text-[23px]">event_available</span><span class="text-[10px] font-bold">Reservas</span></a>
+    </nav>
+  </div>
+</body>
+</html>
