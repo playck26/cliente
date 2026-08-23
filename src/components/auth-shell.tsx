@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { TennisBallIcon } from "@/components/icons/tennis-ball-icon";
+import Image from "next/image";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
 /**
@@ -37,8 +37,14 @@ export function AuthShell({
       />
       <Card className="relative w-full max-w-[420px] overflow-hidden rounded-2xl p-2 shadow-[var(--shadow-elevated)]">
         <CardHeader className="items-center justify-items-center text-center">
-          <div className="mb-2 flex size-16 items-center justify-center rounded-full bg-[var(--color-primary-container)] text-[var(--color-primary)]">
-            <TennisBallIcon className="size-8" strokeWidth={1.75} aria-hidden="true" />
+          <div className="mb-2 flex size-20 items-center justify-center">
+            <Image
+              src="/playck-logo.png"
+              alt="Logo PlayCK"
+              width={80}
+              height={80}
+              className="size-20 object-contain drop-shadow-[0_8px_14px_rgba(18,20,15,0.18)]"
+            />
           </div>
           <h1 className="text-2xl font-bold text-[var(--color-primary)]">{titulo}</h1>
           <p className="text-sm text-[var(--color-text-secondary)]">{descricao}</p>

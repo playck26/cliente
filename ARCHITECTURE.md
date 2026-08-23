@@ -78,8 +78,9 @@ page.tsx (server component, fino)
 `localStorage` (`auth-storage.ts`); o refresh token é cookie `httpOnly` que
 o JS nunca lê.
 
-**PWA:** `register-service-worker.tsx` + manifest. Ícones ainda são
-placeholder sólido — falta o arquivo de marca oficial (ver Gaps).
+**PWA:** `register-service-worker.tsx` + manifest. A marca oficial vive em
+`public/playck-logo.png` e deriva os ícones do navegador, Apple Touch Icon
+e PWA (`192x192`/`512x512`).
 
 ## 5. Camada de API — a regra que mais importa
 
@@ -131,4 +132,3 @@ Deploy: Netlify (plano Personal desde 2026-08-22, ADR-014).
 | 2 | **Sem estado global e sem cache de servidor**: cada tela refaz suas chamadas. Adequado hoje; vira problema quando duas telas precisarem do mesmo dado fresco | Média |
 | 3 | Sem tratamento de offline apesar do service worker registrado (`cliente`) | Baixa |
 | 4 | Cobertura de teste concentrada em poucos componentes | Média |
-| 5 | Ícones e paleta ainda derivados de inferência, sem arquivo de marca oficial | Baixa |

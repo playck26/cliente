@@ -42,6 +42,9 @@
   --color-success: #009c3f;
   --color-warning: #b8862e;
   --color-border: #dee3db;
+  --color-court-dark: #11160f;
+  --color-court-clay: #b9673b;
+  --color-court-blue: #31658c;
 
   --radius: 8px;
   --radius-hero: 16px;
@@ -49,6 +52,8 @@
 
   --shadow-low: 0 4px 12px rgba(18, 20, 15, 0.06);
   --shadow-elevated: 0 8px 24px rgba(18, 20, 15, 0.12);
+  --shadow-lift: 0 18px 44px rgba(18, 20, 15, 0.16);
+  --shadow-glow: 0 16px 40px rgba(0, 156, 63, 0.22);
 
   /* Tokens semânticos do shadcn/ui, mapeados para os tokens PlayCK acima —
      nunca uma cor nova aqui, só remapeamento (regra de DESIGN.md). */
@@ -96,11 +101,16 @@
   --color-error: var(--color-error);
   --color-success: var(--color-success);
   --color-warning: var(--color-warning);
+  --color-court-dark: var(--color-court-dark);
+  --color-court-clay: var(--color-court-clay);
+  --color-court-blue: var(--color-court-blue);
 
   --radius-hero: var(--radius-hero);
   --radius-xl-hero: var(--radius-xl);
   --shadow-low: var(--shadow-low);
   --shadow-elevated: var(--shadow-elevated);
+  --shadow-lift: var(--shadow-lift);
+  --shadow-glow: var(--shadow-glow);
 
   --font-sans: var(--font-inter);
 
@@ -138,5 +148,29 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+@layer utilities {
+  .app-screen {
+    width: 100%;
+    max-width: 430px;
+    margin-inline: auto;
+    box-shadow: 0 0 60px rgba(18, 20, 15, 0.08);
+  }
+
+  .court-lines {
+    background:
+      linear-gradient(90deg, transparent 18%, rgba(255, 255, 255, 0.42) 18% 19%, transparent 19% 81%, rgba(255, 255, 255, 0.42) 81% 82%, transparent 82%),
+      linear-gradient(0deg, transparent 26%, rgba(255, 255, 255, 0.38) 26% 27%, transparent 27% 73%, rgba(255, 255, 255, 0.38) 73% 74%, transparent 74%),
+      linear-gradient(90deg, transparent 49.5%, rgba(255, 255, 255, 0.28) 49.5% 50.5%, transparent 50.5%);
+  }
+
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
   }
 }

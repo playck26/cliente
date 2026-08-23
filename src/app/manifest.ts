@@ -1,7 +1,6 @@
 import type { MetadataRoute } from "next";
 
-// PWA instalável (ADR-012). Ícones são placeholder sólido — trocar quando
-// o arquivo de marca oficial chegar (gap registrado em STATUS.md).
+// PWA instalável (ADR-012), usando a marca oficial fornecida para o Cliente.
 export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "PlayCK",
@@ -9,11 +8,11 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Suas aulas e reservas de quadra em um só lugar",
     start_url: "/",
     display: "standalone",
-    background_color: "#f7f6f1",
-    theme_color: "#2f6b3a",
+    background_color: "#f7f8f5",
+    theme_color: "#00763a",
     icons: [
-      { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
-      { src: "/icon-512.png", sizes: "512x512", type: "image/png" },
+      { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+      { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
     ],
   };
 }

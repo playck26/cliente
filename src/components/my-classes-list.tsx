@@ -1,21 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CalendarDays, Clock, MapPin } from "lucide-react";
+import { CalendarDays, Clock, Landmark } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
+import { CourtLines } from "@/components/court-lines";
+import { TennisBallIcon } from "@/components/icons/tennis-ball-icon";
 import { TopAppBar } from "@/components/top-app-bar";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ApiError, listMyClasses, type MyClass } from "@/lib/api-client";
 
-const DIAS_SEMANA = [
-  "Domingo",
-  "Segunda-feira",
-  "Terça-feira",
-  "Quarta-feira",
-  "Quinta-feira",
-  "Sexta-feira",
-  "Sábado",
-];
+const DIAS_SEMANA = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
 
 function formatarData(data: string): string {
   const [ano, mes, dia] = data.split("-").map(Number);
@@ -23,10 +16,7 @@ function formatarData(data: string): string {
   return `${diaSemana}, ${String(dia).padStart(2, "0")}/${String(mes).padStart(2, "0")}`;
 }
 
-// REQ-002 (SPEC-005): aluno lista as próprias próximas aulas. View-only
-// nesta rodada (GAP-008, TARGET_ARCHITECTURE.md) — uma ocupação de turma
-// é compartilhada por todos os alunos matriculados, sem aluno_id próprio,
-// então remarcar/cancelar uma ocorrência individual não é suportado ainda.
+// REQ-002 (SPEC-005): aluno lista as próprias próximas aulas. View-only.
 export function MyClassesList() {
   const [aulas, setAulas] = useState<MyClass[]>([]);
   const [loading, setLoading] = useState(true);
@@ -41,60 +31,84 @@ export function MyClassesList() {
       .finally(() => setLoading(false));
   }, []);
 
+  const totalQuadras = new Set(aulas.map((aula) => aula.quadraId)).size;
+
   return (
-    <main className="flex min-h-screen flex-col bg-background pb-20">
+    <main className="app-screen min-h-screen overflow-hidden bg-background pb-36">
       <TopAppBar />
 
-      <div className="flex flex-col gap-6 px-5 pt-2">
-        <h1 className="text-3xl font-bold text-[var(--color-primary)]">Minhas Aulas</h1>
+      <div className="space-y-5 px-5">
+        <section className="relative overflow-hidden rounded-3xl bg-[var(--color-primary-strong)] p-4 text-white shadow-[var(--shadow-lift)]">
+          <CourtLines className="opacity-30" />
+          <div className="relative z-10">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/12 px-3 py-1.5 text-[11px] font-bold tracking-[0.12em] text-white/80 uppercase ring-1 ring-white/10">
+                  <span className="size-2 rounded-full bg-[var(--color-secondary)]" />
+                  Minhas aulas
+                </div>
+                <h1 className="text-[28px] leading-[1.04] font-extrabold">Agenda de treino</h1>
+                <p className="mt-1.5 text-[13px] font-semibold text-white/75">
+                  {loading ? "Carregando sua agenda..." : `${aulas.length} ${aulas.length === 1 ? "aula programada" : "aulas programadas"}`}
+                </p>
+              </div>
+              <span className="flex size-[60px] shrink-0 items-center justify-center rounded-3xl bg-white/12 ring-1 ring-white/10">
+                <TennisBallIcon className="size-9 text-[#b8ff29]" strokeWidth={2.25} aria-hidden="true" />
+              </span>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <div className="rounded-2xl bg-white/12 p-3 ring-1 ring-white/20">
+                <p className="text-[22px] leading-none font-extrabold">{loading ? "–" : aulas.length}</p>
+                <p className="mt-1 text-[11px] font-bold text-white/70">próximas</p>
+              </div>
+              <div className="rounded-2xl bg-white/12 p-3 ring-1 ring-white/20">
+                <p className="text-[22px] leading-none font-extrabold">{loading ? "–" : totalQuadras}</p>
+                <p className="mt-1 text-[11px] font-bold text-white/70">quadras</p>
+              </div>
+            </div>
+          </div>
+        </section>
 
         {error ? (
-          <p role="alert" className="text-[var(--color-error)]">
-            {error}
-          </p>
+          <p role="alert" className="rounded-2xl bg-surface p-4 text-sm font-semibold text-[var(--color-error)] shadow-[var(--shadow-low)] ring-1 ring-border">{error}</p>
         ) : loading ? (
-          <p className="text-[var(--color-text-secondary)]">Carregando...</p>
-        ) : aulas.length === 0 ? (
-          <p className="text-[var(--color-text-secondary)]">Nenhuma aula agendada.</p>
-        ) : (
-          <div className="flex flex-col gap-4">
-            {aulas.map((aula) => (
-              <Card
-                key={aula.ocupacaoId}
-                className="relative overflow-hidden rounded-2xl border border-border/50 p-2 shadow-[var(--shadow-low)]"
-              >
-                <div
-                  aria-hidden="true"
-                  className="pointer-events-none absolute top-0 right-0 h-32 w-32 rounded-bl-[100px] bg-[var(--color-primary)]/5"
-                />
-                <CardHeader className="relative">
-                  <div className="flex items-start justify-between gap-2">
-                    <h2 className="text-lg font-semibold text-[var(--color-text-primary)]">
-                      {aula.turmaNome ?? "Turma"}
-                    </h2>
-                    {/* Badge de status com texto único (SPEC-007, decisão do
-                        usuário): o backend não distingue "confirmada" de
-                        "agendada" — toda aula listada é a mesma coisa, o
-                        badge só reforça a estética do card. */}
-                    <span className="flex h-6 shrink-0 items-center rounded-full bg-[var(--color-secondary-container)] px-3 text-xs font-semibold text-[var(--color-on-secondary-container)]">
-                      Agendada
-                    </span>
-                  </div>
-                </CardHeader>
-                <CardContent className="relative flex flex-col gap-1.5 text-sm text-[var(--color-text-secondary)]">
-                  <span className="flex items-center gap-2">
-                    <CalendarDays className="size-[18px]" /> {formatarData(aula.data)}
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <Clock className="size-[18px]" /> {aula.horaInicio}–{aula.horaFim}
-                  </span>
-                  <span className="flex items-center gap-2">
-                    <MapPin className="size-[18px]" /> {aula.quadraNome}
-                  </span>
-                </CardContent>
-              </Card>
-            ))}
+          <div className="space-y-3" aria-label="Carregando aulas">
+            {[0, 1].map((item) => <div key={item} className="h-36 animate-pulse rounded-3xl bg-[var(--color-surface-container-high)]" />)}
           </div>
+        ) : aulas.length === 0 ? (
+          <section className="rounded-3xl bg-surface p-6 text-center shadow-[var(--shadow-low)] ring-1 ring-border">
+            <span className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-[var(--color-secondary-container)] text-[var(--color-primary-strong)]">
+              <CalendarDays className="size-6" aria-hidden="true" />
+            </span>
+            <h2 className="mt-4 text-lg font-extrabold">Nenhuma aula agendada</h2>
+            <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Quando seu clube programar uma aula, ela aparecerá aqui.</p>
+          </section>
+        ) : (
+          <section className="space-y-3" aria-label="Próximas aulas">
+            {aulas.map((aula, index) => (
+              <article key={aula.ocupacaoId} className="rounded-3xl bg-surface p-4 shadow-[var(--shadow-low)] ring-1 ring-border">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-extrabold tracking-[0.14em] text-[var(--color-primary-strong)] uppercase">
+                      {formatarData(aula.data)} • {aula.horaInicio}
+                    </p>
+                    <h2 className="mt-1 truncate text-[19px] font-extrabold text-[var(--color-text-primary)]">{aula.turmaNome ?? "Turma"}</h2>
+                    <p className="mt-1 flex items-center gap-1.5 text-[13px] font-semibold text-[var(--color-text-secondary)]">
+                      <Landmark className="size-4 shrink-0" aria-hidden="true" />
+                      <span className="truncate">{aula.quadraNome}</span>
+                    </p>
+                  </div>
+                  <span className={`flex size-12 shrink-0 items-center justify-center rounded-2xl ${index === 0 ? "bg-[var(--color-secondary-container)]" : "bg-[var(--color-primary-container)]/55"} text-[var(--color-primary-strong)]`}>
+                    {index === 0 ? <Clock className="size-6" aria-hidden="true" /> : <TennisBallIcon className="size-6" aria-hidden="true" />}
+                  </span>
+                </div>
+                <div className="mt-4 flex min-h-11 items-center justify-between rounded-2xl bg-[var(--color-surface-container)] px-4">
+                  <span className="text-[13px] font-bold text-[var(--color-text-secondary)]">{aula.horaInicio}–{aula.horaFim}</span>
+                  <span className="rounded-full bg-white px-3 py-1 text-[11px] font-extrabold text-[var(--color-primary-strong)] ring-1 ring-border">Agendada</span>
+                </div>
+              </article>
+            ))}
+          </section>
         )}
       </div>
 
