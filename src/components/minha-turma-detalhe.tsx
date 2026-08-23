@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, CalendarDays, Clock, Landmark, Users } from "lucide-react";
+import { ArrowLeft, CalendarDays, CheckCircle2, Clock, Landmark, UserRound, Users } from "lucide-react";
+import { CourtLines } from "@/components/court-lines";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { TopAppBar } from "@/components/top-app-bar";
@@ -62,21 +63,19 @@ export function MinhaTurmaDetalheView({ id }: { id: string }) {
   }, [id]);
 
   return (
-    <div className="flex min-h-full flex-col bg-[var(--color-background)]">
+    <div className="app-screen flex min-h-full flex-col bg-[var(--color-background)]">
       <TopAppBar />
 
-      <main className="flex flex-1 flex-col gap-4 p-4">
+      <main className="flex flex-1 flex-col gap-5 px-4 pt-1 pb-8">
         <Button
           type="button"
           variant="ghost"
-          className="self-start gap-2 px-0"
+          className="self-start gap-2 px-0 text-[var(--color-primary-strong)]"
           onClick={() => router.push("/minhas-turmas")}
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
           Minhas turmas
         </Button>
-
-        <h1 className="text-2xl font-bold">{turma?.nome ?? "Turma"}</h1>
 
         {error ? (
           <p role="alert" className="text-sm text-[var(--color-error)]">
@@ -86,52 +85,55 @@ export function MinhaTurmaDetalheView({ id }: { id: string }) {
 
         {turma ? (
           <>
-            <Card>
-              <CardContent className="flex flex-col gap-2 py-4 text-sm text-[var(--color-text-secondary)]">
-                <span className="inline-flex items-center gap-2">
+            <section className="relative overflow-hidden rounded-[var(--radius-hero)] bg-[var(--color-primary-strong)] p-5 text-white shadow-[var(--shadow-elevated)]">
+              <CourtLines className="opacity-30" />
+              <div className="relative z-10">
+                <p className="text-xs font-bold tracking-[0.14em] text-white/65 uppercase">Turma ativa</p>
+                <h1 className="mt-2 text-3xl leading-tight font-extrabold">{turma.nome}</h1>
+                <div className="mt-5 grid grid-cols-2 gap-2 text-sm">
+                  <span className="inline-flex items-center gap-2 rounded-lg bg-black/15 px-3 py-2">
                   <CalendarDays className="size-4" aria-hidden="true" />
                   {DIAS_SEMANA[turma.diaSemana] ?? "—"}
-                </span>
-                <span className="inline-flex items-center gap-2">
+                  </span>
+                  <span className="inline-flex items-center gap-2 rounded-lg bg-black/15 px-3 py-2">
                   <Clock className="size-4" aria-hidden="true" />
                   {turma.horaInicio}–{turma.horaFim}
-                </span>
-                <span className="inline-flex items-center gap-2">
+                  </span>
+                  <span className="inline-flex items-center gap-2 rounded-lg bg-black/15 px-3 py-2">
                   <Landmark className="size-4" aria-hidden="true" />
                   {turma.quadraNome}
-                </span>
+                  </span>
                 {/* Sem prefixo "Nível": o nome vem do cadastro do gestor e
                     costuma já conter a palavra — na primeira empresa real o
                     nível se chama "Nivel 1", e a tela mostrava "Nível Nivel
                     1". Rótulo que a gente inventa em cima de texto do
                     usuário duplica no primeiro dado de verdade. */}
                 {turma.nivelNome ? (
-                  <span className="inline-flex items-center gap-2">
+                  <span className="inline-flex items-center gap-2 rounded-lg bg-black/15 px-3 py-2">
                     <Users className="size-4" aria-hidden="true" />
                     {turma.nivelNome}
                   </span>
                 ) : null}
-              </CardContent>
-            </Card>
+                </div>
+              </div>
+            </section>
 
             {ocorrencias.length > 0 ? (
               <>
-                <h2 className="text-sm font-semibold tracking-wide uppercase text-[var(--color-text-secondary)]">
-                  Aulas
-                </h2>
+                <h2 className="text-lg font-extrabold">Aulas e chamadas</h2>
                 <ul className="flex flex-col gap-2">
                   {ocorrencias.map((o) => {
                     const conteudo = (
                       <Card
                         className={
                           o.podeLancar
-                            ? "transition-colors hover:border-[var(--color-primary)]"
-                            : "opacity-60"
+                            ? "border-0 shadow-[var(--shadow-low)] ring-1 ring-border transition-colors hover:ring-[var(--color-primary)]"
+                            : "border-0 opacity-60 ring-1 ring-border"
                         }
                       >
                         <CardContent className="flex items-center justify-between gap-3 py-3">
-                          <span className="font-medium">{dataBR(o.data)}</span>
-                          <span className="text-sm text-[var(--color-text-secondary)]">
+                          <span className="flex items-center gap-3 font-bold"><span className="flex size-9 items-center justify-center rounded-lg bg-[var(--color-surface-container)]"><CalendarDays className="size-4" /></span>{dataBR(o.data)}</span>
+                          <span className={`text-xs font-semibold ${o.podeLancar ? "text-[var(--color-primary-strong)]" : "text-[var(--color-text-secondary)]"}`}>
                             {o.cancelada
                               ? "aula cancelada"
                               : o.chamadaFeita
@@ -164,7 +166,7 @@ export function MinhaTurmaDetalheView({ id }: { id: string }) {
               </>
             ) : null}
 
-            <h2 className="text-sm font-semibold tracking-wide uppercase text-[var(--color-text-secondary)]">
+            <h2 className="text-lg font-extrabold">
               Alunos ({turma.alunos.length}/{turma.capacidade})
             </h2>
 
@@ -176,11 +178,12 @@ export function MinhaTurmaDetalheView({ id }: { id: string }) {
               <ul className="flex flex-col gap-2">
                 {turma.alunos.map((aluno) => (
                   <li key={aluno.id}>
-                    <Card>
+                    <Card className="border-0 shadow-[var(--shadow-low)] ring-1 ring-border">
                       <CardContent className="flex items-center justify-between py-3">
-                        <span className="font-medium">{aluno.nome}</span>
+                        <span className="flex items-center gap-3 font-semibold"><span className="flex size-9 items-center justify-center rounded-full bg-[var(--color-secondary-container)] text-[var(--color-on-secondary-container)]"><UserRound className="size-4" /></span>{aluno.nome}</span>
                         {aluno.nivelNome ? (
-                          <span className="text-sm text-[var(--color-text-secondary)]">
+                          <span className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--color-text-secondary)]">
+                            <CheckCircle2 className="size-3.5 text-[var(--color-primary)]" />
                             {aluno.nivelNome}
                           </span>
                         ) : null}

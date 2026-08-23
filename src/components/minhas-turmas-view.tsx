@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, ChevronRight, Clock, Landmark, Users } from "lucide-react";
+import { CalendarCheck, CalendarDays, ChevronRight, Landmark, Users } from "lucide-react";
+import { CourtLines } from "@/components/court-lines";
 import { TopAppBar } from "@/components/top-app-bar";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -57,16 +58,32 @@ export function MinhasTurmasView() {
   }, []);
 
   return (
-    <div className="flex min-h-full flex-col bg-[var(--color-background)]">
-      <TopAppBar iniciais={usuario?.nome.charAt(0).toUpperCase()} />
+    <div className="app-screen flex min-h-full flex-col bg-[var(--color-background)]">
+      <TopAppBar saudacao={usuario?.nome.split(" ")[0]} />
 
-      <main className="flex flex-1 flex-col gap-4 p-4">
-        <h1 className="text-2xl font-bold">Minhas turmas</h1>
-        {usuario ? (
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            Olá, {usuario.nome.split(" ")[0]}.
-          </p>
-        ) : null}
+      <main className="flex flex-1 flex-col gap-5 px-4 pt-2 pb-8">
+        <section className="relative overflow-hidden rounded-[var(--radius-hero)] bg-[var(--color-court-dark)] p-5 text-white shadow-[var(--shadow-lift)]">
+          <CourtLines className="opacity-35" />
+          <div className="relative z-10 flex min-h-40 flex-col justify-between gap-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold tracking-[0.14em] text-white/65 uppercase">Painel do professor</p>
+                <h1 className="mt-2 text-3xl leading-tight font-extrabold">Minhas turmas</h1>
+                <p className="mt-1 text-sm text-white/70">Sua agenda de aulas em um só lugar.</p>
+              </div>
+              <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-[var(--color-secondary)] text-[var(--color-court-dark)] shadow-lg">
+                <CalendarCheck className="size-6" aria-hidden="true" />
+              </span>
+            </div>
+            <div className="flex items-end justify-between border-t border-white/20 pt-4">
+              <div>
+                <p className="text-3xl font-extrabold">{loading ? "—" : turmas.length}</p>
+                <p className="text-xs font-semibold text-white/65">turmas atribuídas</p>
+              </div>
+              <p className="max-w-32 text-right text-xs leading-relaxed text-white/60">Toque em uma turma para ver alunos e chamadas.</p>
+            </div>
+          </div>
+        </section>
 
         {loading ? (
           <p className="text-[var(--color-text-secondary)]">Carregando...</p>
@@ -97,22 +114,29 @@ export function MinhasTurmasView() {
           </Card>
         ) : null}
 
+        {!loading && !error && turmas.length > 0 ? (
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-extrabold">Sua grade</h2>
+            <span className="text-xs font-bold tracking-[0.12em] text-[var(--color-text-secondary)] uppercase">Semanal</span>
+          </div>
+        ) : null}
+
         <ul className="flex flex-col gap-3">
           {turmas.map((turma) => (
             <li key={turma.id}>
               <Link href={`/minhas-turmas/${turma.id}`} className="block">
-                <Card className="transition-colors hover:border-[var(--color-primary)]">
+                <Card className="border-0 shadow-[var(--shadow-low)] ring-1 ring-border transition-all hover:-translate-y-0.5 hover:ring-[var(--color-primary)]">
                   <CardContent className="flex items-center gap-3 py-4">
-                    <div className="flex flex-1 flex-col gap-1">
-                      <span className="font-semibold">{turma.nome}</span>
-                      <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[var(--color-text-secondary)]">
+                    <div className="flex size-11 shrink-0 flex-col items-center justify-center rounded-lg bg-[var(--color-primary-container)] text-[var(--color-primary-strong)]">
+                      <span className="text-[10px] font-bold uppercase">{(DIAS_SEMANA[turma.diaSemana] ?? "—").slice(0, 3)}</span>
+                      <span className="text-sm font-extrabold">{turma.horaInicio.slice(0, 2)}h</span>
+                    </div>
+                    <div className="flex min-w-0 flex-1 flex-col gap-2">
+                      <span className="truncate text-base font-extrabold">{turma.nome}</span>
+                      <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--color-text-secondary)]">
                         <span className="inline-flex items-center gap-1">
                           <CalendarDays className="size-4" aria-hidden="true" />
-                          {DIAS_SEMANA[turma.diaSemana] ?? "—"}
-                        </span>
-                        <span className="inline-flex items-center gap-1">
-                          <Clock className="size-4" aria-hidden="true" />
-                          {turma.horaInicio}–{turma.horaFim}
+                          {DIAS_SEMANA[turma.diaSemana] ?? "—"}, {turma.horaInicio}–{turma.horaFim}
                         </span>
                         <span className="inline-flex items-center gap-1">
                           <Landmark className="size-4" aria-hidden="true" />
@@ -125,7 +149,7 @@ export function MinhasTurmasView() {
                       </span>
                     </div>
                     <ChevronRight
-                      className="size-5 shrink-0 text-[var(--color-text-secondary)]"
+                      className="size-5 shrink-0 text-[var(--color-primary-strong)]"
                       aria-hidden="true"
                     />
                   </CardContent>

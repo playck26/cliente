@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Check, CircleSlash, Minus } from "lucide-react";
+import { ArrowLeft, CalendarDays, Check, CircleSlash, Minus, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { CourtLines } from "@/components/court-lines";
 import { TopAppBar } from "@/components/top-app-bar";
 import {
   ApiError,
@@ -127,29 +128,39 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
   const completa = total > 0 && faltamMarcar === 0;
 
   return (
-    <div className="flex min-h-full flex-col bg-[var(--color-background)]">
+    <div className="app-screen flex min-h-full flex-col bg-[var(--color-background)]">
       <TopAppBar />
 
-      <main className="flex flex-1 flex-col gap-4 p-4 pb-32">
+      <main className="flex flex-1 flex-col gap-5 px-4 pt-1 pb-40">
         <Button
           type="button"
           variant="ghost"
-          className="self-start gap-2 px-0"
+          className="self-start gap-2 px-0 text-[var(--color-primary-strong)]"
           onClick={() => router.back()}
         >
           <ArrowLeft className="size-4" aria-hidden="true" />
           Voltar
         </Button>
 
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-bold">Chamada</h1>
-          {chamada ? (
-            <p className="text-sm text-[var(--color-text-secondary)]">
-              {chamada.data.split("-").reverse().join("/")} ·{" "}
-              {chamada.horaInicio}–{chamada.horaFim}
-            </p>
-          ) : null}
-        </div>
+        <section className="relative overflow-hidden rounded-[var(--radius-hero)] bg-[var(--color-court-dark)] p-5 text-white shadow-[var(--shadow-elevated)]">
+          <CourtLines className="opacity-30" />
+          <div className="relative z-10">
+            <p className="text-xs font-bold tracking-[0.14em] text-[var(--color-secondary)] uppercase">Controle de presença</p>
+            <h1 className="mt-2 text-3xl font-extrabold">Chamada</h1>
+            {chamada ? (
+              <div className="mt-5 flex flex-wrap gap-2 text-sm">
+                <span className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2">
+                  <CalendarDays className="size-4" aria-hidden="true" />
+                  {chamada.data.split("-").reverse().join("/")} · {chamada.horaInicio}–{chamada.horaFim}
+                </span>
+                <span className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2">
+                  <Users className="size-4" aria-hidden="true" />
+                  {marcados}/{total} marcados
+                </span>
+              </div>
+            ) : null}
+          </div>
+        </section>
 
         {erro ? (
           <p role="alert" className="text-sm text-[var(--color-error)]">
@@ -188,11 +199,18 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
           </div>
         ) : null}
 
-        <ul className="flex flex-col gap-2">
+        {chamada ? (
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-extrabold">Alunos</h2>
+            <span className="text-xs font-bold text-[var(--color-text-secondary)]">{faltamMarcar > 0 ? `${faltamMarcar} pendentes` : "Completa"}</span>
+          </div>
+        ) : null}
+
+        <ul className="flex flex-col gap-3">
           {chamada?.alunos.map((aluno) => (
             <li key={aluno.alunoId}>
-              <Card>
-                <CardContent className="flex flex-col gap-3 py-3">
+              <Card className="border-0 shadow-[var(--shadow-low)] ring-1 ring-border">
+                <CardContent className="flex flex-col gap-3 py-4">
                   <div className="flex items-center gap-2">
                     <span className="font-medium">{aluno.nome}</span>
                     {/* AC-010: quem saiu da turma continua no histórico, e a
@@ -203,7 +221,7 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
                       </span>
                     ) : null}
                   </div>
-                  <div className="flex gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     {OPCOES.map(({ valor, label, Icon }) => {
                       const ativo = marcas[aluno.alunoId] === valor;
                       return (
@@ -212,10 +230,14 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
                           type="button"
                           aria-pressed={ativo}
                           onClick={() => marcar(aluno.alunoId, valor)}
-                          className={`flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-lg border text-sm font-medium transition-colors ${
-                            ativo
-                              ? "border-[var(--color-primary)] bg-[var(--color-primary)] text-white"
-                              : "border-border text-[var(--color-text-secondary)]"
+                          className={`flex min-h-12 items-center justify-center gap-1.5 rounded-lg border text-xs font-bold transition-colors ${
+                            ativo && valor === "presente"
+                              ? "border-[var(--color-primary-strong)] bg-[var(--color-primary-strong)] text-white"
+                              : ativo && valor === "ausente"
+                                ? "border-[var(--color-tertiary)] bg-[var(--color-tertiary)] text-white"
+                                : ativo
+                                  ? "border-[var(--color-warning)] bg-[var(--color-warning)] text-white"
+                                  : "border-border bg-[var(--color-surface-container)] text-[var(--color-text-secondary)]"
                           }`}
                         >
                           <Icon className="size-4" aria-hidden="true" />
@@ -234,7 +256,7 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
       {/* Barra fixa: em quadra a pessoa rola a lista, e o botão de salvar não
           pode exigir que ela role de volta até o fim. */}
       {chamada ? (
-        <div className="fixed inset-x-0 bottom-0 flex flex-col gap-2 border-t border-border bg-surface p-4">
+        <div className="fixed bottom-0 left-1/2 z-20 flex w-full max-w-[430px] -translate-x-1/2 flex-col gap-2 border-t border-border bg-surface/95 p-4 shadow-[0_-8px_24px_rgba(18,20,15,0.08)] backdrop-blur">
           <div className="flex items-center gap-3">
             {/* O contador dizia o estado ("2/10 marcados"); agora diz a
                 pendência. Estado é informação; pendência é instrução, e em
