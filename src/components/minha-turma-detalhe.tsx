@@ -6,11 +6,18 @@ import { ArrowLeft, CalendarDays, Clock, Landmark, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { TopAppBar } from "@/components/top-app-bar";
+import Link from "next/link";
 import {
   ApiError,
   getMinhaTurma,
+  listOcorrencias,
   type MinhaTurmaDetalhe,
+  type Ocorrencia,
 } from "@/lib/api-client";
+
+function dataBR(iso: string): string {
+  return iso.split("-").reverse().join("/");
+}
 
 const DIAS_SEMANA = [
   "Domingo",
@@ -36,6 +43,7 @@ const DIAS_SEMANA = [
 export function MinhaTurmaDetalheView({ id }: { id: string }) {
   const router = useRouter();
   const [turma, setTurma] = useState<MinhaTurmaDetalhe | null>(null);
+  const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -48,6 +56,9 @@ export function MinhaTurmaDetalheView({ id }: { id: string }) {
             : "Não foi possível carregar a turma.",
         );
       });
+    // Falha aqui não derruba a tela: a lista de alunos continua útil sem as
+    // ocorrências, e a chamada é a parte que pode esperar um retry.
+    listOcorrencias(id).then(setOcorrencias).catch(() => setOcorrencias([]));
   }, [id]);
 
   return (
@@ -102,6 +113,56 @@ export function MinhaTurmaDetalheView({ id }: { id: string }) {
                 ) : null}
               </CardContent>
             </Card>
+
+            {ocorrencias.length > 0 ? (
+              <>
+                <h2 className="text-sm font-semibold tracking-wide uppercase text-[var(--color-text-secondary)]">
+                  Aulas
+                </h2>
+                <ul className="flex flex-col gap-2">
+                  {ocorrencias.map((o) => {
+                    const conteudo = (
+                      <Card
+                        className={
+                          o.podeLancar
+                            ? "transition-colors hover:border-[var(--color-primary)]"
+                            : "opacity-60"
+                        }
+                      >
+                        <CardContent className="flex items-center justify-between gap-3 py-3">
+                          <span className="font-medium">{dataBR(o.data)}</span>
+                          <span className="text-sm text-[var(--color-text-secondary)]">
+                            {o.cancelada
+                              ? "aula cancelada"
+                              : o.chamadaFeita
+                                ? `chamada feita · ${o.marcados}/${o.totalAlunos}`
+                                : o.podeLancar
+                                  ? "fazer chamada"
+                                  : "ainda não aconteceu"}
+                          </span>
+                        </CardContent>
+                      </Card>
+                    );
+
+                    // INV-017 decide no servidor; aqui a tela só não oferece
+                    // o que seria recusado. Oferecer e depois recusar com
+                    // 422 seria pior: a pessoa tocaria, esperaria e levaria
+                    // um erro por algo que dava para saber antes.
+                    return (
+                      <li key={o.ocupacaoId}>
+                        {o.podeLancar ? (
+                          <Link href={`/chamada/${o.ocupacaoId}`} className="block">
+                            {conteudo}
+                          </Link>
+                        ) : (
+                          conteudo
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              </>
+            ) : null}
 
             <h2 className="text-sm font-semibold tracking-wide uppercase text-[var(--color-text-secondary)]">
               Alunos ({turma.alunos.length}/{turma.capacidade})

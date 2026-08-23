@@ -290,6 +290,63 @@ export async function getMe(): Promise<Usuario> {
   return (await res.json()) as Usuario;
 }
 
+export type StatusPresenca = "presente" | "ausente" | "justificado";
+
+export interface Ocorrencia {
+  ocupacaoId: string;
+  data: string;
+  horaInicio: string;
+  horaFim: string;
+  cancelada: boolean;
+  chamadaFeita: boolean;
+  marcados: number;
+  totalAlunos: number;
+  /** SPEC-014/INV-017: falso para aula futura, cancelada ou com mais de 7 dias. */
+  podeLancar: boolean;
+}
+
+export interface Chamada {
+  ocupacaoId: string;
+  turmaId: string;
+  data: string;
+  horaInicio: string;
+  horaFim: string;
+  cancelada: boolean;
+  /**
+   * SPEC-014/INV-019 — precisa voltar no PUT. Sem ela, dois aparelhos na
+   * mesma chamada se sobrescrevem em silêncio.
+   */
+  versao: string;
+  alunos: {
+    alunoId: string;
+    nome: string;
+    status: StatusPresenca | null;
+    naTurmaHoje: boolean;
+  }[];
+}
+
+export async function listOcorrencias(turmaId: string, dias = 30): Promise<Ocorrencia[]> {
+  const res = await authFetch(`/me/teacher/classes/${turmaId}/ocorrencias?dias=${dias}`);
+  return (await res.json()) as Ocorrencia[];
+}
+
+export async function getChamada(ocupacaoId: string): Promise<Chamada> {
+  const res = await authFetch(`/me/teacher/attendance/${ocupacaoId}`);
+  return (await res.json()) as Chamada;
+}
+
+export async function salvarChamada(
+  ocupacaoId: string,
+  versao: string,
+  itens: { alunoId: string; status: StatusPresenca }[],
+): Promise<{ versao: string; total: number }> {
+  const res = await authFetch(`/me/teacher/attendance/${ocupacaoId}`, {
+    method: "PUT",
+    body: JSON.stringify({ versao, itens }),
+  });
+  return (await res.json()) as { versao: string; total: number };
+}
+
 export async function listMinhasTurmas(): Promise<MinhaTurma[]> {
   const res = await authFetch("/me/teacher/classes");
   return (await res.json()) as MinhaTurma[];

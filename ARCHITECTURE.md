@@ -59,7 +59,8 @@ page.tsx (server component, fino)
 | `/home` | `home-view` | próximas aulas e atalhos |
 | `/minhas-aulas` | `my-classes-list` | aulas de turma (view-only, GAP-008) |
 | `/minhas-turmas` | `minhas-turmas-view` | **app do professor** (SPEC-013): a grade dele, sem `BottomNav` — barra com um item só é decoração |
-| `/minhas-turmas/[id]` | `minha-turma-detalhe` | quem está na turma: nome e nível. Sem contato, sem valor (AC-008) |
+| `/minhas-turmas/[id]` | `minha-turma-detalhe` | quem está na turma e as aulas dos últimos 30 dias |
+| `/chamada/[ocupacaoId]` | `chamada-view` | **a chamada** (SPEC-014). Desenhada para uso em quadra: 3 estados visíveis, 1 toque cada, salvar explícito e barra fixa |
 | `/quadras` (+ `[id]`) | `courts-list`, `court-booking` | reserva |
 | `/reservas` | `my-bookings-list` | reservas do aluno |
 
