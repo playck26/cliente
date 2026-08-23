@@ -185,14 +185,14 @@ async function requisicaoAutenticada(
   });
 }
 
-async function ehSenhaTemporaria(res: Response): Promise<boolean> {
+async function temCodigo(res: Response, codigo: string): Promise<boolean> {
   try {
     const body: unknown = await res.json();
     return (
       typeof body === "object" &&
       body !== null &&
       "code" in body &&
-      (body as { code?: string }).code === "SENHA_TEMPORARIA"
+      (body as { code?: string }).code === codigo
     );
   } catch {
     return false;
@@ -210,7 +210,17 @@ async function authFetch(path: string, init: RequestInit = {}): Promise<Response
   // temporária. Sem este desvio, a pessoa que chegasse a uma rota interna
   // (link antigo, voltar do navegador) veria um erro seco em vez da tela
   // que resolve o problema dela.
-  if (res.status === 403 && (await ehSenhaTemporaria(res.clone()))) {
+  // SPEC-013/INV-013 — conta inativada enquanto a sessão estava aberta. O
+  // servidor passa a responder 403 CONTA_INATIVA em toda rota, e um 403 não
+  // dispara a renovação logo abaixo: sem este desvio a pessoa ficaria presa
+  // numa tela viva cheia de erros, sem entender que perdeu o acesso.
+  // Encerra a sessão como se fosse expiração, porque para ela é isso mesmo.
+  if (res.status === 403 && (await temCodigo(res.clone(), "CONTA_INATIVA"))) {
+    encerrarSessao();
+    throw await parseError(res, "Esta conta está inativa. Procure o administrador.");
+  }
+
+  if (res.status === 403 && (await temCodigo(res.clone(), "SENHA_TEMPORARIA"))) {
     if (typeof window !== "undefined" && window.location.pathname !== "/primeiro-acesso") {
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.href = "/primeiro-acesso";
