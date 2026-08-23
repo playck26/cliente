@@ -58,6 +58,8 @@ page.tsx (server component, fino)
 | `/convite/[token]` | `aceitar-convite-form` | aceite de convite |
 | `/home` | `home-view` | próximas aulas e atalhos |
 | `/minhas-aulas` | `my-classes-list` | aulas de turma (view-only, GAP-008) |
+| `/minhas-turmas` | `minhas-turmas-view` | **app do professor** (SPEC-013): a grade dele, sem `BottomNav` — barra com um item só é decoração |
+| `/minhas-turmas/[id]` | `minha-turma-detalhe` | quem está na turma: nome e nível. Sem contato, sem valor (AC-008) |
 | `/quadras` (+ `[id]`) | `courts-list`, `court-booking` | reserva |
 | `/reservas` | `my-bookings-list` | reservas do aluno |
 

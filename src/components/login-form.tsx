@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError, login } from "@/lib/api-client";
+import { rotaInicial } from "@/lib/rota-inicial";
 import { saveAccessToken } from "@/lib/auth-storage";
 
 export function LoginForm() {
@@ -30,7 +31,9 @@ export function LoginForm() {
       // até trocá-la (INV-008). Mandar direto para a Home só produziria
       // uma tela de erro; o servidor barraria tudo de qualquer forma.
       router.push(
-        result.usuario.senhaTemporaria ? "/primeiro-acesso" : "/home",
+        result.usuario.senhaTemporaria
+          ? "/primeiro-acesso"
+          : rotaInicial(result.usuario.role),
       );
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Não foi possível entrar. Tente de novo.");

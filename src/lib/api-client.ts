@@ -9,12 +9,34 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 
 export type LoginDto = components["schemas"]["LoginDto"];
 
+export type Papel = "super_admin" | "company_admin" | "aluno" | "professor";
+
 export interface Usuario {
   id: string;
   nome: string;
   email: string;
-  role: "super_admin" | "company_admin" | "aluno";
+  role: Papel;
   companyId: string | null;
+}
+
+// SPEC-013 — o que o professor vê. Note o que **não** está aqui: telefone
+// e e-mail de aluno, valor, situação de pagamento. O servidor também não
+// devolve (AC-008); o tipo existe para que adicionar isso exija uma
+// decisão, não um descuido.
+export interface MinhaTurma {
+  id: string;
+  nome: string;
+  diaSemana: number;
+  horaInicio: string;
+  horaFim: string;
+  quadraNome: string;
+  nivelNome: string | null;
+  capacidade: number;
+  totalAlunos: number;
+}
+
+export interface MinhaTurmaDetalhe extends Omit<MinhaTurma, "totalAlunos"> {
+  alunos: { id: string; nome: string; nivelNome: string | null }[];
 }
 
 export interface LoginResult {
@@ -23,7 +45,7 @@ export interface LoginResult {
   usuario: {
     id: string;
     nome: string;
-    role: "super_admin" | "company_admin" | "aluno";
+    role: Papel;
     companyId: string | null;
     /**
      * SPEC-009/AC-008 — conta criada pelo admin entra com senha temporária
@@ -266,6 +288,16 @@ export async function login(dto: LoginDto): Promise<LoginResult> {
 export async function getMe(): Promise<Usuario> {
   const res = await authFetch("/auth/me");
   return (await res.json()) as Usuario;
+}
+
+export async function listMinhasTurmas(): Promise<MinhaTurma[]> {
+  const res = await authFetch("/me/teacher/classes");
+  return (await res.json()) as MinhaTurma[];
+}
+
+export async function getMinhaTurma(id: string): Promise<MinhaTurmaDetalhe> {
+  const res = await authFetch(`/me/teacher/classes/${id}`);
+  return (await res.json()) as MinhaTurmaDetalhe;
 }
 
 export async function listMyClasses(): Promise<MyClass[]> {

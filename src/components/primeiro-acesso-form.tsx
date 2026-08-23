@@ -4,7 +4,8 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { CampoSenha } from "@/components/campo-senha";
-import { ApiError, trocarSenha } from "@/lib/api-client";
+import { ApiError, getMe, trocarSenha } from "@/lib/api-client";
+import { rotaInicial } from "@/lib/rota-inicial";
 import { saveAccessToken } from "@/lib/auth-storage";
 
 /**
@@ -40,7 +41,12 @@ export function PrimeiroAcessoForm() {
       // sem guardar este token, a pessoa cairia no login logo depois de
       // fazer exatamente o que o sistema exigiu.
       saveAccessToken(accessToken);
-      router.push("/home");
+      // SPEC-013 — o destino depende do papel, e `trocarSenha` devolve só o
+      // token. Uma ida a `/auth/me` custa menos que mandar o professor para
+      // a Home do aluno, onde o servidor recusaria tudo e ele veria um erro
+      // logo depois de fazer exatamente o que o sistema exigiu.
+      const usuario = await getMe();
+      router.push(rotaInicial(usuario.role));
     } catch (err) {
       setError(
         err instanceof ApiError
