@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, CalendarDays, CheckCircle2, Clock, Landmark, UserRound, Users } from "lucide-react";
+import { ArrowLeft, CalendarDays, CheckCircle2, Clock, UserRound, Users } from "lucide-react";
+import { TennisCourtIcon } from "@/components/icons/tennis-court-icon";
 import { CourtLines } from "@/components/court-lines";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -100,7 +101,7 @@ export function MinhaTurmaDetalheView({ id }: { id: string }) {
                   {turma.horaInicio}–{turma.horaFim}
                   </span>
                   <span className="inline-flex items-center gap-2 rounded-lg bg-black/15 px-3 py-2">
-                  <Landmark className="size-4" aria-hidden="true" />
+                  <TennisCourtIcon className="size-4" aria-hidden="true" />
                   {turma.quadraNome}
                   </span>
                 {/* Sem prefixo "Nível": o nome vem do cadastro do gestor e

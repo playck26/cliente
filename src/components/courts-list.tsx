@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Landmark } from "lucide-react";
+import { ArrowRight } from "lucide-react";
+import { TennisCourtIcon } from "@/components/icons/tennis-court-icon";
 import { BottomNav } from "@/components/bottom-nav";
 import { CourtLines } from "@/components/court-lines";
 import { TennisBallIcon } from "@/components/icons/tennis-ball-icon";
@@ -46,7 +47,7 @@ export function CourtsList() {
               </p>
             </div>
             <span className="flex size-14 shrink-0 items-center justify-center rounded-3xl bg-[var(--color-secondary)] text-[var(--color-on-secondary-container)]">
-              <Landmark className="size-7" aria-hidden="true" />
+              <TennisCourtIcon className="size-7" aria-hidden="true" />
             </span>
           </div>
 

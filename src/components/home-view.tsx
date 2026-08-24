@@ -2,15 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import {
-  ArrowRight,
-  CalendarCheck,
-  CalendarDays,
-  Clock,
-  Eye,
-  Landmark,
-  Plus,
-} from "lucide-react";
+import { ArrowRight, CalendarCheck, CalendarDays, Clock, Eye, Plus } from "lucide-react";
+import { TennisCourtIcon } from "@/components/icons/tennis-court-icon";
 import { BottomNav } from "@/components/bottom-nav";
 import { CourtLines } from "@/components/court-lines";
 import { TennisBallIcon } from "@/components/icons/tennis-ball-icon";
@@ -36,7 +29,7 @@ function formatarData(data: string): string {
 const ATALHOS = [
   { href: "/quadras", label: "Reservar", Icon: Plus },
   { href: "/minhas-aulas", label: "Aulas", Icon: TennisBallIcon },
-  { href: "/quadras", label: "Quadras", Icon: Landmark },
+  { href: "/quadras", label: "Quadras", Icon: TennisCourtIcon },
   { href: "/reservas", label: "Reservas", Icon: CalendarCheck },
 ] as const;
 
@@ -105,7 +98,7 @@ export function HomeView() {
               {proximaAula ? (
                 <div className="mt-5 flex flex-wrap gap-2">
                   <span className="inline-flex min-h-10 items-center gap-2 rounded-2xl bg-white/12 px-3 text-[13px] font-bold ring-1 ring-white/20">
-                    <Landmark className="size-4 text-[var(--color-secondary)]" aria-hidden="true" />
+                    <TennisCourtIcon className="size-4 text-[var(--color-secondary)]" aria-hidden="true" />
                     {proximaAula.quadraNome}
                   </span>
                   <span className="inline-flex min-h-10 items-center gap-2 rounded-2xl bg-white/12 px-3 text-[13px] font-bold ring-1 ring-white/20">

@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CalendarCheck, Home, Landmark, Plus } from "lucide-react";
+import { CalendarCheck, Home, Plus } from "lucide-react";
+import { TennisCourtIcon } from "@/components/icons/tennis-court-icon";
 import { TennisBallIcon } from "@/components/icons/tennis-ball-icon";
 
 // Navegação inferior (tab bar) — padrão de mobile do app do aluno
@@ -15,7 +16,7 @@ const ITENS_ESQUERDA = [
 ] as const;
 
 const ITENS_DIREITA = [
-  { href: "/quadras", label: "Quadras", Icon: Landmark },
+  { href: "/quadras", label: "Quadras", Icon: TennisCourtIcon },
   { href: "/reservas", label: "Reservas", Icon: CalendarCheck },
 ] as const;
 

@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CalendarCheck, CalendarDays, ChevronRight, Landmark, Users } from "lucide-react";
+import { CalendarCheck, CalendarDays, ChevronRight, Users } from "lucide-react";
+import { TennisCourtIcon } from "@/components/icons/tennis-court-icon";
 import { CourtLines } from "@/components/court-lines";
 import { TopAppBar } from "@/components/top-app-bar";
 import { Card, CardContent } from "@/components/ui/card";
@@ -139,7 +140,7 @@ export function MinhasTurmasView() {
                           {DIAS_SEMANA[turma.diaSemana] ?? "—"}, {turma.horaInicio}–{turma.horaFim}
                         </span>
                         <span className="inline-flex items-center gap-1">
-                          <Landmark className="size-4" aria-hidden="true" />
+                          <TennisCourtIcon className="size-4" aria-hidden="true" />
                           {turma.quadraNome}
                         </span>
                         <span className="inline-flex items-center gap-1">

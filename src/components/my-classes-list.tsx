@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CalendarDays, Clock, Landmark } from "lucide-react";
+import { CalendarDays, Clock } from "lucide-react";
+import { TennisCourtIcon } from "@/components/icons/tennis-court-icon";
 import { BottomNav } from "@/components/bottom-nav";
 import { CourtLines } from "@/components/court-lines";
 import { TennisBallIcon } from "@/components/icons/tennis-ball-icon";
@@ -94,7 +95,7 @@ export function MyClassesList() {
                     </p>
                     <h2 className="mt-1 truncate text-[19px] font-extrabold text-[var(--color-text-primary)]">{aula.turmaNome ?? "Turma"}</h2>
                     <p className="mt-1 flex items-center gap-1.5 text-[13px] font-semibold text-[var(--color-text-secondary)]">
-                      <Landmark className="size-4 shrink-0" aria-hidden="true" />
+                      <TennisCourtIcon className="size-4 shrink-0" aria-hidden="true" />
                       <span className="truncate">{aula.quadraNome}</span>
                     </p>
                   </div>
