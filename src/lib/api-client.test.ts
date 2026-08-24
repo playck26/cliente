@@ -37,6 +37,8 @@ describe("parseError (pelo authFetch)", () => {
   });
 
   it("403 sem mensagem própria vira uma frase que a pessoa entende", async () => {
+    // Todas as chamadas devolvem 403 — inclusive a renovação, que falha e
+    // deixa o erro original subir.
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
@@ -52,6 +54,65 @@ describe("parseError (pelo authFetch)", () => {
       "Sua conta não tem acesso a esta área.",
     );
     expect((erro as ApiError).message).not.toMatch(/forbidden/i);
+  });
+
+  it("DEF-008: 403 puro tenta RENOVAR a sessão e repete o pedido", async () => {
+    // O servidor autoriza pelo TOKEN; o app navega pelo `/auth/me`, que lê do
+    // BANCO. Quando papel ou empresa mudam, os dois discordam — e sem esta
+    // renovação a divergência não tinha como se resolver sozinha.
+    const fetchMock = vi
+      .fn()
+      // 1ª tentativa: 403 com o token velho
+      .mockResolvedValueOnce(respostaDe(403, { message: "Forbidden", statusCode: 403 }))
+      // a renovação
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ accessToken: "token-novo" }),
+        clone() {
+          return this;
+        },
+      } as unknown as Response)
+      // 2ª tentativa: já com o token novo
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve([]),
+        clone() {
+          return this;
+        },
+      } as unknown as Response);
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(listMyClasses()).resolves.toEqual([]);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(window.localStorage.getItem("playck_cliente_access_token")).toBe(
+      "token-novo",
+    );
+  });
+
+  it("403 que PERSISTE depois da renovação é permissão de verdade", async () => {
+    // Aluno pedindo rota de gestor continua sendo recusado — a renovação não
+    // pode virar uma forma de insistir até passar.
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(respostaDe(403, { message: "Forbidden", statusCode: 403 }))
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ accessToken: "token-novo" }),
+        clone() {
+          return this;
+        },
+      } as unknown as Response)
+      .mockResolvedValueOnce(respostaDe(403, { message: "Forbidden", statusCode: 403 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const erro = await listMyClasses().catch((e: unknown) => e);
+
+    expect((erro as ApiError).status).toBe(403);
+    expect((erro as ApiError).message).toBe("Sua conta não tem acesso a esta área.");
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("403 COM mensagem própria passa intacto", async () => {
