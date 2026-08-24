@@ -129,12 +129,27 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * O texto que o Nest devolve num `ForbiddenException()` sem argumento.
+ * Chegou até o usuário em produção, sozinho no meio da tela (DEF-007).
+ */
+const FORBIDDEN_CRU = "Forbidden";
+
 async function parseError(res: Response, fallback: string): Promise<ApiError> {
   const body: unknown = await res.json().catch(() => null);
   const message =
     body && typeof body === "object" && "message" in body && typeof body.message === "string"
       ? body.message
       : fallback;
+
+  // DEF-007 — um 403 sem mensagem própria é o servidor dizendo "seu papel
+  // não pode isso". "Forbidden" na tela não diz nada a ninguém e não dá o
+  // que fazer a seguir. Erro de domínio com mensagem própria passa intacto:
+  // a troca só alcança o texto padrão do framework.
+  if (res.status === 403 && message === FORBIDDEN_CRU) {
+    return new ApiError(res.status, "Sua conta não tem acesso a esta área.");
+  }
+
   return new ApiError(res.status, message);
 }
 

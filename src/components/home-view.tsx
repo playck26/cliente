@@ -37,19 +37,56 @@ const ATALHOS = [
 export function HomeView() {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [aulas, setAulas] = useState<MyClass[]>([]);
+  const [agendaIndisponivel, setAgendaIndisponivel] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // DEF-007 (2026-08-24) — três defeitos empilhados, achados em produção:
+  //
+  // 1. `/me/classes` é `@Roles('aluno')`, mas `rotaInicial()` manda para cá
+  //    TODO papel que não é professor — gestor e super admin inclusive. Para
+  //    eles a chamada sempre devolveu 403.
+  // 2. O `Promise.all` fazia esse 403 derrubar o `getMe()` junto, e a home
+  //    inteira — nome, agenda, atalhos — virava uma palavra vermelha.
+  // 3. A palavra era "Forbidden", crua do servidor. Ninguém consegue agir
+  //    sobre isso.
+  //
+  // A ordem aqui é deliberada: o `getMe()` decide o que mais vale a pena
+  // pedir, e o que é secundário não pode derrubar o que é principal.
   useEffect(() => {
-    Promise.all([getMe(), listMyClasses()])
-      .then(([usuarioData, aulasData]) => {
+    let ativo = true;
+
+    getMe()
+      .then(async (usuarioData) => {
+        if (!ativo) return;
         setUsuario(usuarioData);
-        setAulas(aulasData);
+
+        if (usuarioData.role !== "aluno") return;
+
+        try {
+          const aulasData = await listMyClasses();
+          if (ativo) setAulas(aulasData);
+        } catch {
+          // A agenda é dado secundário: sem ela a home fica de pé, e o
+          // aviso ocupa o lugar dela em vez do lugar da tela.
+          if (ativo) setAgendaIndisponivel(true);
+        }
       })
       .catch((err: unknown) => {
-        setError(err instanceof ApiError ? err.message : "Não foi possível carregar a home.");
+        if (!ativo) return;
+        setError(
+          err instanceof ApiError && err.status === 403
+            ? "Sua conta não tem acesso a esta área."
+            : "Não foi possível carregar a home.",
+        );
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (ativo) setLoading(false);
+      });
+
+    return () => {
+      ativo = false;
+    };
   }, []);
 
   const primeiroNome = usuario?.nome.split(" ")[0];
@@ -106,6 +143,16 @@ export function HomeView() {
                     {proximaAula.horaInicio}
                   </span>
                 </div>
+              ) : null}
+
+              {agendaIndisponivel ? (
+                <p
+                  role="status"
+                  className="mt-4 text-[13px] font-semibold text-white/72"
+                >
+                  Não foi possível carregar sua agenda agora. O resto da home
+                  continua funcionando.
+                </p>
               ) : null}
 
               <Link
