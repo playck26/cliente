@@ -1,6 +1,6 @@
 # ARCHITECTURE — `cliente` (PlayCK)
 
-**Fonte: análise direta do código.** Data: 2026-08-22.
+**Fonte: análise direta do código.** Data: 2026-08-25.
 
 Planta **AS-IS**. Intenção arquitetural vive em `TARGET_ARCHITECTURE.md`
 (raiz do workspace) + ADRs em `DECISIONS.md`. Divergência entre este
@@ -123,8 +123,47 @@ Deploy: Netlify (plano Personal desde 2026-08-22, ADR-014).
 | `api-types.ts` nunca editado à mão | arquivo é gerado; diff denuncia |
 | Sem estado global sem ADR | busca por libs de estado no CI seria o gate — **hoje não existe** |
 | `typecheck`, `lint`, `test`, `build` verdes | CI (GitHub Actions) a cada push |
+| `comprimir-imagem.ts` idêntico entre `admin` e `cliente` | **não existe gate** — poly-repo sem pacote compartilhado (ADR-001). Custo declarado, ver a seção da compressão |
 
-## 9. Gaps e pontos de atenção
+## 9. Compressão de imagem no navegador (SPEC-018/TASK-002)
+
+`lib/comprimir-imagem.ts` — **existe desde 2026-08-25 e ainda não tem
+chamador**: as telas que sobem foto são das TASK-003 a 006. É a peça que
+transforma a foto de 12 MP do celular no que o servidor aceita: **2000px no
+maior lado, WebP q90** (REQ-001), abaixo do teto de 2 MB e dos 2500px que o
+`back` impõe.
+
+**O arquivo é duplicado, byte a byte, em `admin` e `cliente`** — poly-repo
+(ADR-001), sem pacote compartilhado. **Não há gate que garanta a
+sincronia**: as duas cópias divergirem em silêncio é o custo declarado da
+decisão, e mudança numa é mudança na outra.
+
+**A parte que não é óbvia é `sRGB` (INV-050).** `canvas.toBlob('image/webp')`
+num aparelho de tela **Display P3** pode gravar o chunk `ICCP`, e o validador
+do `back` é allowlist — recusa. O defeito só apareceria no aparelho de quem
+está usando, que é o pior lugar para ele morar. Duas defesas:
+
+1. `getContext('2d', { colorSpace: 'srgb' })` e
+   `createImageBitmap(f, { colorSpaceConversion: 'default' })`, os dois
+   **explícitos**;
+2. `inspecionarWebp()` lê os FourCC do resultado **antes de subir**, e
+   reprova localmente com mensagem legível em vez de deixar virar 422.
+
+A defesa 2 **não é uma segunda validação**: a autoridade continua sendo
+`webp.validator.ts` no `back`, que confere ordem, cardinalidade e dimensão.
+Aqui só se pergunta "apareceu chunk que eu sei que vai ser recusado?".
+
+**O que os testes provam e o que não provam.** `jsdom` não tem canvas nem
+encoder de WebP, então **nenhum teste comprime imagem de verdade** — a
+costura `DependenciasDoNavegador` existe para isso, e adicionar o pacote
+nativo `canvas` seria mudar a lista de dependências deste repositório por
+causa de um teste. Provado: a conta de dimensão (varredura, não caso
+escolhido), a leitura de chunk, e **os argumentos exatos** de
+`getContext`/`createImageBitmap`/`toBlob`. **Não provado, e é lacuna real:**
+que um Chrome em tela Display P3 de fato não grava `ICCP` — isso é prova de
+aparelho, e a defesa contra ela estar errada é a inspeção do resultado.
+
+## 10. Gaps e pontos de atenção
 
 | # | Gap | Severidade |
 |---|---|---|
