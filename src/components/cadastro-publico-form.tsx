@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { CampoSenha } from "@/components/campo-senha";
+import { LogoDaEmpresa } from "@/components/logo-da-empresa";
 import {
   ApiError,
   getEmpresaPorSlug,
@@ -101,6 +102,22 @@ export function CadastroPublicoForm({ slug }: { slug: string }) {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
+      {/* SPEC-018/TASK-006 — esta é a ÚNICA tela em que a logo aparece para
+          quem ainda não é cliente do clube. Quem chega por este link veio de
+          um convite da escola, e reconhecer a marca antes de digitar dados
+          pessoais é o que faz o link parecer legítimo. */}
+      <header className="flex flex-col items-center gap-3 pb-2 text-center">
+        <LogoDaEmpresa url={empresa?.logoUrl ?? null} nome={empresa?.nome} className="size-20" />
+        {empresa?.nome ? (
+          <div>
+            <p className="text-xs font-bold tracking-[0.14em] text-[var(--color-text-secondary)] uppercase">
+              Cadastro em
+            </p>
+            <p className="text-xl font-extrabold text-[var(--color-primary-strong)]">{empresa.nome}</p>
+          </div>
+        ) : null}
+      </header>
+
       <div className="flex flex-col gap-2">
         <Label htmlFor="nome">Nome completo</Label>
         <div className="relative">

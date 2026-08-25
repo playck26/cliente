@@ -184,6 +184,28 @@ Quem monta o cabeçalho de multipart é o navegador, porque só ele conhece o
 servidor — e o erro apareceria como "envie o arquivo no campo arquivo",
 mandando quem investigasse para o lado errado.
 
+### A marca do clube na tela (SPEC-018/TASK-006)
+
+`logo-da-empresa.tsx` — desenha a logo, ou a **inicial do clube** quando não
+há. **Nunca cai para a marca do PlayCK:** o aluno abre o app da escola dele,
+e pôr a marca do fornecedor no lugar diria a coisa errada todos os dias.
+
+Aparece em dois lugares: o `TopAppBar` (quatro telas do aluno, onde o nome do
+clube também substituiu "PlayCK") e a **página pública de cadastro**
+`/cadastro/<slug>` — a única tela em que a logo aparece para quem ainda
+**não** é cliente, e onde reconhecer a marca antes de digitar dados pessoais
+é o que faz o link parecer legítimo.
+
+**A URL vem sempre resolvida pelo servidor**, nunca montada aqui: quem
+traduz `logo_key` → URL, com o fallback para a `logo_url` antiga (AC-013), é
+o `LogoDaEmpresaService` no `back`. O frontend não sabe montar chave.
+
+`getMinhaEmpresa()` é **cacheada num módulo** (uma promessa guardada), porque
+o `TopAppBar` aparece em quatro telas e sem isso cada navegação refaria a
+chamada. Não há React Query nem estado global neste projeto, e um store por
+causa de um avatar seria a decisão errada. O cache é limpo em
+`encerrarSessao()`: a próxima pessoa nesta aba pode ser de outro clube.
+
 ## 10. Gaps e pontos de atenção
 
 | # | Gap | Severidade |

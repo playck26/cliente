@@ -196,6 +196,10 @@ async function renovarSessao(): Promise<boolean> {
 
 function encerrarSessao(): void {
   clearAccessToken();
+  // A navegação dura abaixo já descartaria o cache, mas ela é condicional
+  // (não roda se a pessoa já está em /login). Limpar aqui garante que a
+  // logo do clube anterior não sobreviva à troca de sessão na mesma aba.
+  limparCacheDaEmpresa();
   if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
     // Navegação dura de propósito, em vez de `router.push`: este módulo não
     // é componente (não há hook disponível) e, mais importante, sessão
@@ -586,4 +590,50 @@ export async function removerMinhaFoto(): Promise<void> {
   if (!res.ok) {
     throw await parseError(res, "Não foi possível remover sua foto");
   }
+}
+
+// ---------------------------------------------------------------------------
+// SPEC-018/TASK-006 — a marca do clube
+// ---------------------------------------------------------------------------
+
+export interface MinhaEmpresa {
+  nome: string;
+  slug: string;
+  /** Já resolvida pelo servidor: upload quando existe, `logo_url` senão. */
+  logoUrl: string | null;
+  status: string;
+  permiteAutoCadastro: boolean;
+}
+
+let empresaEmCache: Promise<MinhaEmpresa> | null = null;
+
+/**
+ * **Cacheada em memória, e de propósito.** O `TopAppBar` aparece em quatro
+ * telas; sem o cache, cada navegação refaria a chamada só para desenhar a
+ * mesma logo. Este projeto não tem React Query nem estado global (ADR
+ * registrado na planta), então o cache é uma promessa guardada no módulo —
+ * a coisa mais simples que resolve, e some quando a aba fecha.
+ *
+ * `limparCacheDaEmpresa()` existe para o logout: a próxima pessoa a entrar
+ * nesta aba pode ser de outro clube.
+ */
+export async function getMinhaEmpresa(): Promise<MinhaEmpresa> {
+  empresaEmCache ??= authFetch("/me/company")
+    .then(async (res) => {
+      if (!res.ok) {
+        throw await parseError(res, "Não foi possível carregar o clube");
+      }
+      return (await res.json()) as MinhaEmpresa;
+    })
+    .catch((erro: unknown) => {
+      // Uma falha não pode envenenar o cache: sem isto, um erro de rede no
+      // primeiro carregamento deixaria a logo ausente até recarregar a aba.
+      empresaEmCache = null;
+      throw erro;
+    });
+  return empresaEmCache;
+}
+
+export function limparCacheDaEmpresa(): void {
+  empresaEmCache = null;
 }

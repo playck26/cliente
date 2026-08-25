@@ -1,33 +1,56 @@
 "use client";
 
-import Image from "next/image";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Bell, User } from "lucide-react";
+import { LogoDaEmpresa } from "@/components/logo-da-empresa";
+import { getMinhaEmpresa, type MinhaEmpresa } from "@/lib/api-client";
 
 // Cabeçalho compartilhado (SPEC-007) — repete em Home/Minhas Aulas/
 // Quadras/Minhas Reservas na referência "Performance Court". `iniciais`
 // é opcional (a Home já tinha a inicial do aluno; as outras 3 telas não
 // tinham esse dado antes e não precisam buscá-lo só pra isso).
 export function TopAppBar({ saudacao, iniciais }: { saudacao?: string; iniciais?: string }) {
+  const [empresa, setEmpresa] = useState<MinhaEmpresa | null>(null);
+
+  useEffect(() => {
+    let vivo = true;
+    // A chamada é cacheada no módulo: este cabeçalho aparece em quatro
+    // telas, e sem o cache cada navegação refaria a requisição.
+    getMinhaEmpresa()
+      .then((e) => {
+        if (vivo) setEmpresa(e);
+      })
+      .catch(() => {
+        // Sem logo o cabeçalho continua inteiro, com a inicial. Erro aqui
+        // não merece alarme: nada do que a pessoa veio fazer depende disso.
+      });
+    return () => {
+      vivo = false;
+    };
+  }, []);
+
   return (
     <header className="flex items-center justify-between gap-2 px-5 pt-4 pb-3">
       <div className="flex items-center gap-3">
         <div className="relative flex size-12 items-center justify-center rounded-2xl bg-surface shadow-[var(--shadow-low)] ring-1 ring-border">
-          <Image
-            src="/playck-logo.png"
-            alt=""
-            width={40}
-            height={40}
-            className="size-10 object-contain"
-            aria-hidden="true"
-          />
+          {/* SPEC-018/TASK-006 — a marca do CLUBE, não a do PlayCK. O aluno
+              abre o app da escola dele; mostrar a marca do fornecedor aqui
+              dizia a coisa errada todos os dias. Sem logo, aparece a inicial
+              do clube. */}
+          <LogoDaEmpresa url={empresa?.logoUrl ?? null} nome={empresa?.nome} className="size-10" />
           <span className="absolute -top-1 -right-1 flex size-3 rounded-full bg-[var(--color-secondary)] ring-2 ring-background" />
         </div>
         <div>
           <p className="text-[11px] font-bold tracking-[0.16em] text-[var(--color-text-secondary)] uppercase">
             {saudacao ? `Olá, ${saudacao}` : iniciais ? `Olá, ${iniciais}` : "PlayCK Club"}
           </p>
-          <span className="text-2xl leading-none font-extrabold text-[var(--color-primary-strong)]">PlayCK</span>
+          {/* O nome do clube toma o lugar de "PlayCK" pelo mesmo motivo da
+              logo. Enquanto ele não chega, "PlayCK" segura o espaço — trocar
+              por vazio faria o cabeçalho pular. */}
+          <span className="text-2xl leading-none font-extrabold text-[var(--color-primary-strong)]">
+            {empresa?.nome ?? "PlayCK"}
+          </span>
         </div>
       </div>
       {/* Sino de notificação inerte (SPEC-007, decisão do usuário): não

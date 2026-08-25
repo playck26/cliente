@@ -34,6 +34,17 @@ vi.mock("@/lib/api-client", () => ({
   ApiError: ApiErrorFalso,
   getMe: (...a: unknown[]) => getMeMock(...a),
   listMyClasses: (...a: unknown[]) => listMyClassesMock(...a),
+  // SPEC-018/TASK-006: o `TopAppBar` passou a buscar a empresa para
+  // desenhar a logo do clube. Não é o assunto desta suíte, mas sem o mock
+  // ela quebra inteira — e o erro fala de módulo, não de home.
+  getMinhaEmpresa: () =>
+    Promise.resolve({
+      nome: "Smart Tennis",
+      slug: "smart-tennis",
+      logoUrl: null,
+      status: "ativa",
+      permiteAutoCadastro: true,
+    }),
 }));
 
 const { HomeView } = await import("./home-view");
