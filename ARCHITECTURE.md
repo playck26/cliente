@@ -63,6 +63,7 @@ page.tsx (server component, fino)
 | `/minhas-turmas/[id]` | `minha-turma-detalhe` | quem está na turma e as aulas dos últimos 30 dias |
 | `/chamada/[ocupacaoId]` | `chamada-view` | **a chamada** (SPEC-014). Desenhada para uso em quadra: 3 estados visíveis, 1 toque cada, salvar explícito e barra fixa. **SPEC-015/DEF-002 (TASK-000a):** salvar exige todos os alunos marcados — antes gravava chamada pela metade — com atalho "Todos vieram" para o caso comum, e aviso quando a chamada é legada (`completude: desconhecida`) |
 | `/quadras` (+ `[id]`) | `courts-list`, `court-booking` | reserva |
+| `/perfil` | `perfil-view` + `foto-de-perfil` | **SPEC-018/TASK-003** — a foto do aluno/professor. Alcançável pelo ícone no `TopAppBar`, e não pela `BottomNav`: ela é `grid-cols-5` com botão central saliente, e um sexto item quebraria o desenho |
 | `/reservas` | `my-bookings-list` | reservas do aluno |
 
 ## 4. Estado
@@ -162,6 +163,26 @@ escolhido), a leitura de chunk, e **os argumentos exatos** de
 `getContext`/`createImageBitmap`/`toBlob`. **Não provado, e é lacuna real:**
 que um Chrome em tela Display P3 de fato não grava `ICCP` — isso é prova de
 aparelho, e a defesa contra ela estar errada é a inspeção do resultado.
+
+### Foto de perfil (SPEC-018/TASK-003)
+
+`/perfil` → `perfil-view.tsx` → `foto-de-perfil.tsx` → `comprimir-imagem.ts`
+→ `api-client.ts` (`getMinhaFoto`/`enviarMinhaFoto`/`removerMinhaFoto`).
+**A compressão acontece antes do envio, e a ordem é o ponto:** subir o
+original de um celular (≈4 MB) daria 413 depois de a pessoa esperar o upload
+inteiro por uma rede ruim.
+
+**A URL da foto é assinada e expira**, e por isso vem de um `GET /me/foto`
+próprio em vez de dentro de `/auth/me`: embutida na resposta de login,
+ficaria velha numa sessão longa e a tela mostraria imagem quebrada sem ter
+como se recuperar. Pela mesma razão a `<img>` é crua, e não `next/image` —
+não há como otimizar no build uma URL que muda a cada leitura.
+
+**`authFetch` deixou de mandar `Content-Type` quando o corpo é `FormData`.**
+Quem monta o cabeçalho de multipart é o navegador, porque só ele conhece o
+`boundary`. Com `application/json` junto, o campo `arquivo` nunca chegaria ao
+servidor — e o erro apareceria como "envie o arquivo no campo arquivo",
+mandando quem investigasse para o lado errado.
 
 ## 10. Gaps e pontos de atenção
 

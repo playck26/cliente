@@ -211,11 +211,19 @@ async function requisicaoAutenticada(
   init: RequestInit,
 ): Promise<Response> {
   const accessToken = getAccessToken();
+  // SPEC-018/TASK-003 — **`FormData` não pode levar `Content-Type` nosso.**
+  // Quem monta o cabeçalho de multipart é o navegador, porque só ele conhece
+  // o `boundary` que separa as partes. Mandar `application/json` junto de um
+  // corpo multipart faz o servidor tentar parsear o corpo como JSON: o campo
+  // `arquivo` nunca chega, e o erro que aparece é "envie o arquivo no campo
+  // arquivo" — que manda quem for investigar para o lado errado.
+  const ehFormData =
+    typeof FormData !== "undefined" && init.body instanceof FormData;
   return fetch(`${API_URL}/api/v1${path}`, {
     ...init,
     credentials: "include",
     headers: {
-      "Content-Type": "application/json",
+      ...(ehFormData ? {} : { "Content-Type": "application/json" }),
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...init.headers,
     },
@@ -530,5 +538,52 @@ export async function aceitarConvite(dto: {
   });
   if (!res.ok) {
     throw await parseError(res, "Não foi possível concluir o cadastro.");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// SPEC-018/TASK-003 — foto de perfil
+// ---------------------------------------------------------------------------
+
+export interface FotoDePerfil {
+  /** `null` é o estado normal de quem nunca subiu foto — não é erro. */
+  url: string | null;
+}
+
+/**
+ * A URL vem **assinada e expira** (SPEC-018/AC-003). Por isso a foto tem
+ * endpoint próprio em vez de vir dentro de `/auth/me`: numa sessão longa,
+ * uma URL embutida no login ficaria velha e a tela mostraria imagem
+ * quebrada sem ter como se recuperar.
+ */
+export async function getMinhaFoto(): Promise<FotoDePerfil> {
+  const res = await authFetch("/me/foto");
+  if (!res.ok) {
+    throw await parseError(res, "Não foi possível carregar sua foto");
+  }
+  return (await res.json()) as FotoDePerfil;
+}
+
+/**
+ * O `arquivo` já vem **comprimido** por `comprimir-imagem.ts` — quem chama
+ * é responsável por isso. Subir o original de um celular seria 413: o
+ * servidor recusa acima de 2 MB, e uma foto de 12 MP tem o dobro disso.
+ */
+export async function enviarMinhaFoto(arquivo: File): Promise<FotoDePerfil> {
+  const corpo = new FormData();
+  // O nome do campo é contrato (CON-017.1). Errar aqui dá 400
+  // `CAMPO_INESPERADO`, não um erro de validação comum.
+  corpo.append("arquivo", arquivo);
+  const res = await authFetch("/me/foto", { method: "PUT", body: corpo });
+  if (!res.ok) {
+    throw await parseError(res, "Não foi possível enviar sua foto");
+  }
+  return (await res.json()) as FotoDePerfil;
+}
+
+export async function removerMinhaFoto(): Promise<void> {
+  const res = await authFetch("/me/foto", { method: "DELETE" });
+  if (!res.ok) {
+    throw await parseError(res, "Não foi possível remover sua foto");
   }
 }

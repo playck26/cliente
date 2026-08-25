@@ -1,7 +1,8 @@
 "use client";
 
 import Image from "next/image";
-import { Bell } from "lucide-react";
+import Link from "next/link";
+import { Bell, User } from "lucide-react";
 
 // Cabeçalho compartilhado (SPEC-007) — repete em Home/Minhas Aulas/
 // Quadras/Minhas Reservas na referência "Performance Court". `iniciais`
@@ -9,7 +10,7 @@ import { Bell } from "lucide-react";
 // tinham esse dado antes e não precisam buscá-lo só pra isso).
 export function TopAppBar({ saudacao, iniciais }: { saudacao?: string; iniciais?: string }) {
   return (
-    <header className="flex items-center justify-between px-5 pt-4 pb-3">
+    <header className="flex items-center justify-between gap-2 px-5 pt-4 pb-3">
       <div className="flex items-center gap-3">
         <div className="relative flex size-12 items-center justify-center rounded-2xl bg-surface shadow-[var(--shadow-low)] ring-1 ring-border">
           <Image
@@ -32,6 +33,7 @@ export function TopAppBar({ saudacao, iniciais }: { saudacao?: string; iniciais?
       {/* Sino de notificação inerte (SPEC-007, decisão do usuário): não
           existe sistema de notificação no backend ainda — ícone presente
           por identidade visual, sem badge de "não lido" nem ação real. */}
+      <div className="flex items-center gap-2">
       <button
         type="button"
         aria-label="Notificações"
@@ -39,6 +41,18 @@ export function TopAppBar({ saudacao, iniciais }: { saudacao?: string; iniciais?
       >
         <Bell className="size-5" aria-hidden="true" />
       </button>
+      {/* SPEC-018/TASK-003 — o acesso ao perfil. Fica aqui, e não na
+          `BottomNav`, porque a barra inferior é `grid-cols-5` com o botão
+          central saliente: um sexto item quebraria o desenho dela. E o
+          cabeçalho já é o lugar de "quem sou eu" nas quatro telas. */}
+      <Link
+        href="/perfil"
+        aria-label="Seu perfil"
+        className="relative flex size-11 items-center justify-center rounded-2xl bg-surface text-[var(--color-text-secondary)] shadow-[var(--shadow-low)] ring-1 ring-border transition-colors hover:text-[var(--color-primary-strong)]"
+      >
+        <User className="size-5" aria-hidden="true" />
+      </Link>
+      </div>
     </header>
   );
 }
