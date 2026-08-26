@@ -169,6 +169,13 @@ Três camadas hoje:
 **A ordem entre 2 e 3 é o conserto.** Invertida, o pré-voo reprova o arquivo
 que a remoção consertaria em seguida — que era, literalmente, o defeito.
 
+**Um teste desta tela nunca provou o que dizia** (corrigido em 2026-08-26).
+`expect(enviarMinhaFoto).toHaveBeenCalledWith(COMPRIMIDA)` passava mesmo
+quando a tela subia o original de 4 MB: `File` não tem propriedade própria
+enumerável, e a comparação estrutural do vitest vê `{}` contra `{}`. Agora
+a asserção é por **identidade** (`toBe`). Vale para qualquer `File`,
+`Blob`, `FormData` ou `Headers` num assert deste repositório.
+
 A camada 3 **não é uma segunda validação**: a autoridade continua sendo
 `webp.validator.ts` no `back`, que confere ordem, cardinalidade e dimensão.
 Aqui só se pergunta "apareceu chunk que eu sei que vai ser recusado?".

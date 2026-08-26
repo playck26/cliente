@@ -83,7 +83,22 @@ describe("FotoDePerfil", () => {
     expect(comprimirImagem).toHaveBeenCalledWith(ORIGINAL);
     // A asserção que importa: o que subiu é o WebP pequeno. Enviar o
     // original daria 413 depois de a pessoa esperar o upload inteiro.
-    expect(enviarMinhaFoto).toHaveBeenCalledWith(COMPRIMIDA);
+    // **`toHaveBeenCalledWith(COMPRIMIDA)` NÃO prova isto**, e a descoberta
+    // custou uma sabotagem que passou (2026-08-26): `File` e `Blob` não têm
+    // propriedade própria enumerável — `name`, `size` e `type` são getters
+    // do protótipo. A comparação estrutural do vitest vê `{}` contra `{}`, e
+    // considera **qualquer** File igual a qualquer outro.
+    //
+    // A identidade (`toBe`) é o que separa: só passa se for o mesmo objeto.
+    //
+    // Esta linha existe desde a TASK-003 e **nunca provou o que dizia
+    // provar**: o cabeçalho deste arquivo garante que "o que sobe é o
+    // arquivo COMPRIMIDO, não o original", e a asserção antiga passaria
+    // igual se subisse o original de 4 MB.
+    const [enviado] = enviarMinhaFoto.mock.calls[0] as [File];
+    expect(enviado).toBe(COMPRIMIDA);
+    expect(enviado).not.toBe(ORIGINAL);
+    expect(enviado.name).toBe("foto.webp");
 
     const ordemDaCompressao = comprimirImagem.mock.invocationCallOrder[0];
     const ordemDoEnvio = enviarMinhaFoto.mock.invocationCallOrder[0];
