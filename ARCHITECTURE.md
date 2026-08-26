@@ -144,7 +144,7 @@ decisão, e mudança numa é mudança na outra.
 sRGB de 456 bytes, e o validador do `back` é allowlist — recusa. Sem
 tratamento, **nenhuma imagem sobe**.
 
-**O que este parágrafo dizia antes estava errado, e custou o DEF-007.** Dizia
+**O que este parágrafo dizia antes estava errado, e custou o DEF-010.** Dizia
 que era caso de aparelho **Display P3** e que forçar `sRGB` no canvas
 evitaria o chunk. Medido em Chrome 151 headless, sem tela nenhuma:
 `colorSpace: 'srgb'`, contexto sem `colorSpace`, `colorSpaceConversion:
@@ -169,6 +169,50 @@ Três camadas hoje:
 **A ordem entre 2 e 3 é o conserto.** Invertida, o pré-voo reprova o arquivo
 que a remoção consertaria em seguida — que era, literalmente, o defeito.
 
+### A barra de baixo conhece o papel (DEF-011, 2026-08-26)
+
+`bottom-nav.tsx` desenha **duas** barras: a do aluno (cinco itens) e a do
+professor (`/minhas-turmas` e `/perfil`).
+
+**Antes ela era cega a papel, e isso prendia o professor.** Ele entrava em
+`/perfil` para trocar a própria foto — a única tela que aluno e professor
+dividem — recebia a barra do aluno, e os cinco itens dela são
+`@Roles('aluno')` no servidor. Cada toque virava "Sua conta não tem acesso
+a esta área", e `/minhas-turmas`, a tela dele, **não estava na barra**: não
+havia caminho de volta.
+
+**A regra já existia e estava no lugar errado.** `minhas-turmas-view` tinha
+decidido certo e escrito o porquê num comentário — *"com os itens do aluno
+seria mentira, porque o servidor recusa todos eles"* — e `perfil-view` não
+tinha como saber. Decisão que mora em comentário só vale para quem lê aquele
+arquivo.
+
+Agora ela mora no componente que desenha a barra: tela nova que renderize
+`<BottomNav>` sem pensar em papel acerta sozinha.
+
+O papel vai como **prop**, e não é a barra que busca: as telas já chamam
+`getMe()`, e um segundo `fetch` dentro da barra faria toda página com barra
+pagar por isso.
+
+### A imagem da quadra chega ao aluno (SPEC-018/TASK-005)
+
+`capa-da-quadra.tsx` decide **foto quando há, desenho quando não**, e é
+usada pela lista (`courts-list`) e pela tela de reserva (`court-booking`).
+
+**Ela nasceu de um vão:** a TASK-005 subiu com o upload no Admin e a rota no
+`back`, e **sem uma linha neste repositório**. O gestor subia a foto, o
+servidor devolvia `imagemUrl`, e o app continuava com as linhas sintéticas —
+exatamente para quem a spec dizia que ia ver.
+
+**O degradê não é enfeite:** o preço e o nome são texto branco por cima.
+Sobre as linhas o fundo é cor escolhida por nós; sobre a foto do clube não há
+garantia, e uma quadra clara ao meio-dia apaga os dois. Ele só existe quando
+há foto.
+
+**Sem `next/image`:** URL de CDN externo exigiria o domínio em
+`next.config.ts`, e a planta declara que este projeto não carrega otimizador
+para host de terceiro.
+
 **Um teste desta tela nunca provou o que dizia** (corrigido em 2026-08-26).
 `expect(enviarMinhaFoto).toHaveBeenCalledWith(COMPRIMIDA)` passava mesmo
 quando a tela subia o original de 4 MB: `File` não tem propriedade própria
@@ -190,7 +234,7 @@ escolhido), a leitura de chunk, e **os argumentos exatos** de
 (remoção do chunk, queda do bit `ICC`, tamanho do RIFF recalculado, padding
 de payload ímpar, idempotência e totalidade).
 
-**A lacuna que este parágrafo declarava antes era o DEF-007.** Dizia: "não
+**A lacuna que este parágrafo declarava antes era o DEF-010.** Dizia: "não
 provado, e é lacuna real: que um Chrome em tela Display P3 de fato não grava
 `ICCP`". Ele grava — sempre, em qualquer tela. A lacuna foi fechada por
 medição em Chrome 151 headless, e o conserto foi conferido ponta a ponta

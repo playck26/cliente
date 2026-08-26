@@ -18,7 +18,7 @@
  * perfil de cor sRGB de 456 bytes. O validador do servidor é **allowlist**
  * (`VP8 `, `VP8L`, `VP8X`, `ALPH`) e recusa qualquer chunk fora dela —
  * então, sem o tratamento abaixo, **nenhuma imagem sobe por nenhum
- * caminho**. Foi o DEF-007, e ele derrubou foto de perfil e logo em
+ * caminho**. Foi o DEF-010, e ele derrubou foto de perfil e logo em
  * produção.
  *
  * **A versão anterior desta nota dizia que era caso de aparelho Display P3.
@@ -406,7 +406,7 @@ export async function comprimirImagem(
     );
   }
 
-  // A ordem é a correção do DEF-007: remover primeiro, inspecionar o
+  // A ordem é a correção do DEF-010: remover primeiro, inspecionar o
   // resultado. Ao contrário, o pré-voo reprova o que a remoção consertaria.
   const limpo = removerIccp(await blob.arrayBuffer());
 

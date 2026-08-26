@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CalendarCheck, CalendarDays, ChevronRight, Users } from "lucide-react";
 import { TennisCourtIcon } from "@/components/icons/tennis-court-icon";
+import { BottomNav } from "@/components/bottom-nav";
 import { CourtLines } from "@/components/court-lines";
 import { TopAppBar } from "@/components/top-app-bar";
 import { Card, CardContent } from "@/components/ui/card";
@@ -32,9 +33,18 @@ const DIAS_SEMANA = [
  * professor não é um aluno com permissões a mais nem um gestor com
  * permissões a menos — ele lê a própria grade e quem está nela.
  *
- * Por isso não há `BottomNav` aqui: uma barra de navegação com um item só
- * é decoração, e com os itens do aluno seria mentira, porque o servidor
- * recusa todos eles (INV-012).
+ * **Esta tela não tinha `BottomNav`, e o motivo era bom:** uma barra com um
+ * item só é decoração, e com os itens do aluno seria mentira, porque o
+ * servidor recusa todos eles (INV-012).
+ *
+ * **O DEF-011 mostrou que o raciocínio estava certo e o alcance errado.** A
+ * decisão morava neste comentário, então `perfil-view` — a única tela que
+ * aluno e professor dividem — não a conhecia, renderizava a barra do aluno,
+ * e o professor ficava preso lá sem caminho de volta para cá.
+ *
+ * Agora `BottomNav` conhece o papel e dá ao professor **dois** itens, os
+ * dois reais: esta tela e o perfil. E ela entra aqui: não renderizá-la
+ * manteria metade do defeito — ele chegaria ao perfil e não voltaria.
  */
 export function MinhasTurmasView() {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
@@ -62,7 +72,8 @@ export function MinhasTurmasView() {
     <div className="app-screen flex min-h-full flex-col bg-[var(--color-background)]">
       <TopAppBar saudacao={usuario?.nome.split(" ")[0]} />
 
-      <main className="flex flex-1 flex-col gap-5 px-4 pt-2 pb-8">
+      {/* `pb-28` abre espaço para a barra fixa não cobrir a última turma. */}
+      <main className="flex flex-1 flex-col gap-5 px-4 pt-2 pb-28">
         <section className="relative overflow-hidden rounded-[var(--radius-hero)] bg-[var(--color-court-dark)] p-5 text-white shadow-[var(--shadow-lift)]">
           <CourtLines className="opacity-35" />
           <div className="relative z-10 flex min-h-40 flex-col justify-between gap-6">
@@ -160,6 +171,12 @@ export function MinhasTurmasView() {
           ))}
         </ul>
       </main>
+
+      {/*
+        DEF-011 — sem isto o professor chega ao perfil e não volta. O papel
+        vem do `getMe()` que esta tela já faz.
+      */}
+      <BottomNav papel={usuario?.role} />
     </div>
   );
 }

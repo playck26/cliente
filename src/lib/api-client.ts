@@ -72,6 +72,14 @@ export interface Court {
   precoHora: number;
   status: "ativa" | "inativa";
   createdAt: string;
+  /**
+   * SPEC-018/TASK-005 — URL de CDN, **sem assinatura** (AC-002): a imagem de
+   * quadra é pública de propósito, e abre em aba anônima. `null` quando o
+   * clube ainda não subiu nenhuma, que é o estado normal.
+   *
+   * A chave crua nunca chega aqui (INV-037).
+   */
+  imagemUrl: string | null;
 }
 
 export interface AvailabilitySlot {

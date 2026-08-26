@@ -5,7 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, CheckCircle2, CreditCard, MessageCircle } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
-import { CourtLines } from "@/components/court-lines";
+import { CapaDaQuadra } from "@/components/capa-da-quadra";
 import { Button } from "@/components/ui/button";
 import {
   ApiError,
@@ -155,7 +155,10 @@ export function CourtBooking({ id }: { id: string }) {
       <div className="space-y-4 px-5">
         <section className="overflow-hidden rounded-3xl bg-surface shadow-[var(--shadow-lift)] ring-1 ring-border">
           <div className="relative h-[128px] overflow-hidden bg-[var(--color-court-clay)] text-white">
-            <CourtLines />
+            <CapaDaQuadra
+              imagemUrl={quadra?.imagemUrl ?? null}
+              nome={quadra?.nome ?? "quadra"}
+            />
             <div className="absolute top-3 right-4 z-10 rounded-2xl bg-white/18 px-3 py-2 text-right backdrop-blur-sm ring-1 ring-white/15">
               <p className="text-lg leading-none font-extrabold">{(quadra?.precoHora ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })}</p>
               <p className="mt-1 text-[10px] font-bold text-white/75">por hora</p>

@@ -14,6 +14,11 @@ import { getMe, type Usuario } from "@/lib/api-client";
  * dependência de storage, e saem em spec própria. Encher esta tela agora
  * seria misturar escopo — e uma tela de perfil "quase completa" é mais
  * difícil de terminar depois que uma que só faz uma coisa.
+ *
+ * **DEF-011 (2026-08-26) — esta é a única tela que aluno e professor
+ * dividem**, e era por ela que o professor ficava preso: a barra de baixo
+ * era a do aluno, e o servidor recusa todos os itens dela. Agora ela passa
+ * o papel, e o `BottomNav` decide.
  */
 export function PerfilView() {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
@@ -53,7 +58,16 @@ export function PerfilView() {
         <FotoDePerfil nome={usuario?.nome} />
       </main>
 
-      <BottomNav />
+      {/*
+        O papel vai como prop, e não é o `BottomNav` que busca: esta tela já
+        chama `getMe()` para o nome, e uma segunda ida ao servidor dentro da
+        barra faria toda página com barra pagar por isso.
+
+        `undefined` enquanto carrega dá a barra do aluno por um instante, e é
+        o certo: aluno é a maioria, e trocar cinco itens por dois depois que
+        a tela desenhou pisca mais do que o contrário.
+      */}
+      <BottomNav papel={usuario?.role} />
     </div>
   );
 }

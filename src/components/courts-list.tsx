@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { TennisCourtIcon } from "@/components/icons/tennis-court-icon";
 import { BottomNav } from "@/components/bottom-nav";
-import { CourtLines } from "@/components/court-lines";
+import { CapaDaQuadra } from "@/components/capa-da-quadra";
 import { TennisBallIcon } from "@/components/icons/tennis-ball-icon";
 import { TopAppBar } from "@/components/top-app-bar";
 import { ApiError, listCourts, type Court } from "@/lib/api-client";
@@ -82,7 +82,7 @@ export function CourtsList() {
             {quadrasFiltradas.map((quadra, index) => (
               <Link key={quadra.id} href={`/quadras/${quadra.id}`} className="block overflow-hidden rounded-3xl bg-surface shadow-[var(--shadow-low)] ring-1 ring-border transition-transform active:scale-[0.99]">
                 <div className={`relative h-[142px] overflow-hidden text-white ${index % 2 === 0 ? "bg-[var(--color-court-clay)]" : "bg-[var(--color-court-blue)]"}`}>
-                  <CourtLines />
+                  <CapaDaQuadra imagemUrl={quadra.imagemUrl} nome={quadra.nome} />
                   <div className="absolute top-3 right-4 z-10 rounded-2xl bg-white/16 px-3 py-2 text-right backdrop-blur-sm ring-1 ring-white/15">
                     <p className="text-lg leading-none font-extrabold">{quadra.precoHora.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 })}</p>
                     <p className="mt-1 text-[10px] font-bold text-white/75">por hora</p>

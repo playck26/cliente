@@ -119,7 +119,7 @@ describe("FotoDePerfil", () => {
   it("erro do pré-voo chega à tela com o texto dele, e nada é enviado", async () => {
     // Este teste falava do `ICCP` e da INV-050 até 2026-08-26. Guardava a
     // mensagem errada: o `ICCP` deixou de ser motivo de recusa quando o
-    // DEF-007 foi corrigido — o compressor **remove** o chunk, não reprova
+    // DEF-010 foi corrigido — o compressor **remove** o chunk, não reprova
     // por ele. Um teste que guarda mensagem que o produto não emite mais
     // parece cobertura e não é.
     //

@@ -11,7 +11,7 @@
  * era o defeito.** Dizia-se aqui que faltava provar "que o Chrome num
  * aparelho Display P3 realmente não grava `ICCP`". Medido em 2026-08-26,
  * em Chrome 151 headless: ele grava **sempre**, em qualquer aparelho, e
- * nenhuma opção de canvas muda isso. Foi o DEF-007, e derrubou foto de
+ * nenhuma opção de canvas muda isso. Foi o DEF-010, e derrubou foto de
  * perfil e logo em produção.
  *
  * O que sobra sem cobertura agora é só o encanamento com o navegador (não
@@ -261,7 +261,7 @@ const FOTO = new File([new Uint8Array(4 * 1024 * 1024)], "foto.JPG", {
   type: "image/jpeg",
 });
 
-describe("removerIccp — o conserto do DEF-007", () => {
+describe("removerIccp — o conserto do DEF-010", () => {
   const fourccs = (bytes: ArrayBuffer) => {
     const r = inspecionarWebp(bytes);
     return r.ok ? r.chunks : ["REPROVADO: " + r.motivo];
@@ -429,7 +429,7 @@ describe("comprimirImagem — o encanamento, e a INV-050 no argumento", () => {
     expect(r.bytesFinais).toBeLessThanOrEqual(ALVO_BYTES);
   });
 
-  it("DEF-007 — o WebP do Chrome, com ICCP, SOBE (não é mais recusado)", async () => {
+  it("DEF-010 — o WebP do Chrome, com ICCP, SOBE (não é mais recusado)", async () => {
     // Este teste já existiu com a expectativa invertida: mandava REPROVAR.
     // Era o que produção fazia, e por isso upload nenhum funcionava — o
     // Chrome grava `ICCP` em todo WebP que produz. A forma abaixo é a que
