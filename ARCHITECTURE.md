@@ -62,7 +62,7 @@ page.tsx (server component, fino)
 | `/minhas-turmas` | `minhas-turmas-view` | **app do professor** (SPEC-013): a grade dele, sem `BottomNav` — barra com um item só é decoração |
 | `/minhas-turmas/[id]` | `minha-turma-detalhe` | quem está na turma e as aulas dos últimos 30 dias |
 | `/chamada/[ocupacaoId]` | `chamada-view` | **a chamada** (SPEC-014). Desenhada para uso em quadra: 3 estados visíveis, 1 toque cada, salvar explícito e barra fixa. **SPEC-015/DEF-002 (TASK-000a):** salvar exige todos os alunos marcados — antes gravava chamada pela metade — com atalho "Todos vieram" para o caso comum, e aviso quando a chamada é legada (`completude: desconhecida`) |
-| `/quadras` (+ `[id]`) | `courts-list`, `court-booking` | reserva |
+| `/quadras` (+ `[id]`) | `courts-list` (+ `GrupoDeFiltro`), `court-booking` | reserva |
 | `/perfil` | `perfil-view` + `foto-de-perfil` | **SPEC-018/TASK-003** — a foto do aluno/professor. Alcançável pelo ícone no `TopAppBar`, e não pela `BottomNav`: ela é `grid-cols-5` com botão central saliente, e um sexto item quebraria o desenho |
 | `/reservas` | `my-bookings-list` | reservas do aluno |
 
@@ -227,6 +227,64 @@ de sair só localmente é um refresh token que expira sozinho, e o de não sair
 
 `router.replace`, não `push`: depois de sair, "voltar" não pode devolver a
 tela de quem saiu.
+
+### O filtro por esporte e categoria (SPEC-020/TASK-006)
+
+A barra da lista de quadras tem **dois** grupos, esporte e categoria de piso,
+e os dois se combinam por **interseção** (AC-009).
+
+**As opções são derivadas das quadras que já chegaram** — e isso não é atalho,
+é a leitura correta da spec. A INV-056 original proibia derivar das quadras; a
+1ª rodada de dúvida derrubou a proibição, porque o defeito nunca foi *olhar
+para as quadras*, era o valor ser **texto digitado**. Depois da TASK-003,
+`quadra.esporte` é uma referência ao catálogo — derivar dela **é** derivar do
+catálogo.
+
+Derivar assim entrega duas coisas sem código extra:
+
+- **AC-008** — opção do catálogo sem nenhuma quadra não vira botão morto. Um
+  clube com 6 categorias e 2 em uso não empurra 4 filtros que não filtram;
+- **NFR-001** — continua **uma** requisição. Filtro não vale três idas à rede.
+
+**A regra de quando o grupo aparece não é "mais de uma opção".** Um clube com
+*uma* categoria e algumas quadras sem categoria tem escolha real — ver só as de
+saibro exclui as sem classificação. Já um clube onde *toda* quadra é de tênis
+não tem escolha nenhuma. Por isso o "sem opção" conta como um balde, e o grupo
+some quando existe um balde só.
+
+**O filtro compara `id`, nunca `nome`.** Comparar por nome traria de volta
+exatamente o que a SPEC-020 veio desfazer.
+
+### DEF-012 — o app ficou em BRANCO em produção, e o typecheck estava verde
+
+A TASK-003 trocou `quadra.esporte` de `string` para `{ id, nome } | null`.
+Três telas deste repositório renderizavam a string direto — `courts-list`,
+`court-booking` e `my-bookings-list`. Objeto como filho de JSX faz o React
+**estourar**, não mostrar texto errado: a tela vai a branco.
+
+**Por que o typecheck não pegou, e é a lição que fica:** a interface `Court`
+é escrita **à mão** em `api-client.ts`. Ela dizia `esporte: string` e
+continuou dizendo depois que o contrato mudou. **Tipo escrito à mão não é
+contrato — é uma afirmação sobre ele, e ela envelhece calada.**
+
+No mesmo dia, o Admin pegou um erro da mesma família (`categoriaId` emitido
+como `Record<string, never>`) **porque lá os tipos são gerados** do
+`openapi.json`. Mesma spec, mesmo dia, dois repositórios: o que gera pegou, o
+que afirma não pegou.
+
+**E `?? "Quadra"` não protegia.** `quadra?.esporte ?? "Quadra"` parece
+defensivo e não é: objeto não é nulo, então o `??` entrega o objeto ao JSX.
+Só o `?.nome` fecha.
+
+**A lacuna de raiz continua aberta:** a resposta de `/courts` **não está no
+`openapi.json`** — o controller não declara tipo de resposta, então nem
+regenerar traria um `Court` gerado. Enquanto isso não mudar no `back`, este
+tipo continua sendo afirmação. Fica para a TASK-007 da SPEC-020.
+
+**O teste que existia não pegava:** `my-bookings-list.test.tsx` mocka
+`listCourts` com `data: []`. Lista vazia nunca chega à linha que renderiza o
+esporte. `courts-list.test.tsx` nasceu para fechar isso, e reproduz o estouro
+antes de consertá-lo.
 
 ### A imagem da quadra chega ao aluno (SPEC-018/TASK-005)
 

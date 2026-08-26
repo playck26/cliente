@@ -164,7 +164,9 @@ export function CourtBooking({ id }: { id: string }) {
               <p className="mt-1 text-[10px] font-bold text-white/75">por hora</p>
             </div>
             <div className="absolute inset-x-4 bottom-3 z-10 min-w-0">
-              <p className="text-[11px] font-extrabold tracking-[0.14em] text-white/75 uppercase">{quadra?.esporte ?? "Quadra"}</p>
+              <p className="text-[11px] font-extrabold tracking-[0.14em] text-white/75 uppercase">{/* DEF-012 — `?? "Quadra"` NÃO protegia: objeto não é nulo, e o React
+                  estourava. Só o `?.nome` fecha. */}
+              {quadra?.esporte?.nome ?? "Quadra"}</p>
               <h2 className="mt-0.5 text-[22px] leading-tight font-extrabold">{quadra?.nome ?? "Carregando..."}</h2>
             </div>
           </div>

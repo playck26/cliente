@@ -64,11 +64,33 @@ export interface Paginated<T> {
   total: number;
 }
 
+/**
+ * SPEC-020 — uma linha do catálogo de quadra do clube (esporte ou categoria
+ * de piso). O `id` é o que o filtro compara; o `nome` é o que a tela mostra.
+ * Comparar por `nome` traria de volta o defeito que a spec veio desfazer.
+ */
+export interface OpcaoDeCatalogo {
+  id: string;
+  nome: string;
+}
+
 export interface Court {
   id: string;
   companyId: string;
   nome: string;
-  esporte: string;
+  /**
+   * **DEF-012 — este campo era `string` e virou objeto (SPEC-020/TASK-003).**
+   * Enquanto esta interface continuou dizendo `string`, o typecheck ficou
+   * verde e três telas do app estouraram em produção com *"Objects are not
+   * valid as a React child"*. Tipo escrito à mão não é contrato: é uma
+   * afirmação sobre ele, e ela envelhece calada.
+   *
+   * `null` acontece de verdade: quadra cujo `esporte` estava em branco
+   * quando o backfill da TASK-001 rodou. A TASK-004 vai exigir preenchimento.
+   */
+  esporte: OpcaoDeCatalogo | null;
+  /** Opcional por decisão de produto (AC-006): nem todo clube classifica piso. */
+  categoria: OpcaoDeCatalogo | null;
   precoHora: number;
   status: "ativa" | "inativa";
   createdAt: string;

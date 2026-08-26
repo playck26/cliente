@@ -8,12 +8,85 @@ import { BottomNav } from "@/components/bottom-nav";
 import { CapaDaQuadra } from "@/components/capa-da-quadra";
 import { TennisBallIcon } from "@/components/icons/tennis-ball-icon";
 import { TopAppBar } from "@/components/top-app-bar";
-import { ApiError, listCourts, type Court } from "@/lib/api-client";
+import { ApiError, listCourts, type Court, type OpcaoDeCatalogo } from "@/lib/api-client";
+
+/**
+ * SPEC-020/TASK-006 — a barra de filtro passa a ter DOIS grupos, esporte e
+ * categoria de piso, e os dois vêm do catálogo do clube.
+ *
+ * **De onde saem as opções, e por que isso não contradiz a spec.** Elas são
+ * derivadas das quadras que já chegaram. A INV-056 original proibia isso, e a
+ * 1ª rodada de dúvida derrubou a proibição: o defeito nunca foi "olhar para as
+ * quadras", era o valor ser **texto digitado**. Agora `quadra.esporte` é uma
+ * referência ao catálogo — derivar dela **é** derivar do catálogo.
+ *
+ * E derivar assim entrega duas coisas de graça:
+ *
+ * - **AC-008**, opção sem quadra não vira filtro morto. Um clube com 6
+ *   categorias e 2 em uso não empurra 4 botões que não filtram nada;
+ * - **NFR-001**, continua **uma** requisição. Filtro não vale três idas à rede.
+ */
+
+/**
+ * Uma opção só é oferecida quando escolhê-la muda alguma coisa.
+ *
+ * **Contar as opções não basta**, e é aqui que mora a sutileza: um clube com
+ * *uma* categoria e algumas quadras sem categoria tem escolha real — ver só as
+ * de saibro exclui as sem classificação. Já um clube onde *toda* quadra é de
+ * tênis não tem escolha nenhuma. Por isso o "sem opção" conta como um balde.
+ */
+function opcoesDe(quadras: Court[], de: (quadra: Court) => OpcaoDeCatalogo | null) {
+  const porId = new Map<string, OpcaoDeCatalogo>();
+  let temSemOpcao = false;
+
+  for (const quadra of quadras) {
+    const opcao = de(quadra);
+    if (opcao === null) {
+      temSemOpcao = true;
+    } else {
+      porId.set(opcao.id, opcao);
+    }
+  }
+
+  const opcoes = [...porId.values()].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+  return { opcoes, oferece: opcoes.length + (temSemOpcao ? 1 : 0) > 1 };
+}
+
+function GrupoDeFiltro({
+  rotulo,
+  textoTodas,
+  opcoes,
+  escolhida,
+  onEscolher,
+}: {
+  rotulo: string;
+  textoTodas: string;
+  opcoes: OpcaoDeCatalogo[];
+  escolhida: string | null;
+  onEscolher: (id: string | null) => void;
+}) {
+  const classe = (ativo: boolean) =>
+    `h-10 shrink-0 rounded-full px-4 text-[13px] font-extrabold transition-colors ${ativo ? "bg-white text-[var(--color-primary-strong)]" : "bg-white/10 text-white ring-1 ring-white/20"}`;
+
+  return (
+    <div role="group" aria-label={rotulo} className="no-scrollbar mt-4 flex gap-2 overflow-x-auto">
+      <button type="button" onClick={() => onEscolher(null)} aria-pressed={escolhida === null} className={classe(escolhida === null)}>
+        {textoTodas}
+      </button>
+      {opcoes.map((opcao) => (
+        <button key={opcao.id} type="button" onClick={() => onEscolher(opcao.id)} aria-pressed={escolhida === opcao.id} className={classe(escolhida === opcao.id)}>
+          {opcao.nome}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 // REQ-005 (SPEC-005): aluno navega as quadras ativas da própria empresa.
 export function CourtsList() {
   const [quadras, setQuadras] = useState<Court[]>([]);
-  const [filtro, setFiltro] = useState("Todas");
+  const [esporteId, setEsporteId] = useState<string | null>(null);
+  const [categoriaId, setCategoriaId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,8 +99,18 @@ export function CourtsList() {
       .finally(() => setLoading(false));
   }, []);
 
-  const esportes = useMemo(() => ["Todas", ...Array.from(new Set(quadras.map((quadra) => quadra.esporte)))], [quadras]);
-  const quadrasFiltradas = filtro === "Todas" ? quadras : quadras.filter((quadra) => quadra.esporte === filtro);
+  const esportes = useMemo(() => opcoesDe(quadras, (quadra) => quadra.esporte), [quadras]);
+  const categorias = useMemo(() => opcoesDe(quadras, (quadra) => quadra.categoria), [quadras]);
+
+  // AC-009 — os dois se combinam por INTERSEÇÃO. `null` de um lado significa
+  // "não filtra por isto", e não "casa com qualquer coisa": uma quadra SEM
+  // categoria não pertence a categoria nenhuma, então ela some quando o aluno
+  // escolhe uma — e volta quando ele limpa.
+  const quadrasFiltradas = quadras.filter(
+    (quadra) =>
+      (esporteId === null || quadra.esporte?.id === esporteId) &&
+      (categoriaId === null || quadra.categoria?.id === categoriaId),
+  );
 
   return (
     <main className="app-screen min-h-screen overflow-hidden bg-background pb-36">
@@ -51,17 +134,11 @@ export function CourtsList() {
             </span>
           </div>
 
-          {esportes.length > 1 ? (
-            <div className="no-scrollbar mt-4 flex gap-2 overflow-x-auto" aria-label="Filtrar quadras por esporte">
-              {esportes.map((esporte) => {
-                const ativo = filtro === esporte;
-                return (
-                  <button key={esporte} type="button" onClick={() => setFiltro(esporte)} aria-pressed={ativo} className={`h-10 shrink-0 rounded-full px-4 text-[13px] font-extrabold transition-colors ${ativo ? "bg-white text-[var(--color-primary-strong)]" : "bg-white/10 text-white ring-1 ring-white/20"}`}>
-                    {esporte}
-                  </button>
-                );
-              })}
-            </div>
+          {esportes.oferece ? (
+            <GrupoDeFiltro rotulo="Filtrar quadras por esporte" textoTodas="Todos os esportes" opcoes={esportes.opcoes} escolhida={esporteId} onEscolher={setEsporteId} />
+          ) : null}
+          {categorias.oferece ? (
+            <GrupoDeFiltro rotulo="Filtrar quadras por categoria" textoTodas="Todas as categorias" opcoes={categorias.opcoes} escolhida={categoriaId} onEscolher={setCategoriaId} />
           ) : null}
         </section>
 
@@ -88,7 +165,16 @@ export function CourtsList() {
                     <p className="mt-1 text-[10px] font-bold text-white/75">por hora</p>
                   </div>
                   <div className="absolute inset-x-4 bottom-3 z-10 min-w-0">
-                    <p className="text-[11px] font-extrabold tracking-[0.14em] text-white/75 uppercase">{quadra.esporte}</p>
+                    {/*
+                      DEF-012 — era `{quadra.esporte}`, e desde a TASK-003 isso é
+                      um objeto: o React estourava e a tela ficava BRANCA, não
+                      com texto errado. "Quadra" cobre a que o backfill não
+                      catalogou.
+                    */}
+                    <p className="text-[11px] font-extrabold tracking-[0.14em] text-white/75 uppercase">
+                      {quadra.esporte?.nome ?? "Quadra"}
+                      {quadra.categoria === null ? null : <span className="text-white/60"> · {quadra.categoria.nome}</span>}
+                    </p>
                     <h2 className="mt-1 text-[22px] leading-tight font-extrabold">{quadra.nome}</h2>
                   </div>
                 </div>

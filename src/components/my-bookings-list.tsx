@@ -152,7 +152,8 @@ export function MyBookingsList() {
                       </div>
                       <div className="rounded-2xl bg-[var(--color-surface-container)] p-3">
                         <p className="text-[11px] font-bold text-[var(--color-text-secondary)]">Esporte</p>
-                        <p className="mt-0.5 truncate text-[13px] font-extrabold">{quadra?.esporte ?? "Quadra"}</p>
+                        <p className="mt-0.5 truncate text-[13px] font-extrabold">{/* DEF-012 — ver `courts-list.tsx`. */}
+                        {quadra?.esporte?.nome ?? "Quadra"}</p>
                       </div>
                     </div>
 
