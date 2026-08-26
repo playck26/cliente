@@ -276,10 +276,16 @@ que afirma não pegou.
 defensivo e não é: objeto não é nulo, então o `??` entrega o objeto ao JSX.
 Só o `?.nome` fecha.
 
-**A lacuna de raiz continua aberta:** a resposta de `/courts` **não está no
-`openapi.json`** — o controller não declara tipo de resposta, então nem
-regenerar traria um `Court` gerado. Enquanto isso não mudar no `back`, este
-tipo continua sendo afirmação. Fica para a TASK-007 da SPEC-020.
+**A raiz é maior do que este repositório, e foi medida:** das **90**
+respostas que a API expõe, **zero** declaram schema no `openapi.json` — o
+Nest só emite schema para corpo de **requisição**. Por isso o Admin pegou o
+erro do `UpdateCourtDto` hoje (requisição) e ninguém tinha como pegar o do
+`esporte` (resposta).
+
+Ou seja: **não é que o Cliente escreve tipo à mão e o Admin gera.** Os três
+frontends escrevem à mão *toda* resposta, porque não há o que gerar. Enquanto
+o `back` não declarar tipo de resposta, **qualquer mudança de contrato de
+resposta é invisível para os três typechecks.** Vai para a TASK-007.
 
 **O teste que existia não pegava:** `my-bookings-list.test.tsx` mocka
 `listCourts` com `data: []`. Lista vazia nunca chega à linha que renderiza o
