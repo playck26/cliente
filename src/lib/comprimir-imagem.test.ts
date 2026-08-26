@@ -7,10 +7,17 @@
  * a inspeção de chunk, e **os argumentos exatos com que o canvas é chamado**
  * — que é onde a INV-050 vive.
  *
- * O que fica sem cobertura, declarado em vez de disfarçado: que o Chrome
- * num aparelho Display P3 realmente não grava `ICCP` quando o contexto é
- * `srgb`. Isso é comportamento de navegador; a defesa contra ele estar
- * errado é a inspeção do resultado, e essa **está** coberta.
+ * **A lacuna que este cabeçalho declarava foi fechada da pior maneira: ela
+ * era o defeito.** Dizia-se aqui que faltava provar "que o Chrome num
+ * aparelho Display P3 realmente não grava `ICCP`". Medido em 2026-08-26,
+ * em Chrome 151 headless: ele grava **sempre**, em qualquer aparelho, e
+ * nenhuma opção de canvas muda isso. Foi o DEF-007, e derrubou foto de
+ * perfil e logo em produção.
+ *
+ * O que sobra sem cobertura agora é só o encanamento com o navegador (não
+ * há encoder no `jsdom`). A remoção do `ICCP`, que é o conserto, **está**
+ * coberta aqui, e foi conferida contra o `webp.validator.ts` real com um
+ * arquivo produzido por um Chrome de verdade.
  *
  * Este arquivo é duplicado em `Admin` e `Cliente` (ADR-001).
  */
@@ -24,6 +31,7 @@ import {
   inspecionarWebp,
   LADO_MAXIMO_PX,
   QUALIDADE_WEBP,
+  removerIccp,
   type CanvasLike,
   type DependenciasDoNavegador,
   type ImageBitmapLike,
@@ -253,6 +261,89 @@ const FOTO = new File([new Uint8Array(4 * 1024 * 1024)], "foto.JPG", {
   type: "image/jpeg",
 });
 
+describe("removerIccp — o conserto do DEF-007", () => {
+  const fourccs = (bytes: ArrayBuffer) => {
+    const r = inspecionarWebp(bytes);
+    return r.ok ? r.chunks : ["REPROVADO: " + r.motivo];
+  };
+
+  // A forma exata que o Chrome 151 emite, medida: VP8X com o bit ICC ligado,
+  // ICCP com o perfil sRGB, e o bitstream.
+  const comoOChromeEmite = () =>
+    montarWebp([
+      { fourcc: "VP8X", payload: [0x20, 0, 0, 0, 0xe7, 3, 0, 0x9a, 2, 0] },
+      { fourcc: "ICCP", payload: new Array<number>(456).fill(7) },
+      { fourcc: "VP8 ", payload: [10, 20, 30, 40] },
+    ]);
+
+  it("tira o chunk ICCP e apaga o bit ICC do VP8X", () => {
+    const limpo = removerIccp(comoOChromeEmite());
+
+    expect(fourccs(limpo)).toEqual(["VP8X", "VP8 "]);
+    // O bit precisa cair junto: o servidor recusa pelo flag mesmo sem o
+    // chunk (AC-003), então tirar só o chunk não consertaria nada.
+    expect(new Uint8Array(limpo)[20] & 0x20).toBe(0);
+  });
+
+  it("recalcula o tamanho do RIFF — o servidor confere que ele bate", () => {
+    const limpo = removerIccp(comoOChromeEmite());
+    const declarado = new DataView(limpo).getUint32(4, true);
+    expect(declarado).toBe(limpo.byteLength - 8);
+  });
+
+  it("NÃO recodifica: o bitstream da imagem sai byte a byte igual", () => {
+    // É a diferença entre cirurgia de contêiner e recodificar. Se um pixel
+    // mudasse, este teste cairia — e mudar pixel no navegador seria perda de
+    // qualidade que ninguém pediu.
+    const limpo = new Uint8Array(removerIccp(comoOChromeEmite()));
+    const bitstream = limpo.slice(limpo.byteLength - 4);
+    expect(Array.from(bitstream)).toEqual([10, 20, 30, 40]);
+  });
+
+  it("é idempotente: rodar de novo no já-limpo não muda nada", () => {
+    const uma = removerIccp(comoOChromeEmite());
+    const duas = removerIccp(uma);
+    expect(Array.from(new Uint8Array(duas))).toEqual(
+      Array.from(new Uint8Array(uma)),
+    );
+  });
+
+  it("devolve intacto o que não tem ICCP", () => {
+    const semIccp = montarWebp([{ fourcc: "VP8 ", payload: [1, 2, 3] }]);
+    expect(removerIccp(semIccp)).toBe(semIccp);
+  });
+
+  it("respeita o padding de payload ímpar", () => {
+    // Payload ímpar leva um byte de padding que é do RIFF, não do chunk.
+    // Errar isto desalinha o cursor e corrompe tudo o que vem depois.
+    const limpo = removerIccp(
+      montarWebp([
+        { fourcc: "VP8X", payload: [0x20, 0, 0, 0, 9, 0, 0, 9, 0, 0] },
+        { fourcc: "ICCP", payload: [1, 2, 3] },
+        { fourcc: "VP8 ", payload: [4, 5, 6, 7, 8] },
+      ]),
+    );
+    expect(fourccs(limpo)).toEqual(["VP8X", "VP8 "]);
+  });
+
+  it("é total: entrada estranha volta sem lançar", () => {
+    // Mesma regra do resto do módulo — exceção aqui viraria erro de tela sem
+    // explicação, num caminho que já sabe recusar com mensagem.
+    const naoEWebp = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])
+      .buffer;
+    expect(() => removerIccp(naoEWebp)).not.toThrow();
+    expect(removerIccp(naoEWebp)).toBe(naoEWebp);
+    expect(() => removerIccp(new ArrayBuffer(0))).not.toThrow();
+    expect(() => removerIccp(new ArrayBuffer(3))).not.toThrow();
+
+    // Truncado: um chunk que diz ser maior do que o arquivo.
+    const truncado = new Uint8Array(
+      montarWebp([{ fourcc: "ICCP", payload: [1, 2, 3, 4] }]),
+    ).slice(0, 16).buffer;
+    expect(() => removerIccp(truncado)).not.toThrow();
+  });
+});
+
 describe("comprimirImagem — o encanamento, e a INV-050 no argumento", () => {
   it("pede o contexto 2D com colorSpace srgb EXPLÍCITO", async () => {
     // Este é o teste da INV-050. Trocar `srgb` por `display-p3` compila,
@@ -338,20 +429,40 @@ describe("comprimirImagem — o encanamento, e a INV-050 no argumento", () => {
     expect(r.bytesFinais).toBeLessThanOrEqual(ALVO_BYTES);
   });
 
-  it("REPROVA localmente quando o navegador gravou ICCP mesmo assim", async () => {
-    // A defesa 2: se o canvas sRGB não bastou, a falha é local e explicada,
-    // em vez de um 422 sem explicação no aparelho de quem está usando.
+  it("DEF-007 — o WebP do Chrome, com ICCP, SOBE (não é mais recusado)", async () => {
+    // Este teste já existiu com a expectativa invertida: mandava REPROVAR.
+    // Era o que produção fazia, e por isso upload nenhum funcionava — o
+    // Chrome grava `ICCP` em todo WebP que produz. A forma abaixo é a que
+    // ele emite de verdade: VP8X com o bit ICC, ICCP, VP8.
+    const espiao = espiar({ largura: 100, altura: 100 }, montarWebp([
+      { fourcc: "VP8X", payload: [0x20, 0, 0, 0, 99, 0, 0, 99, 0, 0] },
+      { fourcc: "ICCP", payload: [1, 2] },
+      { fourcc: "VP8 ", payload: [1] },
+    ]));
+
+    const r = await comprimirImagem(FOTO, espiao.deps);
+
+    // E o que sobe é o arquivo LIMPO, não o que o canvas devolveu.
+    const subiu = await r.arquivo.arrayBuffer();
+    const inspecao = inspecionarWebp(subiu);
+    expect(inspecao.ok).toBe(true);
+    expect(inspecao.ok && inspecao.chunks).toEqual(["VP8X", "VP8 "]);
+    expect(r.bytesFinais).toBe(subiu.byteLength);
+  });
+
+  it("continua REPROVANDO localmente chunk que a remoção não resolve", async () => {
+    // A defesa 3 não morreu com o conserto: `EXIF` não é removido — ele
+    // carrega metadado de verdade (GPS, entre outros), e sumir com ele em
+    // silêncio seria decidir por quem subiu. Reprova, e diz qual chunk é.
     const espiao = espiar({ largura: 100, altura: 100 }, montarWebp([
       { fourcc: "VP8X", payload: new Array<number>(10).fill(0) },
-      { fourcc: "ICCP", payload: [1, 2] },
+      { fourcc: "EXIF", payload: [1, 2] },
       { fourcc: "VP8 ", payload: [1] },
     ]));
     await expect(comprimirImagem(FOTO, espiao.deps)).rejects.toThrow(
       ErroDeCompressao,
     );
-    await expect(comprimirImagem(FOTO, espiao.deps)).rejects.toThrow(
-      /perfil de cor \(ICCP\)/,
-    );
+    await expect(comprimirImagem(FOTO, espiao.deps)).rejects.toThrow(/EXIF/);
   });
 
   it("diz que o navegador não tem encoder quando o blob vem nulo", async () => {

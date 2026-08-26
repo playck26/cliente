@@ -101,13 +101,21 @@ describe("FotoDePerfil", () => {
     expect(screen.getByText("Remover")).toBeInTheDocument();
   });
 
-  it("INV-050 — o erro do Display P3 chega à tela com o texto dele", async () => {
-    // O caso que a INV-050 existe para não deixar acontecer em silêncio. Sem
-    // esta mensagem, a pessoa veria um 422 genérico num aparelho onde a foto
-    // é perfeitamente boa, e o problema não reproduziria em outra máquina.
+  it("erro do pré-voo chega à tela com o texto dele, e nada é enviado", async () => {
+    // Este teste falava do `ICCP` e da INV-050 até 2026-08-26. Guardava a
+    // mensagem errada: o `ICCP` deixou de ser motivo de recusa quando o
+    // DEF-007 foi corrigido — o compressor **remove** o chunk, não reprova
+    // por ele. Um teste que guarda mensagem que o produto não emite mais
+    // parece cobertura e não é.
+    //
+    // O que continua valendo, e é o que ele prova: quando o pré-voo recusa,
+    // o texto chega à tela em vez de virar um 422 genérico, e a rede não é
+    // gasta. `EXIF` é um motivo que existe de verdade — não é removido,
+    // porque carrega metadado (GPS, entre outros) e sumir com ele em
+    // silêncio seria decidir por quem subiu a foto.
     comprimirImagem.mockRejectedValue(
       new ErroDeCompressao(
-        "A imagem gerada não seria aceita pelo servidor (o navegador gravou o perfil de cor (ICCP) na imagem).",
+        'A imagem gerada não seria aceita pelo servidor (chunk fora da allowlist: "EXIF").',
       ),
     );
 
@@ -116,7 +124,7 @@ describe("FotoDePerfil", () => {
     escolherArquivo(ORIGINAL);
 
     const alerta = await screen.findByRole("alert");
-    expect(alerta).toHaveTextContent("perfil de cor (ICCP)");
+    expect(alerta).toHaveTextContent("EXIF");
     // E nada foi enviado: o pré-voo recusou antes de gastar a rede.
     expect(enviarMinhaFoto).not.toHaveBeenCalled();
   });

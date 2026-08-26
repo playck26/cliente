@@ -139,18 +139,37 @@ maior lado, WebP q90** (REQ-001), abaixo do teto de 2 MB e dos 2500px que o
 sincronia**: as duas cópias divergirem em silêncio é o custo declarado da
 decisão, e mudança numa é mudança na outra.
 
-**A parte que não é óbvia é `sRGB` (INV-050).** `canvas.toBlob('image/webp')`
-num aparelho de tela **Display P3** pode gravar o chunk `ICCP`, e o validador
-do `back` é allowlist — recusa. O defeito só apareceria no aparelho de quem
-está usando, que é o pior lugar para ele morar. Duas defesas:
+**A parte que não é óbvia é o `ICCP` (INV-050, reescrita em 2026-08-26).**
+`canvas.toBlob('image/webp')` **sempre** grava o chunk `ICCP` com um perfil
+sRGB de 456 bytes, e o validador do `back` é allowlist — recusa. Sem
+tratamento, **nenhuma imagem sobe**.
+
+**O que este parágrafo dizia antes estava errado, e custou o DEF-007.** Dizia
+que era caso de aparelho **Display P3** e que forçar `sRGB` no canvas
+evitaria o chunk. Medido em Chrome 151 headless, sem tela nenhuma:
+`colorSpace: 'srgb'`, contexto sem `colorSpace`, `colorSpaceConversion:
+'none'` e `OffscreenCanvas` produzem o **mesmo arquivo, byte a byte**, todos
+com `ICCP`. Foto de perfil e logo ficaram no ar sem funcionar.
+
+Três camadas hoje:
 
 1. `getContext('2d', { colorSpace: 'srgb' })` e
    `createImageBitmap(f, { colorSpaceConversion: 'default' })`, os dois
-   **explícitos**;
-2. `inspecionarWebp()` lê os FourCC do resultado **antes de subir**, e
+   **explícitos**. Não evitam o `ICCP` — garantem que os **pixels** saiam em
+   sRGB, que é o que torna a camada 2 segura;
+2. `removerIccp()` tira o chunk e apaga o bit `ICC` do `VP8X` antes de
+   subir. Cirurgia de contêiner, **sem recodificar**: o bitstream sai
+   intacto. Perda zero, porque o perfil removido é o sRGB — que já é como
+   toda imagem sem perfil é lida;
+3. `inspecionarWebp()` lê os FourCC do resultado **antes de subir**, e
    reprova localmente com mensagem legível em vez de deixar virar 422.
+   `EXIF` cai aqui, e **não** é removido: carrega metadado de verdade (GPS,
+   entre outros), e sumir com ele em silêncio seria decidir por quem subiu.
 
-A defesa 2 **não é uma segunda validação**: a autoridade continua sendo
+**A ordem entre 2 e 3 é o conserto.** Invertida, o pré-voo reprova o arquivo
+que a remoção consertaria em seguida — que era, literalmente, o defeito.
+
+A camada 3 **não é uma segunda validação**: a autoridade continua sendo
 `webp.validator.ts` no `back`, que confere ordem, cardinalidade e dimensão.
 Aqui só se pergunta "apareceu chunk que eu sei que vai ser recusado?".
 
@@ -160,9 +179,20 @@ costura `DependenciasDoNavegador` existe para isso, e adicionar o pacote
 nativo `canvas` seria mudar a lista de dependências deste repositório por
 causa de um teste. Provado: a conta de dimensão (varredura, não caso
 escolhido), a leitura de chunk, e **os argumentos exatos** de
-`getContext`/`createImageBitmap`/`toBlob`. **Não provado, e é lacuna real:**
-que um Chrome em tela Display P3 de fato não grava `ICCP` — isso é prova de
-aparelho, e a defesa contra ela estar errada é a inspeção do resultado.
+`getContext`/`createImageBitmap`/`toBlob`, e **a remoção do `ICCP`**
+(remoção do chunk, queda do bit `ICC`, tamanho do RIFF recalculado, padding
+de payload ímpar, idempotência e totalidade).
+
+**A lacuna que este parágrafo declarava antes era o DEF-007.** Dizia: "não
+provado, e é lacuna real: que um Chrome em tela Display P3 de fato não grava
+`ICCP`". Ele grava — sempre, em qualquer tela. A lacuna foi fechada por
+medição em Chrome 151 headless, e o conserto foi conferido ponta a ponta
+contra o `webp.validator.ts` real, com um arquivo produzido por um Chrome de
+verdade: antes `IMAGEM_COM_METADADOS`, depois `valido: true`.
+
+**A lição, que vale além deste arquivo:** lacuna declarada com honestidade
+ainda é lacuna. Esta ficou escrita, revisada e aprovada por sete rodadas de
+validação cruzada, e continuou sendo o defeito até alguém rodar o navegador.
 
 ### Foto de perfil (SPEC-018/TASK-003)
 

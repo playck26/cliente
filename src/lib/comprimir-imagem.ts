@@ -12,26 +12,43 @@
  * a arquitetura por causa de 150 linhas. As duas cópias precisam andar
  * juntas — mudança aqui é mudança lá.
  *
- * ## A parte que não é óbvia: sRGB (INV-050)
+ * ## A parte que não é óbvia: o `ICCP` (INV-050, corrigida em 2026-08-26)
  *
- * `canvas.toBlob('image/webp')` num aparelho de tela **Display P3** pode
- * gravar o chunk `ICCP` com o perfil de cor. O validador do servidor é
- * **allowlist** (`VP8 `, `VP8L`, `VP8X`, `ALPH`) e recusa qualquer chunk
- * fora dela — inclusive `ICCP`.
+ * `canvas.toBlob('image/webp')` **sempre** grava o chunk `ICCP` com um
+ * perfil de cor sRGB de 456 bytes. O validador do servidor é **allowlist**
+ * (`VP8 `, `VP8L`, `VP8X`, `ALPH`) e recusa qualquer chunk fora dela —
+ * então, sem o tratamento abaixo, **nenhuma imagem sobe por nenhum
+ * caminho**. Foi o DEF-007, e ele derrubou foto de perfil e logo em
+ * produção.
  *
- * O efeito seria o pior tipo de defeito: **o dono de um iPhone recente
- * recebe 422 numa foto perfeitamente boa, e o problema não reproduz na
- * máquina de quem for investigar.** Daí as duas defesas abaixo:
+ * **A versão anterior desta nota dizia que era caso de aparelho Display P3.
+ * Não é.** Medido em Chrome 151 headless, sem tela nenhuma: `colorSpace:
+ * 'srgb'`, contexto sem `colorSpace`, `colorSpaceConversion: 'none'` e
+ * `OffscreenCanvas` produzem o **mesmo arquivo, byte a byte**, todos com
+ * `ICCP`. Nenhuma opção de canvas evita o chunk — a premissa de que dava
+ * para preveni-lo na origem era falsa, e por isso as defesas antigas nunca
+ * poderiam ter funcionado.
+ *
+ * As três camadas de hoje:
  *
  * 1. o contexto 2D é pedido com `colorSpace: 'srgb'` **explícito**, e o
- *    bitmap é decodificado com `colorSpaceConversion: 'default'` — que
- *    converte para o espaço do canvas. `'none'` preservaria o perfil de
- *    origem, que é exatamente o que não pode acontecer;
- * 2. o resultado é **inspecionado antes de sair** (`inspecionarWebp`). Se
+ *    bitmap é decodificado com `colorSpaceConversion: 'default'`. Isto não
+ *    evita o `ICCP`, mas garante que os **pixels** saiam em sRGB — o que
+ *    é justamente o que torna o passo 2 seguro;
+ * 2. `removerIccp()` tira o chunk do contêiner antes de subir. **É perda
+ *    zero:** o perfil que o Chrome grava é o sRGB (`desc` = "sRGB",
+ *    "Google Inc. 2016"), e imagem sem perfil já é lida como sRGB por todo
+ *    navegador. Some o chunk, some o bit `ICC` do `VP8X`, e os pixels
+ *    ficam exatamente onde estavam;
+ * 3. o resultado é **inspecionado antes de sair** (`inspecionarWebp`). Se
  *    algum chunk fora da allowlist apareceu mesmo assim, a falha é local e
  *    diz o que houve, em vez de virar um 422 sem explicação.
  *
- * A defesa 2 **não substitui o validador do servidor** e não tenta imitá-lo:
+ * A ordem importa: **remover primeiro, inspecionar depois.** Invertida, o
+ * pré-voo reprovaria o arquivo que o passo 2 consertaria em seguida — que
+ * era, literalmente, o defeito.
+ *
+ * A defesa 3 **não substitui o validador do servidor** e não tenta imitá-lo:
  * a autoridade continua sendo `webp.validator.ts` no `back`, que confere
  * ordem, cardinalidade e dimensão. Aqui só se pergunta *"apareceu chunk que
  * eu sei que vai ser recusado?"* — é pré-voo, não portaria.
@@ -58,6 +75,16 @@ export const ALVO_BYTES = 600 * 1024;
  * e não mais estrita.
  */
 const CHUNKS_PERMITIDOS = new Set(['VP8 ', 'VP8L', 'VP8X', 'ALPH']);
+
+/**
+ * O bit `ICC` do byte de flags do `VP8X`, na posição que o container spec
+ * define: `Rsv(2) | I(ICC) | L(Alpha) | E(Exif) | X(XMP) | A(Anim) | R`.
+ *
+ * Tirar o chunk `ICCP` e deixar o bit ligado faria o arquivo **mentir sobre
+ * si mesmo** — e o servidor recusa pelo flag mesmo sem o chunk (AC-003),
+ * então os dois andam juntos ou o conserto não conserta nada.
+ */
+const FLAG_ICC = 0x20;
 
 export interface DimensaoAlvo {
   readonly largura: number;
@@ -168,6 +195,85 @@ export function inspecionarWebp(bytes: ArrayBuffer): ResultadoDaInspecao {
   }
 
   return { ok: true, chunks };
+}
+
+/**
+ * Tira o chunk `ICCP` do contêiner e apaga o bit `ICC` do `VP8X`.
+ *
+ * **Por que existe:** ver o cabeçalho — o Chrome grava o perfil sRGB em todo
+ * WebP que produz, e o servidor recusa por allowlist. Sem isto, upload
+ * nenhum funciona.
+ *
+ * **É cirurgia de bytes, não recodificação.** O bitstream da imagem
+ * (`VP8 `/`VP8L`) é copiado intacto: nenhum pixel é lido, decodificado ou
+ * reescrito. O que muda é o contêiner — um chunk a menos, um bit a menos, e
+ * o tamanho do RIFF recalculado (o servidor confere que ele bate).
+ *
+ * **Total, como o resto do módulo:** entrada que não é WebP, truncada ou sem
+ * `ICCP` volta **inalterada**. Devolver o original é o certo aqui — quem
+ * julga é `inspecionarWebp` na sequência, e depois o servidor.
+ */
+export function removerIccp(bytes: ArrayBuffer): ArrayBuffer {
+  if (bytes.byteLength < TAMANHO_CABECALHO_RIFF) return bytes;
+
+  const view = new DataView(bytes);
+  const texto = (inicio: number) =>
+    String.fromCharCode(
+      view.getUint8(inicio),
+      view.getUint8(inicio + 1),
+      view.getUint8(inicio + 2),
+      view.getUint8(inicio + 3),
+    );
+
+  if (texto(0) !== "RIFF" || texto(8) !== "WEBP") return bytes;
+
+  const origem = new Uint8Array(bytes);
+  const mantidos: Uint8Array[] = [];
+  let cursor = TAMANHO_CABECALHO_RIFF;
+  let achouIccp = false;
+
+  while (cursor + TAMANHO_CABECALHO_CHUNK <= bytes.byteLength) {
+    const fourcc = texto(cursor);
+    const tamanho = view.getUint32(cursor + 4, true);
+    // Payload ímpar leva um byte de padding — parte do RIFF, não do chunk.
+    const total = TAMANHO_CABECALHO_CHUNK + tamanho + (tamanho % 2);
+
+    // Chunk que diz ser maior que o arquivo: para aqui e devolve o que tem.
+    // Arquivo malformado é assunto do servidor, não deste módulo.
+    if (cursor + total > bytes.byteLength) break;
+
+    if (fourcc === "ICCP") {
+      achouIccp = true;
+    } else {
+      const pedaco = origem.slice(cursor, cursor + total);
+      if (fourcc === "VP8X") {
+        // O byte de flags é o primeiro do payload do VP8X.
+        pedaco[TAMANHO_CABECALHO_CHUNK] &= ~FLAG_ICC;
+      }
+      mantidos.push(pedaco);
+    }
+
+    cursor += total;
+  }
+
+  if (!achouIccp) return bytes;
+
+  const corpo = mantidos.reduce((soma, p) => soma + p.byteLength, 0);
+  const saida = new Uint8Array(TAMANHO_CABECALHO_RIFF + corpo);
+  const escrita = new DataView(saida.buffer);
+
+  saida[0] = 82; saida[1] = 73; saida[2] = 70; saida[3] = 70; // RIFF
+  // O tamanho do RIFF conta a partir do "WEBP", não do início do arquivo.
+  escrita.setUint32(4, 4 + corpo, true);
+  saida[8] = 87; saida[9] = 69; saida[10] = 66; saida[11] = 80; // WEBP
+
+  let destino = TAMANHO_CABECALHO_RIFF;
+  for (const pedaco of mantidos) {
+    saida.set(pedaco, destino);
+    destino += pedaco.byteLength;
+  }
+
+  return saida.buffer;
 }
 
 export interface ImagemComprimida {
@@ -300,7 +406,11 @@ export async function comprimirImagem(
     );
   }
 
-  const inspecao = inspecionarWebp(await blob.arrayBuffer());
+  // A ordem é a correção do DEF-007: remover primeiro, inspecionar o
+  // resultado. Ao contrário, o pré-voo reprova o que a remoção consertaria.
+  const limpo = removerIccp(await blob.arrayBuffer());
+
+  const inspecao = inspecionarWebp(limpo);
   if (!inspecao.ok) {
     throw new ErroDeCompressao(
       "A imagem gerada não seria aceita pelo servidor (" +
@@ -309,14 +419,18 @@ export async function comprimirImagem(
     );
   }
 
+  // O que sobe é o `limpo`, não o `blob`. Subir o blob depois de inspecionar
+  // o limpo seria validar um arquivo e mandar outro.
+  const arquivoFinal = new File([limpo], trocarParaWebp(arquivo.name), {
+    type: "image/webp",
+  });
+
   return {
-    arquivo: new File([blob], trocarParaWebp(arquivo.name), {
-      type: "image/webp",
-    }),
+    arquivo: arquivoFinal,
     largura: alvo.largura,
     altura: alvo.altura,
     bytesOriginais: arquivo.size,
-    bytesFinais: blob.size,
+    bytesFinais: arquivoFinal.size,
   };
 }
 
