@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { BottomNav } from "./bottom-nav";
 
 /**
@@ -16,9 +16,17 @@ import { BottomNav } from "./bottom-nav";
  * `minhas-turmas-view` e que este componente não conhecia.
  */
 
+const getPapel = vi.hoisted(() => vi.fn());
+
 vi.mock("next/navigation", () => ({
   usePathname: () => "/perfil",
 }));
+vi.mock("@/lib/auth-storage", () => ({ getPapel }));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  getPapel.mockReturnValue(null);
+});
 
 /** As rotas que o servidor recusa para `professor` — todas `@Roles('aluno')`. */
 const PROIBIDAS_AO_PROFESSOR = [
@@ -87,10 +95,10 @@ describe("a barra do aluno não mudou", () => {
     expect(screen.getByLabelText("Reservar quadra")).toBeInTheDocument();
   });
 
-  it("sem papel, desenha a do aluno", () => {
-    // O estado de carregamento: `getMe()` ainda não voltou. Aluno é a
-    // maioria, e trocar cinco itens por dois depois que a tela desenhou
-    // pisca mais do que o contrário.
+  it("sem prop, usa o papel guardado no login", () => {
+    // É o que faz `/perfil` — a única tela que os dois dividem — acertar já
+    // na primeira pintura, sem esperar o `getMe()`.
+    getPapel.mockReturnValue("aluno");
     render(<BottomNav />);
     expect(hrefs()).toContain("/quadras");
   });
@@ -101,5 +109,57 @@ describe("a barra do aluno não mudou", () => {
     // que é o jeito certo de uma decisão pendente se anunciar.
     render(<BottomNav papel="company_admin" />);
     expect(hrefs()).toContain("/quadras");
+  });
+});
+
+describe("a barra NUNCA adivinha (correção de 2026-08-26, à noite)", () => {
+  it("papel desconhecido: NÃO mostra a barra do aluno", () => {
+    // A primeira versão do DEF-011 mostrava a do aluno enquanto não sabia,
+    // com o argumento de que aluno é a maioria. O Israel viu o resultado:
+    // no painel do professor, a barra do aluno piscava antes de virar a
+    // certa. Menu que pisca e some é pior que menu nenhum — a pessoa toca
+    // no que viu, e o alvo já mudou.
+    getPapel.mockReturnValue(null);
+    render(<BottomNav />);
+
+    expect(screen.queryAllByRole("link")).toHaveLength(0);
+  });
+
+  it("papel desconhecido: ocupa o mesmo espaço, para a tela não pular", () => {
+    getPapel.mockReturnValue(null);
+    const { container } = render(<BottomNav />);
+
+    const barra = container.querySelector('[aria-hidden="true"]');
+    expect(barra).not.toBeNull();
+    expect(barra?.className).toContain("h-[78px]");
+  });
+
+  it("o papel guardado do professor dá a barra dele, sem passar pela do aluno", () => {
+    getPapel.mockReturnValue("professor");
+    render(<BottomNav />);
+
+    expect(hrefs()).toContain("/minhas-turmas");
+    expect(hrefs()).not.toContain("/quadras");
+  });
+
+  it("a PROP ganha do armazenamento", () => {
+    // `/minhas-turmas` passa `"professor"` literal porque a rota é dele por
+    // definição. Se o armazenamento estivesse velho — outra pessoa usou o
+    // navegador antes —, quem manda é a tela.
+    getPapel.mockReturnValue("aluno");
+    render(<BottomNav papel="professor" />);
+
+    expect(hrefs()).toContain("/minhas-turmas");
+    expect(hrefs()).not.toContain("/quadras");
+  });
+
+  it("valor estranho no armazenamento não vira barra de aluno por acidente", () => {
+    // `getPapel()` valida antes de devolver, então lixo chega como `null`.
+    // Este teste guarda o CONTRATO: quem consome trata `null` como "não
+    // sei", nunca como "aluno".
+    getPapel.mockReturnValue(null);
+    render(<BottomNav />);
+
+    expect(screen.queryAllByRole("link")).toHaveLength(0);
   });
 });

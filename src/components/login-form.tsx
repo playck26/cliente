@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ApiError, login } from "@/lib/api-client";
 import { rotaInicial } from "@/lib/rota-inicial";
-import { saveAccessToken } from "@/lib/auth-storage";
+import { saveAccessToken, savePapel } from "@/lib/auth-storage";
 
 export function LoginForm() {
   const router = useRouter();
@@ -29,6 +29,9 @@ export function LoginForm() {
     try {
       const result = await login({ email, senha });
       saveAccessToken(result.accessToken);
+      // O papel vai junto do token: é o que permite ao `BottomNav` acertar
+      // a barra na PRIMEIRA pintura, sem esperar o `getMe()`.
+      savePapel(result.usuario.role);
       router.push(result.usuario.senhaTemporaria ? "/primeiro-acesso" : rotaInicial(result.usuario.role));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Não foi possível entrar. Tente de novo.");

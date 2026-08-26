@@ -190,9 +190,43 @@ arquivo.
 Agora ela mora no componente que desenha a barra: tela nova que renderize
 `<BottomNav>` sem pensar em papel acerta sozinha.
 
-O papel vai como **prop**, e não é a barra que busca: as telas já chamam
-`getMe()`, e um segundo `fetch` dentro da barra faria toda página com barra
-pagar por isso.
+**E ela nunca adivinha** (corrigido na mesma noite). A primeira versão do
+conserto desenhava a do aluno enquanto o papel era `undefined`, com o
+argumento de que aluno é a maioria. **Estava errado:** no painel do professor
+a barra do aluno piscava por um segundo antes de virar a certa, e menu que
+pisca e some é pior que menu nenhum — a pessoa toca no que viu, e o alvo já
+mudou.
+
+São três fontes, nesta ordem:
+
+| Fonte | Quando | Exemplo |
+|---|---|---|
+| a **prop** | a tela sabe quem está lá | `/minhas-turmas` passa `"professor"` literal — a rota é dele por definição |
+| `localStorage` | gravado no login, junto do token | cobre `/perfil`, a única tela que os dois dividem, já na primeira pintura |
+| **nada** | sessão aberta antes desta versão | barra vazia, mesma altura. Some no próximo login |
+
+O papel no `localStorage` é **navegação, nunca autorização** — a mesma
+distinção que `rota-inicial.ts` declara. Adulterá-lo dá tela errada, jamais
+dado. `getPapel()` valida contra a lista de papéis: não para impedir fraude,
+mas para não devolver lixo como se fosse papel, o que faria a barra cair no
+ramo do aluno por acidente em vez de admitir que não sabe.
+
+### Sair da conta (2026-08-26)
+
+`perfil-view` tem o botão, e é a única ação destrutiva daquela tela — por
+isso fica no fim, separado por uma linha dos botões da foto.
+
+**O app não tinha logout.** Quem entrava só saía limpando o navegador, o que
+num celular emprestado não é uma opção.
+
+`logout()` avisa o servidor primeiro — é ele que revoga o refresh token e
+limpa o cookie — mas **o estado local sai de qualquer jeito**, no `finally`.
+Botão "Sair" que não sai porque a rede caiu é pior que não ter botão; o custo
+de sair só localmente é um refresh token que expira sozinho, e o de não sair
+é o aparelho continuar logado.
+
+`router.replace`, não `push`: depois de sair, "voltar" não pode devolver a
+tela de quem saiu.
 
 ### A imagem da quadra chega ao aluno (SPEC-018/TASK-005)
 

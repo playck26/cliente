@@ -1,11 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import { CalendarCheck, Home, Plus, User, Users } from "lucide-react";
 import { TennisCourtIcon } from "@/components/icons/tennis-court-icon";
 import { TennisBallIcon } from "@/components/icons/tennis-ball-icon";
 import type { Papel } from "@/lib/api-client";
+import { getPapel } from "@/lib/auth-storage";
 
 // Navegação inferior (tab bar) — padrão de mobile do app do aluno
 // (DESIGN.md, seção Responsividade: "Cliente: navegação inferior (tab
@@ -44,16 +46,58 @@ const ITENS_DIREITA = [
  * era contra barra de **um** item, que é decoração, e contra a do aluno,
  * que seria mentira. Nenhuma das duas se aplica aqui.
  */
+/** O `subscribe` do `useSyncExternalStore`, declarado fora para ter identidade estável. */
+const NAO_MUDA = () => () => {};
+
 const ITENS_DO_PROFESSOR = [
   { href: "/minhas-turmas", label: "Turmas", Icon: Users },
   { href: "/perfil", label: "Perfil", Icon: User },
 ] as const;
 
+/**
+ * **A barra nunca adivinha** (correção de 2026-08-26, à noite).
+ *
+ * A primeira versão do DEF-011 desenhava a do aluno enquanto o papel era
+ * `undefined`, com o argumento de que aluno é a maioria. **Estava errado, e
+ * o Israel viu:** no painel do professor a barra do aluno aparecia por um
+ * segundo antes de virar a certa. Um menu que pisca e some é pior que menu
+ * nenhum — a pessoa toca no que viu, e o alvo já mudou.
+ *
+ * Agora são três fontes, nesta ordem:
+ *
+ * 1. a **prop**, quando a tela sabe quem está lá (`/minhas-turmas` é do
+ *    professor por definição — o servidor não deixa mais ninguém entrar);
+ * 2. o `localStorage`, gravado no login. Cobre `/perfil`, a única tela que
+ *    os dois dividem, já na primeira pintura;
+ * 3. **nada** — a barra sai vazia, com a mesma altura. É o caso da sessão
+ *    antiga, de antes desta versão: some no próximo login, e até lá a
+ *    pessoa não vê um menu que não é dela.
+ */
 export function BottomNav({ papel }: { papel?: Papel }) {
   const pathname = usePathname();
+  // `useSyncExternalStore` e não `useState` + `useEffect`: o
+  // `localStorage` não existe no servidor, e ler no corpo do componente
+  // quebraria a hidratação. Este hook existe exatamente para isto — o
+  // terceiro argumento é o que o SERVIDOR vê (`null`, "não sei"), e o
+  // segundo é o que o navegador vê.
+  //
+  // O `subscribe` não faz nada: o papel só muda no login e no logout, e os
+  // dois navegam para outra página. Assinar o evento `storage` seria
+  // reagir a uma mudança feita em OUTRA aba, que não é o caso de uso.
+  const doArmazenamento = useSyncExternalStore(
+    NAO_MUDA,
+    () => getPapel(),
+    () => null,
+  );
 
-  if (papel === "professor") {
+  const efetivo = papel ?? doArmazenamento;
+
+  if (efetivo === "professor") {
     return <NavDoProfessor pathname={pathname} />;
+  }
+
+  if (efetivo === null) {
+    return <NavVazia />;
   }
 
   return (
@@ -141,5 +185,21 @@ function NavDoProfessor({ pathname }: { pathname: string }) {
         );
       })}
     </nav>
+  );
+}
+
+/**
+ * A barra sem itens, do tamanho da barra de verdade.
+ *
+ * **Não é estado de carregamento normal** — ela só aparece para sessão
+ * aberta antes de o papel passar a ser guardado no login. Ocupa o mesmo
+ * espaço para a tela não pular quando a barra certa entrar.
+ */
+function NavVazia() {
+  return (
+    <div
+      aria-hidden="true"
+      className="fixed inset-x-2 bottom-2 z-50 mx-auto h-[78px] max-w-[390px] rounded-[28px] bg-[var(--color-court-dark)]/95 shadow-[0_18px_48px_rgba(18,20,15,0.28)] ring-1 ring-white/10 backdrop-blur-xl"
+    />
   );
 }

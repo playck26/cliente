@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { CampoSenha } from "@/components/campo-senha";
 import { ApiError, getMe, trocarSenha } from "@/lib/api-client";
 import { rotaInicial } from "@/lib/rota-inicial";
-import { saveAccessToken } from "@/lib/auth-storage";
+import { saveAccessToken, savePapel } from "@/lib/auth-storage";
 
 /**
  * SPEC-009/REQ-004 — primeiro acesso.
@@ -46,6 +46,7 @@ export function PrimeiroAcessoForm() {
       // a Home do aluno, onde o servidor recusaria tudo e ele veria um erro
       // logo depois de fazer exatamente o que o sistema exigiu.
       const usuario = await getMe();
+      savePapel(usuario.role);
       router.push(rotaInicial(usuario.role));
     } catch (err) {
       setError(

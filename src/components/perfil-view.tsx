@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { LogOut } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
 import { FotoDePerfil } from "@/components/foto-de-perfil";
 import { TopAppBar } from "@/components/top-app-bar";
-import { getMe, type Usuario } from "@/lib/api-client";
+import { getMe, logout, type Usuario } from "@/lib/api-client";
 
 /**
  * SPEC-018/TASK-003 — a página que hospeda a foto de perfil.
@@ -21,7 +23,9 @@ import { getMe, type Usuario } from "@/lib/api-client";
  * o papel, e o `BottomNav` decide.
  */
 export function PerfilView() {
+  const router = useRouter();
   const [usuario, setUsuario] = useState<Usuario | null>(null);
+  const [saindo, setSaindo] = useState(false);
 
   useEffect(() => {
     let vivo = true;
@@ -56,6 +60,37 @@ export function PerfilView() {
         </header>
 
         <FotoDePerfil nome={usuario?.nome} />
+
+        {/*
+          O "Sair" fica no fim, separado, e é a única ação destrutiva desta
+          tela. Perto dos botões da foto, o dedo erraria.
+
+          `router.replace` e não `push`: depois de sair, "voltar" não pode
+          devolver a tela de quem saiu.
+        */}
+        <div className="mt-2 border-t border-border pt-5">
+          <button
+            type="button"
+            disabled={saindo}
+            onClick={() => {
+              setSaindo(true);
+              // `.catch` antes do `.finally`: o `logout()` de produção já
+              // engole o erro, mas depender disso deixaria uma rejeição não
+              // tratada no dia em que ele parar de engolir. O redirecionamento
+              // acontece nos dois caminhos.
+              void logout()
+                .catch(() => undefined)
+                .finally(() => router.replace("/login"));
+            }}
+            className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-bold text-[var(--color-error)] ring-1 ring-border transition-colors hover:bg-[var(--color-error)]/5 disabled:opacity-60"
+          >
+            <LogOut className="size-4" aria-hidden="true" />
+            {saindo ? "Saindo..." : "Sair da conta"}
+          </button>
+          <p className="mt-2 text-center text-xs text-[var(--color-text-secondary)]">
+            Você precisará entrar de novo com e-mail e senha.
+          </p>
+        </div>
       </main>
 
       {/*

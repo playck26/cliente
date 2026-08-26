@@ -176,7 +176,14 @@ export function MinhasTurmasView() {
         DEF-011 — sem isto o professor chega ao perfil e não volta. O papel
         vem do `getMe()` que esta tela já faz.
       */}
-      <BottomNav papel={usuario?.role} />
+      {/*
+        `"professor"` literal, e não `usuario?.role`: esta tela é dele por
+        definição — `/me/teacher/classes` é `@Roles('professor')`, e o
+        servidor não deixa mais ninguém chegar aqui. Esperar o `getMe()`
+        para descobrir o que a rota já garante era o que fazia a barra do
+        aluno piscar no painel do professor.
+      */}
+      <BottomNav papel="professor" />
     </div>
   );
 }

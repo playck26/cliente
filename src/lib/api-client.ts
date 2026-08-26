@@ -343,6 +343,39 @@ export async function login(dto: LoginDto): Promise<LoginResult> {
   return (await res.json()) as LoginResult;
 }
 
+/**
+ * Encerra a sessão.
+ *
+ * **A ordem importa, e o `finally` é o ponto.** O servidor precisa ser
+ * avisado primeiro — é ele que revoga o refresh token e limpa o cookie; sem
+ * isso a sessão continuaria viva do lado de lá, e quem ficou com o
+ * navegador poderia renová-la.
+ *
+ * Mas o estado local sai **de qualquer jeito**. Se a rede caiu ou o
+ * servidor respondeu erro, insistir deixaria a pessoa presa numa sessão que
+ * ela pediu para encerrar — e um botão "Sair" que não sai é pior que não
+ * ter botão. O custo de sair só localmente é um refresh token que expira
+ * sozinho; o de não sair é o dispositivo continuar logado.
+ *
+ * `credentials: "include"` é obrigatório: a identificação do refresh vem
+ * pelo cookie.
+ */
+export async function logout(): Promise<void> {
+  try {
+    await fetch(`${API_URL}/api/v1/auth/logout`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        ...(getAccessToken() ? { Authorization: `Bearer ${getAccessToken()}` } : {}),
+      },
+    });
+  } catch {
+    // Rede fora. O servidor não soube, e o token dele expira sozinho.
+  } finally {
+    clearAccessToken();
+  }
+}
+
 export async function getMe(): Promise<Usuario> {
   const res = await authFetch("/auth/me");
   return (await res.json()) as Usuario;
