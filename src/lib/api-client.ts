@@ -65,44 +65,27 @@ export interface Paginated<T> {
 }
 
 /**
- * SPEC-020 — uma linha do catálogo de quadra do clube (esporte ou categoria
- * de piso). O `id` é o que o filtro compara; o `nome` é o que a tela mostra.
- * Comparar por `nome` traria de volta o defeito que a spec veio desfazer.
+ * SPEC-020/TASK-007 — **estes dois tipos deixaram de ser escritos à mão.**
+ *
+ * Eram uma `interface Court` local, e foi ela que causou o DEF-012: dizia
+ * `esporte: string`, continuou dizendo depois que o `back` passou a devolver
+ * objeto, e o typecheck ficou verde enquanto três telas iam a branco em
+ * produção.
+ *
+ * **Tipo escrito à mão não é contrato — é uma afirmação sobre ele, e ela
+ * envelhece calada.** Agora vêm de `openapi.json`, que vem do
+ * `QuadraResponseDto` do `back`, que está amarrado ao retorno de
+ * `toQuadraResponse`. Mudar a forma da resposta acende vermelho em três
+ * lugares antes de chegar a um usuário.
+ *
+ * `esporte` pode ser `null` de verdade: quadra cujo texto estava em branco
+ * quando o backfill da TASK-001 rodou. `categoria` é opcional por decisão de
+ * produto (AC-006). `imagemUrl` é CDN sem assinatura (SPEC-018/AC-002) — a
+ * chave crua nunca chega aqui (INV-037).
  */
-export interface OpcaoDeCatalogo {
-  id: string;
-  nome: string;
-}
-
-export interface Court {
-  id: string;
-  companyId: string;
-  nome: string;
-  /**
-   * **DEF-012 — este campo era `string` e virou objeto (SPEC-020/TASK-003).**
-   * Enquanto esta interface continuou dizendo `string`, o typecheck ficou
-   * verde e três telas do app estouraram em produção com *"Objects are not
-   * valid as a React child"*. Tipo escrito à mão não é contrato: é uma
-   * afirmação sobre ele, e ela envelhece calada.
-   *
-   * `null` acontece de verdade: quadra cujo `esporte` estava em branco
-   * quando o backfill da TASK-001 rodou. A TASK-004 vai exigir preenchimento.
-   */
-  esporte: OpcaoDeCatalogo | null;
-  /** Opcional por decisão de produto (AC-006): nem todo clube classifica piso. */
-  categoria: OpcaoDeCatalogo | null;
-  precoHora: number;
-  status: "ativa" | "inativa";
-  createdAt: string;
-  /**
-   * SPEC-018/TASK-005 — URL de CDN, **sem assinatura** (AC-002): a imagem de
-   * quadra é pública de propósito, e abre em aba anônima. `null` quando o
-   * clube ainda não subiu nenhuma, que é o estado normal.
-   *
-   * A chave crua nunca chega aqui (INV-037).
-   */
-  imagemUrl: string | null;
-}
+export type OpcaoDeCatalogo =
+  components["schemas"]["OpcaoDeCatalogoResponseDto"];
+export type Court = components["schemas"]["QuadraResponseDto"];
 
 export interface AvailabilitySlot {
   slot: string;

@@ -105,6 +105,16 @@ coisas acima.
 `lib/api-types.ts` é **gerado** do `openapi.json` do `back`
 (`pnpm run gen:api-types`). Não editar à mão.
 
+**E ele estava velho quando o DEF-012 aconteceu** — ainda pedia
+`esporte: string` no `CreateCourtDto`. Desde a SPEC-020/TASK-007 há
+**`pnpm run api-types:check`**, que regenera e sai com código 1 se o arquivo
+commitado estava atrasado. Provado nos dois sentidos: sujo → 1, em dia → 0.
+
+**O que mudou de verdade:** `Court` e `OpcaoDeCatalogo` deixaram de ser
+`interface` escrita à mão em `api-client.ts` e passaram a ser apelidos do
+schema gerado. Antes, o arquivo gerado podia estar perfeito e o defeito
+acontecia mesmo assim, porque a tela consumia o tipo escrito à mão.
+
 **Gap conhecido:** o CI **não** valida se esse arquivo está atualizado — a
 mitigação é lembrar de rodar o comando, que é o tipo de mitigação que falha
 em silêncio. Ver Gaps.

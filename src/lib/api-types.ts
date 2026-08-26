@@ -1072,6 +1072,38 @@ export interface components {
             /** @description Liga ou desliga o link público de auto-cadastro de alunos desta empresa. */
             permiteAutoCadastro: boolean;
         };
+        OpcaoDeCatalogoResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example Saibro */
+            nome: string;
+        };
+        QuadraResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            companyId: string;
+            /** @example Quadra 1 */
+            nome: string;
+            esporte: components["schemas"]["OpcaoDeCatalogoResponseDto"] | null;
+            categoria: components["schemas"]["OpcaoDeCatalogoResponseDto"] | null;
+            /** @example 120 */
+            precoHora: number;
+            /** @enum {string} */
+            status: "ativa" | "inativa";
+            /** Format: date-time */
+            createdAt: string;
+            imagemUrl: string | null;
+        };
+        QuadraPaginadaResponseDto: {
+            data: components["schemas"]["QuadraResponseDto"][];
+            /** @example 1 */
+            page: number;
+            /** @example 20 */
+            pageSize: number;
+            /** @example 3 */
+            total: number;
+        };
         CreateCourtDto: {
             nome: string;
             /**
@@ -1129,6 +1161,18 @@ export interface components {
              */
             horaFim?: string;
             alunoId?: string;
+        };
+        CatalogoDeQuadraResponseDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            companyId: string;
+            /** @example Saibro */
+            nome: string;
+            /** @example 0 */
+            ordem: number;
+            /** Format: date-time */
+            createdAt: string;
         };
         CatalogoDeQuadraDto: {
             /** @example Saibro */
@@ -2118,7 +2162,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["QuadraPaginadaResponseDto"];
+                };
             };
         };
     };
@@ -2135,11 +2181,13 @@ export interface operations {
             };
         };
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["QuadraResponseDto"];
+                };
             };
         };
     };
@@ -2158,7 +2206,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["QuadraResponseDto"];
+                };
             };
         };
     };
@@ -2181,7 +2231,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["QuadraResponseDto"];
+                };
             };
         };
     };
@@ -2471,7 +2523,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CatalogoDeQuadraResponseDto"][];
+                };
             };
         };
     };
@@ -2488,11 +2542,13 @@ export interface operations {
             };
         };
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CatalogoDeQuadraResponseDto"];
+                };
             };
         };
     };
@@ -2534,7 +2590,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CatalogoDeQuadraResponseDto"];
+                };
             };
         };
     };
@@ -2551,7 +2609,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CatalogoDeQuadraResponseDto"][];
+                };
             };
         };
     };
@@ -2568,11 +2628,13 @@ export interface operations {
             };
         };
         responses: {
-            201: {
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CatalogoDeQuadraResponseDto"];
+                };
             };
         };
     };
@@ -2614,7 +2676,9 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "application/json": components["schemas"]["CatalogoDeQuadraResponseDto"];
+                };
             };
         };
     };
