@@ -238,6 +238,32 @@ de sair só localmente é um refresh token que expira sozinho, e o de não sair
 `router.replace`, não `push`: depois de sair, "voltar" não pode devolver a
 tela de quem saiu.
 
+### A turma do professor mostra os N dias (SPEC-019/TASK-005)
+
+As duas telas de turma — lista e detalhe — passam a mostrar toda a
+recorrência.
+
+**Dia e horário andam juntos no mesmo chip.** Antes eram dois chips fixos:
+um com o dia, outro com o horário. Numa turma de dois dias isso produziria
+*"Terça, Sábado"* de um lado e dois horários do outro, e ninguém saberia qual
+hora é de qual dia. Há teste que cai se alguém separar de novo.
+
+**O quadradinho do card cabe um encontro** e mostra o primeiro — a lista vem
+ordenada do servidor, então escolher aqui faria a ordem do card discordar do
+texto ao lado. O **`+N`** avisa que há mais sem tentar espremer.
+
+**`DIAS_SEMANA` estava copiado nas duas telas** e virou `lib/encontros.ts`.
+A convenção do índice é `0 = domingo`, igual a `Date.getDay()` e ao banco:
+**não há tradução de índice em lugar nenhum deste produto**, e é deliberado —
+tradução de índice de dia é erro que só aparece no domingo, quando ninguém
+está olhando. Há sabotagem que prova isso.
+
+**O detalhe do professor foi o BLOQUEADOR 1 da validação cruzada da
+SPEC-019.** A 1ª versão da spec listava só a rota de lista no contrato e
+esquecia `/me/teacher/classes/:id`: a lista seria atualizada e o detalhe
+continuaria esperando campos removidos — tela branca, exatamente o DEF-012.
+Nenhuma das duas telas tinha teste até a TASK-005.
+
 ### O filtro por esporte e categoria (SPEC-020/TASK-006)
 
 A barra da lista de quadras tem **dois** grupos, esporte e categoria de piso,
