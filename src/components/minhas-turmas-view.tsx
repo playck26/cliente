@@ -7,6 +7,11 @@ import { TennisCourtIcon } from "@/components/icons/tennis-court-icon";
 import { BottomNav } from "@/components/bottom-nav";
 import { CourtLines } from "@/components/court-lines";
 import { TopAppBar } from "@/components/top-app-bar";
+import {
+  encontroPrincipal,
+  formatarEncontro,
+  nomeDoDia,
+} from "@/lib/encontros";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   ApiError,
@@ -15,16 +20,6 @@ import {
   type MinhaTurma,
   type Usuario,
 } from "@/lib/api-client";
-
-const DIAS_SEMANA = [
-  "Domingo",
-  "Segunda",
-  "Terça",
-  "Quarta",
-  "Quinta",
-  "Sexta",
-  "Sábado",
-];
 
 /**
  * SPEC-013 — a grade do professor.
@@ -79,9 +74,15 @@ export function MinhasTurmasView() {
           <div className="relative z-10 flex min-h-40 flex-col justify-between gap-6">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-bold tracking-[0.14em] text-white/65 uppercase">Painel do professor</p>
-                <h1 className="mt-2 text-3xl leading-tight font-extrabold">Minhas turmas</h1>
-                <p className="mt-1 text-sm text-white/70">Sua agenda de aulas em um só lugar.</p>
+                <p className="text-xs font-bold tracking-[0.14em] text-white/65 uppercase">
+                  Painel do professor
+                </p>
+                <h1 className="mt-2 text-3xl leading-tight font-extrabold">
+                  Minhas turmas
+                </h1>
+                <p className="mt-1 text-sm text-white/70">
+                  Sua agenda de aulas em um só lugar.
+                </p>
               </div>
               <span className="flex size-12 shrink-0 items-center justify-center rounded-full bg-[var(--color-secondary)] text-[var(--color-court-dark)] shadow-lg">
                 <CalendarCheck className="size-6" aria-hidden="true" />
@@ -89,10 +90,16 @@ export function MinhasTurmasView() {
             </div>
             <div className="flex items-end justify-between border-t border-white/20 pt-4">
               <div>
-                <p className="text-3xl font-extrabold">{loading ? "—" : turmas.length}</p>
-                <p className="text-xs font-semibold text-white/65">turmas atribuídas</p>
+                <p className="text-3xl font-extrabold">
+                  {loading ? "—" : turmas.length}
+                </p>
+                <p className="text-xs font-semibold text-white/65">
+                  turmas atribuídas
+                </p>
               </div>
-              <p className="max-w-32 text-right text-xs leading-relaxed text-white/60">Toque em uma turma para ver alunos e chamadas.</p>
+              <p className="max-w-32 text-right text-xs leading-relaxed text-white/60">
+                Toque em uma turma para ver alunos e chamadas.
+              </p>
             </div>
           </div>
         </section>
@@ -129,46 +136,88 @@ export function MinhasTurmasView() {
         {!loading && !error && turmas.length > 0 ? (
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-extrabold">Sua grade</h2>
-            <span className="text-xs font-bold tracking-[0.12em] text-[var(--color-text-secondary)] uppercase">Semanal</span>
+            <span className="text-xs font-bold tracking-[0.12em] text-[var(--color-text-secondary)] uppercase">
+              Semanal
+            </span>
           </div>
         ) : null}
 
         <ul className="flex flex-col gap-3">
-          {turmas.map((turma) => (
-            <li key={turma.id}>
-              <Link href={`/minhas-turmas/${turma.id}`} className="block">
-                <Card className="border-0 shadow-[var(--shadow-low)] ring-1 ring-border transition-all hover:-translate-y-0.5 hover:ring-[var(--color-primary)]">
-                  <CardContent className="flex items-center gap-3 py-4">
-                    <div className="flex size-11 shrink-0 flex-col items-center justify-center rounded-lg bg-[var(--color-primary-container)] text-[var(--color-primary-strong)]">
-                      <span className="text-[10px] font-bold uppercase">{(DIAS_SEMANA[turma.diaSemana] ?? "—").slice(0, 3)}</span>
-                      <span className="text-sm font-extrabold">{turma.horaInicio.slice(0, 2)}h</span>
-                    </div>
-                    <div className="flex min-w-0 flex-1 flex-col gap-2">
-                      <span className="truncate text-base font-extrabold">{turma.nome}</span>
-                      <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--color-text-secondary)]">
-                        <span className="inline-flex items-center gap-1">
-                          <CalendarDays className="size-4" aria-hidden="true" />
-                          {DIAS_SEMANA[turma.diaSemana] ?? "—"}, {turma.horaInicio}–{turma.horaFim}
+          {turmas.map((turma) => {
+            const principal = encontroPrincipal(turma.encontros);
+            return (
+              <li key={turma.id}>
+                <Link href={`/minhas-turmas/${turma.id}`} className="block">
+                  <Card className="border-0 shadow-[var(--shadow-low)] ring-1 ring-border transition-all hover:-translate-y-0.5 hover:ring-[var(--color-primary)]">
+                    <CardContent className="flex items-center gap-3 py-4">
+                      <div className="flex size-11 shrink-0 flex-col items-center justify-center rounded-lg bg-[var(--color-primary-container)] text-[var(--color-primary-strong)]">
+                        {/*
+                        SPEC-019 — o quadradinho cabe UM encontro, e mostra o
+                        primeiro (a lista vem ordenada do servidor). O "+N"
+                        avisa que há mais sem tentar espremer os outros aqui:
+                        a lista completa está no texto ao lado.
+                      */}
+                        <span className="text-[10px] font-bold uppercase">
+                          {principal === null
+                            ? "—"
+                            : nomeDoDia(principal.diaSemana).slice(0, 3)}
                         </span>
-                        <span className="inline-flex items-center gap-1">
-                          <TennisCourtIcon className="size-4" aria-hidden="true" />
-                          {turma.quadraNome}
+                        <span className="text-sm font-extrabold">
+                          {principal === null
+                            ? "—"
+                            : `${principal.horaInicio.slice(0, 2)}h`}
                         </span>
-                        <span className="inline-flex items-center gap-1">
-                          <Users className="size-4" aria-hidden="true" />
-                          {turma.totalAlunos}/{turma.capacidade}
+                        {turma.encontros.length > 1 ? (
+                          <span className="text-[9px] font-bold opacity-70">
+                            +{turma.encontros.length - 1}
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="flex min-w-0 flex-1 flex-col gap-2">
+                        <span className="truncate text-base font-extrabold">
+                          {turma.nome}
                         </span>
-                      </span>
-                    </div>
-                    <ChevronRight
-                      className="size-5 shrink-0 text-[var(--color-primary-strong)]"
-                      aria-hidden="true"
-                    />
-                  </CardContent>
-                </Card>
-              </Link>
-            </li>
-          ))}
+                        <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[var(--color-text-secondary)]">
+                          {/*
+                          Um item por encontro. Concatenar numa string só
+                          ficaria ilegível numa turma de três dias, e é a
+                          informação que o professor mais usa aqui.
+                        */}
+                          {turma.encontros.map((encontro, indice) => (
+                            <span
+                              key={indice}
+                              className="inline-flex items-center gap-1"
+                            >
+                              <CalendarDays
+                                className="size-4"
+                                aria-hidden="true"
+                              />
+                              {formatarEncontro(encontro)}
+                            </span>
+                          ))}
+                          <span className="inline-flex items-center gap-1">
+                            <TennisCourtIcon
+                              className="size-4"
+                              aria-hidden="true"
+                            />
+                            {turma.quadraNome}
+                          </span>
+                          <span className="inline-flex items-center gap-1">
+                            <Users className="size-4" aria-hidden="true" />
+                            {turma.totalAlunos}/{turma.capacidade}
+                          </span>
+                        </span>
+                      </div>
+                      <ChevronRight
+                        className="size-5 shrink-0 text-[var(--color-primary-strong)]"
+                        aria-hidden="true"
+                      />
+                    </CardContent>
+                  </Card>
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       </main>
 

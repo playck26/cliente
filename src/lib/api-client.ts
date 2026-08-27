@@ -19,25 +19,27 @@ export interface Usuario {
   companyId: string | null;
 }
 
-// SPEC-013 — o que o professor vê. Note o que **não** está aqui: telefone
-// e e-mail de aluno, valor, situação de pagamento. O servidor também não
-// devolve (AC-008); o tipo existe para que adicionar isso exija uma
-// decisão, não um descuido.
-export interface MinhaTurma {
-  id: string;
-  nome: string;
-  diaSemana: number;
-  horaInicio: string;
-  horaFim: string;
-  quadraNome: string;
-  nivelNome: string | null;
-  capacidade: number;
-  totalAlunos: number;
-}
-
-export interface MinhaTurmaDetalhe extends Omit<MinhaTurma, "totalAlunos"> {
-  alunos: { id: string; nome: string; nivelNome: string | null }[];
-}
+/**
+ * SPEC-013 — o que o professor vê. Note o que **não** está aqui: telefone e
+ * e-mail de aluno, valor, situação de pagamento. O servidor também não
+ * devolve (AC-008); o tipo existe para que adicionar isso exija uma decisão,
+ * não um descuido.
+ *
+ * **SPEC-019/REQ-006 (AC-016) — eram `interface` escrita à mão, e diziam
+ * `diaSemana`.** Enquanto fossem locais, trocar a forma da resposta no `back`
+ * deixaria o typecheck daqui verde e a tela quebrada em runtime — que foi
+ * literalmente o DEF-012, em 2026-08-26, neste repositório.
+ *
+ * E a validação cruzada da SPEC-019 apontou que `MinhaTurmaDetalhe` ia
+ * repetir o defeito: a rota `/me/teacher/classes/:id` não estava no contrato
+ * da 1ª versão da spec.
+ */
+export type EncontroDaTurma =
+  components["schemas"]["TurmaEncontroResponseDto"];
+export type MinhaTurma =
+  components["schemas"]["TurmaDoProfessorResponseDto"];
+export type MinhaTurmaDetalhe =
+  components["schemas"]["TurmaDoProfessorDetalheResponseDto"];
 
 export interface LoginResult {
   accessToken: string;
