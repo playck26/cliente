@@ -9,15 +9,17 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 
 export type LoginDto = components["schemas"]["LoginDto"];
 
-export type Papel = "super_admin" | "company_admin" | "aluno" | "professor";
+/**
+ * SPEC-021/INV-059 — o papel vem do contrato, e não de uma cópia.
+ *
+ * Esta união estava certa hoje, e é o tipo de coisa que fica errada quando
+ * ninguém está olhando: o `"professor"` entrou na SPEC-013 e o `LoginResult`
+ * do SAdmin **nunca soube** — lá a lista tinha três papéis até 2026-08-27.
+ * Mesma união, dois repositórios, um deles desatualizado por semanas.
+ */
+export type Papel = components["schemas"]["UsuarioPublicoResponseDto"]["role"];
 
-export interface Usuario {
-  id: string;
-  nome: string;
-  email: string;
-  role: Papel;
-  companyId: string | null;
-}
+export type Usuario = components["schemas"]["UsuarioPublicoResponseDto"];
 
 /**
  * SPEC-013 — o que o professor vê. Note o que **não** está aqui: telefone e
@@ -41,23 +43,7 @@ export type MinhaTurma =
 export type MinhaTurmaDetalhe =
   components["schemas"]["TurmaDoProfessorDetalheResponseDto"];
 
-export interface LoginResult {
-  accessToken: string;
-  refreshToken: string;
-  usuario: {
-    id: string;
-    nome: string;
-    role: Papel;
-    companyId: string | null;
-    /**
-     * SPEC-009/AC-008 — conta criada pelo admin entra com senha temporária
-     * e precisa trocá-la antes de qualquer outra coisa. A trava de verdade
-     * é do servidor (INV-008); isto aqui só evita que o app mostre telas
-     * que ele sabe que vão voltar 403.
-     */
-    senhaTemporaria?: boolean;
-  };
-}
+export type LoginResult = components["schemas"]["LoginResponseDto"];
 
 export interface Paginated<T> {
   data: T[];
@@ -89,51 +75,45 @@ export type OpcaoDeCatalogo =
   components["schemas"]["OpcaoDeCatalogoResponseDto"];
 export type Court = components["schemas"]["QuadraResponseDto"];
 
-export interface AvailabilitySlot {
-  slot: string;
-  status: "livre" | "ocupado_turma" | "ocupado_avulso";
-}
+/**
+ * SPEC-021/INV-059 — **de `interface` escrita à mão para apelido do schema.**
+ *
+ * Este é o repositório do DEF-012: três telas ficaram em branco em produção
+ * porque `quadra.esporte` virou objeto e o tipo daqui continuou dizendo
+ * `string`, com o typecheck verde o tempo todo. `Court` virou alias naquele
+ * dia; **o resto continuou afirmado à mão até hoje**, porque não havia schema
+ * publicado para apontar.
+ *
+ * Agora há, para as 90 rotas. O que era afirmação vira consulta.
+ *
+ * `Booking` é o exemplo de que a mão também acerta e mesmo assim custa:
+ * `statusPagamento` aqui estava **certo** (`pendente_pagamento`), e foi o
+ * contrato que eu publiquei hoje que saiu errado (DEF-016). Estar certo por
+ * enquanto não é o mesmo que estar amarrado.
+ *
+ * O que ele perdia era outra coisa: `valor` — o preço **congelado** na
+ * reserva. Sem ele no tipo, `court-booking.tsx` recalcula
+ * `slotsSelecionados.length × precoHora`, e passaria a mostrar número
+ * diferente do cobrado no primeiro reajuste do clube. O DTO do `back` existe
+ * dizendo exatamente isso.
+ */
+export type AvailabilitySlot =
+  components["schemas"]["SlotDeDisponibilidadeResponseDto"];
 
-export interface Availability {
-  quadraId: string;
-  data: string;
-  /**
-   * SPEC-010/AC-008 — "fechado" e "aberto sem nada livre" produzem a mesma
-   * lista vazia depois que a tela filtra os slots ocupados. Sem este
-   * campo, os dois casos apareceriam como a mesma grade vazia sem
-   * explicação.
-   */
-  estado: "aberto" | "fechado";
-  slots: AvailabilitySlot[];
-}
+/**
+ * SPEC-010/AC-008 — `estado` distingue "fechado" de "aberto sem nada livre".
+ * As duas viram a mesma lista vazia depois que a tela filtra os ocupados, e
+ * sem o campo apareceriam como a mesma grade sem explicação.
+ */
+export type Availability =
+  components["schemas"]["DisponibilidadeResponseDto"];
 
-export interface Booking {
-  id: string;
-  companyId: string;
-  quadraId: string;
-  data: string;
-  horaInicio: string;
-  horaFim: string;
-  origemTipo: "TURMA" | "AVULSO";
-  alunoId: string | null;
-  statusPagamento: "pendente_pagamento" | "pago" | "cancelado";
-}
+export type Booking = components["schemas"]["OcupacaoResponseDto"];
 
-export interface MyClass {
-  ocupacaoId: string;
-  turmaId: string;
-  turmaNome: string | null;
-  quadraId: string;
-  quadraNome: string;
-  data: string;
-  horaInicio: string;
-  horaFim: string;
-}
+export type MyClass = components["schemas"]["AulaDoAlunoResponseDto"];
 
-export interface PublicPaymentConfig {
-  linkPagamentoUrl: string | null;
-  whatsappNumero: string | null;
-}
+export type PublicPaymentConfig =
+  components["schemas"]["PagamentoPublicoResponseDto"];
 
 export class ApiError extends Error {
   constructor(
@@ -388,49 +368,46 @@ export async function getMe(): Promise<Usuario> {
   return (await res.json()) as Usuario;
 }
 
-export type StatusPresenca = "presente" | "ausente" | "justificado";
+/**
+ * SPEC-014 — os três estados de presença.
+ *
+ * Vem do contrato pelo caminho da **linha da chamada**, tirando o `null`:
+ * ali `null` significa "ainda não lançado", que não é um quarto estado de
+ * presença e não pode ser oferecido como opção na tela.
+ */
+export type StatusPresenca = NonNullable<
+  components["schemas"]["LinhaDaChamadaResponseDto"]["status"]
+>;
 
-export interface Ocorrencia {
-  ocupacaoId: string;
-  data: string;
-  horaInicio: string;
-  horaFim: string;
-  cancelada: boolean;
-  chamadaFeita: boolean;
-  marcados: number;
-  totalAlunos: number;
-  /** SPEC-014/INV-017: falso para aula futura, cancelada ou com mais de 7 dias. */
-  podeLancar: boolean;
-}
+/**
+ * SPEC-014 — a ocorrência na visão do professor.
+ *
+ * `podeLancar` vem calculado do servidor e **não é derivável** do resto: ele
+ * junta cancelamento, data futura e a janela retroativa de 7 dias. Recompor
+ * com `data <= hoje` erraria a janela e ofereceria botão que volta 422.
+ */
+export type Ocorrencia =
+  components["schemas"]["OcorrenciaDaTurmaResponseDto"];
 
-export interface Chamada {
-  ocupacaoId: string;
-  turmaId: string;
-  data: string;
-  horaInicio: string;
-  horaFim: string;
-  cancelada: boolean;
-  /**
-   * SPEC-014/INV-019 — precisa voltar no PUT. Sem ela, dois aparelhos na
-   * mesma chamada se sobrescrevem em silêncio.
-   */
-  versao: string;
-  /**
-   * SPEC-015/DEF-002/INV-027 — completude declarada pelo cabeçalho da
-   * chamada. **Opcional de propósito:** esta tela é publicada antes do
-   * backend que passa a mandar o campo (a sequência de deploy exige a tela
-   * primeiro), então durante essa janela ele chega `undefined`. Ausente
-   * significa "backend antigo", não "completa" — e por isso o aviso só
-   * aparece no valor explícito.
-   */
-  completude?: "completa" | "desconhecida";
-  alunos: {
-    alunoId: string;
-    nome: string;
-    status: StatusPresenca | null;
-    naTurmaHoje: boolean;
-  }[];
-}
+/**
+ * SPEC-014/SPEC-015 — a chamada do professor.
+ *
+ * **`completude` era `?` de propósito, e o motivo expirou.** O comentário
+ * original dizia: esta tela é publicada antes do backend que passa a mandar
+ * o campo (a sequência de deploy exige a tela primeiro), então durante essa
+ * janela ele chega `undefined`, e ausente significa "backend antigo", não
+ * "completa".
+ *
+ * A janela fechou — o `back` manda o campo desde a SPEC-015 e está no ar há
+ * dias. No contrato ele é **obrigatório e nulável**: `null` é "chamada não
+ * lançada", que é estado real e não ausência de backend. As duas leituras
+ * pedem o mesmo cuidado na tela (só avisar no valor explícito), e agora a
+ * que está escrita é a que corresponde à API.
+ *
+ * `versao` (INV-019) continua obrigatória: sem ela no PUT, dois aparelhos na
+ * mesma chamada se sobrescrevem em silêncio.
+ */
+export type Chamada = components["schemas"]["ChamadaResponseDto"];
 
 export async function listOcorrencias(turmaId: string, dias = 30): Promise<Ocorrencia[]> {
   const res = await authFetch(`/me/teacher/classes/${turmaId}/ocorrencias?dias=${dias}`);
@@ -529,10 +506,15 @@ export async function trocarSenha(dto: {
   return (await res.json()) as { accessToken: string };
 }
 
-export interface EmpresaPublica {
-  nome: string;
-  logoUrl: string | null;
-}
+/**
+ * REQ-001 — os dados mínimos da empresa na página pública de cadastro.
+ *
+ * **Dois campos, e a escassez é a decisão:** esta rota é alcançável sem
+ * token. Nem o `status`, que o servidor LÊ para decidir se responde, sai no
+ * corpo.
+ */
+export type EmpresaPublica =
+  components["schemas"]["EmpresaPublicaResponseDto"];
 
 /** REQ-001: dados mínimos da empresa para a página pública de cadastro. */
 export async function getEmpresaPorSlug(slug: string): Promise<EmpresaPublica> {
@@ -561,10 +543,14 @@ export async function registerAluno(dto: {
   }
 }
 
-export interface ConvitePublico {
-  empresa: { nome: string };
-  nome: string | null;
-}
+/**
+ * REQ-002 — o que a tela do convite pode mostrar (AC-024).
+ *
+ * O que **não** está aqui é o ponto: `email`, `telefone` e `nivelId` existem
+ * no convite no banco e não saem nesta resposta.
+ */
+export type ConvitePublico =
+  components["schemas"]["ConvitePublicoResponseDto"];
 
 /** REQ-002: dados que a tela do convite pode mostrar (AC-024). */
 export async function getConvite(token: string): Promise<ConvitePublico> {
@@ -597,10 +583,8 @@ export async function aceitarConvite(dto: {
 // SPEC-018/TASK-003 — foto de perfil
 // ---------------------------------------------------------------------------
 
-export interface FotoDePerfil {
-  /** `null` é o estado normal de quem nunca subiu foto — não é erro. */
-  url: string | null;
-}
+/** `null` é o estado normal de quem nunca subiu foto — não é erro. */
+export type FotoDePerfil = components["schemas"]["FotoDePerfilResponseDto"];
 
 /**
  * A URL vem **assinada e expira** (SPEC-018/AC-003). Por isso a foto tem
@@ -644,14 +628,11 @@ export async function removerMinhaFoto(): Promise<void> {
 // SPEC-018/TASK-006 — a marca do clube
 // ---------------------------------------------------------------------------
 
-export interface MinhaEmpresa {
-  nome: string;
-  slug: string;
-  /** Já resolvida pelo servidor: upload quando existe, `logo_url` senão. */
-  logoUrl: string | null;
-  status: string;
-  permiteAutoCadastro: boolean;
-}
+/**
+ * A empresa como o gestor/aluno a vê. `logoUrl` já vem resolvida pelo
+ * servidor — a chave crua nunca chega aqui (INV-037).
+ */
+export type MinhaEmpresa = components["schemas"]["MinhaEmpresaResponseDto"];
 
 let empresaEmCache: Promise<MinhaEmpresa> | null = null;
 

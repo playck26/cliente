@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { Court } from "@/lib/api-client";
 import { CourtsList } from "./courts-list";
 
 /**
@@ -43,15 +44,26 @@ vi.mock("@/lib/api-client", async () => {
 });
 
 /**
- * O formato REAL que o `back` devolve desde a TASK-003 — conferido em
- * `courts.service.ts`, no `toQuadraResponse`: `esporte: quadra.esporteRef ??
- * null`.
+ * O formato REAL que o `back` devolve desde a TASK-003 — e desde a
+ * SPEC-021/INV-059 isso não é mais uma afirmação deste arquivo: o
+ * `satisfies Court` amarra a fixture ao schema publicado.
+ *
+ * **Por que amarrar a FIXTURE, e não só o tipo.** `Court` já era apelido do
+ * contrato desde o DEF-012, e mesmo assim uma mudança de forma passava calada
+ * aqui: um literal solto não é confrontado com nada. Provado por sabotagem no
+ * SAdmin em 2026-08-27 — trocar `string[]` por objetos no schema deixou o
+ * typecheck verde, porque a tela chamava `.join()`, que existe em qualquer
+ * array.
+ *
+ * Com `satisfies`, **a fixture é que fica vermelha** quando o `back` muda a
+ * forma. E é o lugar certo para o vermelho aparecer: este arquivo é a
+ * descrição do que a tela espera receber.
  */
 function quadra(
   nome: string,
-  esporte: { id: string; nome: string } | null,
-  categoria: { id: string; nome: string } | null = null,
-) {
+  esporte: Court["esporte"],
+  categoria: Court["categoria"] = null,
+): Court {
   return {
     id: `q-${nome}`,
     companyId: "c1",
@@ -62,7 +74,7 @@ function quadra(
     status: "ativa" as const,
     createdAt: "2026-08-26T00:00:00.000Z",
     imagemUrl: null,
-  };
+  } satisfies Court;
 }
 
 const TENIS = { id: "e1", nome: "Tênis" };
