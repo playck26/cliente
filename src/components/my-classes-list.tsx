@@ -3,10 +3,8 @@
 import { useEffect, useState } from "react";
 import { CalendarDays, Clock } from "lucide-react";
 import { TennisCourtIcon } from "@/components/icons/tennis-court-icon";
-import { BottomNav } from "@/components/bottom-nav";
 import { CourtLines } from "@/components/court-lines";
 import { TennisBallIcon } from "@/components/icons/tennis-ball-icon";
-import { TopAppBar } from "@/components/top-app-bar";
 import { ApiError, listMyClasses, type MyClass } from "@/lib/api-client";
 
 const DIAS_SEMANA = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
@@ -34,10 +32,11 @@ export function MyClassesList() {
 
   const totalQuadras = new Set(aulas.map((aula) => aula.quadraId)).size;
 
+  // SPEC-023 — a moldura saiu daqui: esta tela virou uma aba dentro de
+  // `aulas-tabs.tsx`, ao lado das turmas do clube. Mesma razao de
+  // `courts-list` e `my-bookings-list` na SPEC-022.
   return (
-    <main className="app-screen min-h-screen overflow-hidden bg-background pb-36">
-      <TopAppBar />
-
+    <>
       <div className="space-y-5 px-5">
         <section className="relative overflow-hidden rounded-3xl bg-[var(--color-primary-strong)] p-4 text-white shadow-[var(--shadow-lift)]">
           <CourtLines className="opacity-30" />
@@ -112,8 +111,6 @@ export function MyClassesList() {
           </section>
         )}
       </div>
-
-      <BottomNav />
-    </main>
+    </>
   );
 }

@@ -1,10 +1,15 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
 import { BottomNav } from "@/components/bottom-nav";
 import { CourtsList } from "@/components/courts-list";
 import { MyBookingsList } from "@/components/my-bookings-list";
 import { TopAppBar } from "@/components/top-app-bar";
+import {
+  BarraDeAbas,
+  normalizarAba,
+  useAbaAtiva,
+  type AbaDaTela,
+} from "@/components/abas-na-url";
 
 /**
  * SPEC-022 — **a aba única de Reservas.**
@@ -18,81 +23,41 @@ import { TopAppBar } from "@/components/top-app-bar";
  * conteúdo delas — foi por isso que `courts-list` e `my-bookings-list`
  * perderam a moldura própria. Duas telas irmãs dentro de abas não podem
  * desenhar duas `TopAppBar` e duas `BottomNav`.
+ *
+ * **SPEC-023:** a mecânica das abas saiu daqui para `abas-na-url.tsx`,
+ * quando a tela de aulas precisou da mesma coisa. Copiar teria criado duas
+ * cópias da mesma decisão.
  */
 
 const ABAS = [
   { id: "reservas", rotulo: "Reservas" },
   { id: "quadras", rotulo: "Quadras" },
-] as const;
+] as const satisfies readonly AbaDaTela<"reservas" | "quadras">[];
 
 type AbaId = (typeof ABAS)[number]["id"];
 
 /** REQ-003: entrar sem parâmetro abre "as minhas reservas". */
 export const ABA_PADRAO: AbaId = "reservas";
 
-/**
- * **Valor desconhecido não é erro.** `?aba=lixo` vem de URL editada à mão ou
- * de link velho, e o certo é abrir a tela padrão em silêncio — mensagem de
- * erro aqui puniria a pessoa por um link que nós mudamos.
- */
-export function normalizarAba(valor: string | null): AbaId {
-  return ABAS.some((aba) => aba.id === valor) ? (valor as AbaId) : ABA_PADRAO;
+/** Mantido exportado: as provas da SPEC-022 dependem dele diretamente. */
+export function normalizarAbaDeReservas(valor: string | null): AbaId {
+  return normalizarAba(ABAS, ABA_PADRAO, valor);
 }
 
 export function ReservasTabs() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const ativa = normalizarAba(searchParams.get("aba"));
-
-  /**
-   * **A aba mora na URL, não em `useState`.** Três coisas dependem disso, e a
-   * terceira é a que decide: link compartilhável; o "voltar" do navegador
-   * desfazendo a troca (REQ-005); e o redirect de `/quadras`, que só tem
-   * para onde apontar porque a aba tem endereço.
-   *
-   * `push` e não `replace`, justamente para o "voltar" ter o que desfazer.
-   * `scroll: false` porque trocar de aba não é navegar para outra tela — a
-   * pessoa perderia a posição de leitura sem motivo.
-   */
-  const irPara = (aba: AbaId) => {
-    if (aba === ativa) return;
-    router.push(aba === ABA_PADRAO ? "/reservas" : `/reservas?aba=${aba}`, {
-      scroll: false,
-    });
-  };
+  const { ativa, irPara } = useAbaAtiva(ABAS, ABA_PADRAO, "/reservas");
 
   return (
     <main className="app-screen min-h-screen overflow-hidden bg-background pb-36">
       <TopAppBar />
 
       <div className="space-y-5 px-5">
-        <div
-          role="tablist"
-          aria-label="Reservas e quadras"
-          className="grid grid-cols-2 gap-1 rounded-[22px] bg-[var(--color-court-dark)]/[0.07] p-1.5"
-        >
-          {ABAS.map((aba) => {
-            const selecionada = aba.id === ativa;
-            return (
-              <button
-                key={aba.id}
-                type="button"
-                role="tab"
-                id={`aba-${aba.id}`}
-                aria-selected={selecionada}
-                aria-controls={`painel-${aba.id}`}
-                onClick={() => irPara(aba.id)}
-                className={`flex h-11 items-center justify-center rounded-[16px] text-[13px] font-extrabold transition-colors ${
-                  selecionada
-                    ? "bg-white text-[var(--color-primary-strong)] shadow-[var(--shadow-low)]"
-                    : "text-[var(--color-court-dark)]/55 hover:text-[var(--color-court-dark)]"
-                }`}
-              >
-                {aba.rotulo}
-              </button>
-            );
-          })}
-        </div>
+        <BarraDeAbas
+          abas={ABAS}
+          ativa={ativa}
+          onTrocar={irPara}
+          rotulo="Reservas e quadras"
+        />
       </div>
 
       {/*

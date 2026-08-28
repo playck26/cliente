@@ -1,6 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ABA_PADRAO, ReservasTabs, normalizarAba } from "./reservas-tabs";
+import {
+  ABA_PADRAO,
+  ReservasTabs,
+  normalizarAbaDeReservas,
+} from "./reservas-tabs";
 
 /**
  * SPEC-022 — **as provas da aba única de Reservas.**
@@ -124,11 +128,11 @@ describe("a prova olha para o que diz olhar", () => {
   });
 
   it("normalizarAba só aceita os dois valores conhecidos", () => {
-    expect(normalizarAba("quadras")).toBe("quadras");
-    expect(normalizarAba("reservas")).toBe("reservas");
-    expect(normalizarAba(null)).toBe(ABA_PADRAO);
-    expect(normalizarAba("")).toBe(ABA_PADRAO);
-    expect(normalizarAba("QUADRAS")).toBe(ABA_PADRAO);
-    expect(normalizarAba("quadras ")).toBe(ABA_PADRAO);
+    expect(normalizarAbaDeReservas("quadras")).toBe("quadras");
+    expect(normalizarAbaDeReservas("reservas")).toBe("reservas");
+    expect(normalizarAbaDeReservas(null)).toBe(ABA_PADRAO);
+    expect(normalizarAbaDeReservas("")).toBe(ABA_PADRAO);
+    expect(normalizarAbaDeReservas("QUADRAS")).toBe(ABA_PADRAO);
+    expect(normalizarAbaDeReservas("quadras ")).toBe(ABA_PADRAO);
   });
 });

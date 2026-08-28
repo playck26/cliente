@@ -112,6 +112,20 @@ export type Booking = components["schemas"]["OcupacaoResponseDto"];
 
 export type MyClass = components["schemas"]["AulaDoAlunoResponseDto"];
 
+/**
+ * SPEC-023 — apelido do schema, nao tipo escrito a mao (INV-059).
+ *
+ * O DEF-012 foi exatamente o contrario: `Court.esporte` era `string` aqui
+ * enquanto o contrato ja dizia objeto, o typecheck ficou verde e tres telas
+ * foram a branco. Tipo local nao e contrato, e uma afirmacao sobre ele.
+ */
+export type TurmaDisponivel =
+  components["schemas"]["TurmaDisponivelResponseDto"];
+
+/** Os cinco codigos de erro de matricula, tambem vindos do schema (LIM-004). */
+export type ErroDeMatricula =
+  components["schemas"]["ErroDeMatriculaResponseDto"];
+
 export type PublicPaymentConfig =
   components["schemas"]["PagamentoPublicoResponseDto"];
 
@@ -119,6 +133,20 @@ export class ApiError extends Error {
   constructor(
     public status: number,
     message: string,
+    /**
+     * SPEC-023 — **o codigo, que ate agora se perdia aqui.**
+     *
+     * O servidor ja mandava `code` em varios erros (`CONTA_INATIVA`,
+     * `SENHA_TEMPORARIA`), e esta classe descartava: quem quisesse decidir
+     * pelo codigo tinha de reler o corpo, e por isso as telas decidiam pela
+     * MENSAGEM. Mensagem e texto para humano — muda numa revisao de copy e
+     * leva a regra junto.
+     *
+     * Opcional porque nem todo erro tem codigo (400 de validacao do Nest,
+     * 500). Quem le trata `undefined` como "sem codigo", nunca como um
+     * codigo especifico.
+     */
+    public code?: string,
   ) {
     super(message);
   }
@@ -141,11 +169,16 @@ async function parseError(res: Response, fallback: string): Promise<ApiError> {
   // não pode isso". "Forbidden" na tela não diz nada a ninguém e não dá o
   // que fazer a seguir. Erro de domínio com mensagem própria passa intacto:
   // a troca só alcança o texto padrão do framework.
+  const code =
+    body && typeof body === "object" && "code" in body && typeof body.code === "string"
+      ? body.code
+      : undefined;
+
   if (res.status === 403 && message === FORBIDDEN_CRU) {
-    return new ApiError(res.status, "Sua conta não tem acesso a esta área.");
+    return new ApiError(res.status, "Sua conta não tem acesso a esta área.", code);
   }
 
-  return new ApiError(res.status, message);
+  return new ApiError(res.status, message, code);
 }
 
 /**
@@ -444,6 +477,27 @@ export async function getMinhaTurma(id: string): Promise<MinhaTurmaDetalhe> {
 export async function listMyClasses(): Promise<MyClass[]> {
   const res = await authFetch("/me/classes");
   return (await res.json()) as MyClass[];
+}
+
+/**
+ * SPEC-023 — as turmas do clube, com a ocupacao e o motivo de bloqueio ja
+ * calculados pelo servidor.
+ *
+ * `podeEntrar` e `motivo` vem prontos de proposito: se a tela deduzisse as
+ * regras, viraria uma segunda copia delas — e e sempre a copia que fica
+ * velha, como o tipo escrito a mao do DEF-012.
+ */
+export async function listTurmasDisponiveis(): Promise<TurmaDisponivel[]> {
+  const res = await authFetch("/me/classes/disponiveis");
+  return (await res.json()) as TurmaDisponivel[];
+}
+
+export async function entrarNaTurma(turmaId: string): Promise<void> {
+  await authFetch(`/me/classes/${turmaId}`, { method: "POST" });
+}
+
+export async function sairDaTurma(turmaId: string): Promise<void> {
+  await authFetch(`/me/classes/${turmaId}`, { method: "DELETE" });
 }
 
 export async function listCourts(): Promise<Paginated<Court>> {

@@ -58,7 +58,7 @@ page.tsx (server component, fino)
 | `/cadastro/[slug]` | `cadastro-publico-form` | auto-cadastro pelo link público da empresa |
 | `/convite/[token]` | `aceitar-convite-form` | aceite de convite |
 | `/home` | `home-view` | próximas aulas e atalhos |
-| `/minhas-aulas` | `my-classes-list` | aulas de turma (view-only, GAP-008) |
+| `/minhas-aulas` | `aulas-tabs` → `my-classes-list` \| `turmas-do-clube` | **SPEC-023** — duas abas: "Minhas aulas" (padrão) e "Turmas do clube". O GAP-008 (view-only) **caiu**: o aluno entra e sai de turma sozinho. As regras não moram na tela — `podeEntrar` e `motivo` vêm calculados do servidor, porque tela que deduz vira segunda cópia das regras (DEF-012) |
 | `/minhas-turmas` | `minhas-turmas-view` | **app do professor** (SPEC-013): a grade dele, sem `BottomNav` — barra com um item só é decoração |
 | `/minhas-turmas/[id]` | `minha-turma-detalhe` | quem está na turma e as aulas dos últimos 30 dias |
 | `/chamada/[ocupacaoId]` | `chamada-view` | **a chamada** (SPEC-014). Desenhada para uso em quadra: 3 estados visíveis, 1 toque cada, salvar explícito e barra fixa. **SPEC-015/DEF-002 (TASK-000a):** salvar exige todos os alunos marcados — antes gravava chamada pela metade — com atalho "Todos vieram" para o caso comum, e aviso quando a chamada é legada (`completude: desconhecida`) |
@@ -179,6 +179,33 @@ Três camadas hoje:
 
 **A ordem entre 2 e 3 é o conserto.** Invertida, o pré-voo reprova o arquivo
 que a remoção consertaria em seguida — que era, literalmente, o defeito.
+
+### Abas na URL, num lugar só (SPEC-022 → SPEC-023)
+
+`abas-na-url.tsx` guarda a mecânica que a SPEC-022 criou para `/reservas` e
+que a SPEC-023 precisou de novo em `/minhas-aulas`. Copiar teria criado duas
+cópias da mesma decisão — e é sempre a cópia que fica velha, como a regra do
+DEF-011 que morava num comentário de outro arquivo.
+
+O que ele decide, e vale para toda tela que o use: a aba mora na **URL** (link
+compartilhável, "voltar" que desfaz a troca, e um endereço para redirects
+apontarem); valor desconhecido cai no padrão **em silêncio**; e a aba padrão
+sai da URL, porque endereço limpo é o que a pessoa copia.
+
+**Duas telas usam `useSearchParams`, então as duas exigem `Suspense`** — com
+`fallback`, senão a tela pisca branco sobre fundo escuro antes de pintar.
+
+### O erro agora chega com código (SPEC-023)
+
+`ApiError` passou a carregar `code`, além de `status` e `message`. O servidor
+já mandava o código em vários erros e **esta classe descartava**: quem
+quisesse decidir pelo código teria de reler o corpo, e por isso as telas
+decidiam pela **mensagem**. Mensagem é texto para humano — muda numa revisão
+de copy e leva a regra junto.
+
+`turmas-do-clube.tsx` é a primeira tela a usar isso: o mapa de explicações é
+chaveado por código, e código desconhecido cai num texto genérico em vez de
+quebrar.
 
 ### A barra de baixo conhece o papel (DEF-011, 2026-08-26)
 
