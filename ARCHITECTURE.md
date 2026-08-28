@@ -62,9 +62,10 @@ page.tsx (server component, fino)
 | `/minhas-turmas` | `minhas-turmas-view` | **app do professor** (SPEC-013): a grade dele, sem `BottomNav` — barra com um item só é decoração |
 | `/minhas-turmas/[id]` | `minha-turma-detalhe` | quem está na turma e as aulas dos últimos 30 dias |
 | `/chamada/[ocupacaoId]` | `chamada-view` | **a chamada** (SPEC-014). Desenhada para uso em quadra: 3 estados visíveis, 1 toque cada, salvar explícito e barra fixa. **SPEC-015/DEF-002 (TASK-000a):** salvar exige todos os alunos marcados — antes gravava chamada pela metade — com atalho "Todos vieram" para o caso comum, e aviso quando a chamada é legada (`completude: desconhecida`) |
-| `/quadras` (+ `[id]`) | `courts-list` (+ `GrupoDeFiltro`), `court-booking` | reserva |
-| `/perfil` | `perfil-view` + `foto-de-perfil` | **SPEC-018/TASK-003** — a foto do aluno/professor. Alcançável pelo ícone no `TopAppBar`, e não pela `BottomNav`: ela é `grid-cols-5` com botão central saliente, e um sexto item quebraria o desenho |
-| `/reservas` | `my-bookings-list` | reservas do aluno |
+| `/quadras` | — | **SPEC-022**: só um `permanentRedirect` (308) para `/reservas?aba=quadras`. Deixou de ser destino, continua sendo endereço — atalho de tela inicial e link mandado por conversa não podem quebrar (INV-022b) |
+| `/quadras/[id]` | `court-booking` | reservar UMA quadra. **Não** foi afetada pelo redirect do índice: é o passo seguinte do fluxo, não uma aba |
+| `/perfil` | `perfil-view` + `foto-de-perfil` | **SPEC-018/TASK-003** — a foto do aluno/professor. Alcançável pelo ícone no `TopAppBar`, e não pela `BottomNav` |
+| `/reservas` | `reservas-tabs` → `my-bookings-list` \| `courts-list` (+ `GrupoDeFiltro`) | **SPEC-022** — duas abas numa tela só: "Reservas" (padrão) e "Quadras". A aba mora em `?aba=`, não em estado de componente: é o que dá link compartilhável, "voltar" que desfaz a troca, e um alvo para o redirect de `/quadras`. Só o painel ativo é montado — montar os dois faria duas idas à rede para mostrar uma |
 
 ## 4. Estado
 
@@ -181,15 +182,27 @@ que a remoção consertaria em seguida — que era, literalmente, o defeito.
 
 ### A barra de baixo conhece o papel (DEF-011, 2026-08-26)
 
-`bottom-nav.tsx` desenha **duas** barras: a do aluno (cinco itens) e a do
-professor (`/minhas-turmas` e `/perfil`).
+`bottom-nav.tsx` desenha **duas** barras: a do aluno e a do professor
+(`/minhas-turmas` e `/perfil`).
+
+**A do aluno tem três destinos desde a SPEC-022** — `/home`,
+`/minhas-aulas`, `/reservas` — mais o botão saliente "Reservar", que aponta
+para `/reservas?aba=quadras`. Eram cinco colunas para quatro destinos: o
+botão do meio e a aba "Quadras" levavam ao mesmo lugar. Hoje são quatro
+colunas, e o botão é o único caminho de um toque para a aba de quadras.
 
 **Antes ela era cega a papel, e isso prendia o professor.** Ele entrava em
 `/perfil` para trocar a própria foto — a única tela que aluno e professor
-dividem — recebia a barra do aluno, e os cinco itens dela são
+dividem — recebia a barra do aluno, e os itens dela são
 `@Roles('aluno')` no servidor. Cada toque virava "Sua conta não tem acesso
 a esta área", e `/minhas-turmas`, a tela dele, **não estava na barra**: não
 havia caminho de volta.
+
+> **Nota da SPEC-022 sobre a prova deste defeito.** A lista de rotas
+> proibidas ao professor perdeu `/quadras`, e não por descuido: depois que
+> ela saiu da barra de todo mundo, afirmar que o professor não a recebe
+> passaria **por acidente**. A regra guardada continua sendo "a barra não
+> oferece rota de aluno"; a lista é só o conteúdo dela hoje.
 
 **A regra já existia e estava no lugar errado.** `minhas-turmas-view` tinha
 decidido certo e escrito o porquê num comentário — *"com os itens do aluno

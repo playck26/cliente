@@ -4,10 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { TennisCourtIcon } from "@/components/icons/tennis-court-icon";
-import { BottomNav } from "@/components/bottom-nav";
 import { CapaDaQuadra } from "@/components/capa-da-quadra";
 import { TennisBallIcon } from "@/components/icons/tennis-ball-icon";
-import { TopAppBar } from "@/components/top-app-bar";
 import { ApiError, listCourts, type Court, type OpcaoDeCatalogo } from "@/lib/api-client";
 
 /**
@@ -112,10 +110,11 @@ export function CourtsList() {
       (categoriaId === null || quadra.categoria?.id === categoriaId),
   );
 
+  // SPEC-022 — a moldura (main, TopAppBar, BottomNav) saiu daqui e passou
+  // para `reservas-tabs.tsx`. Duas telas irmãs dentro de abas não podem
+  // desenhar duas barras: este componente agora é conteúdo, não tela.
   return (
-    <main className="app-screen min-h-screen overflow-hidden bg-background pb-36">
-      <TopAppBar />
-
+    <>
       <div className="space-y-5 px-5">
         <section className="rounded-3xl bg-[var(--color-court-dark)] p-4 text-white shadow-[var(--shadow-lift)]">
           <div className="flex items-start justify-between gap-4">
@@ -189,8 +188,6 @@ export function CourtsList() {
           </section>
         )}
       </div>
-
-      <BottomNav />
-    </main>
+    </>
   );
 }

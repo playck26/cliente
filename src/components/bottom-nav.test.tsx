@@ -28,13 +28,26 @@ beforeEach(() => {
   getPapel.mockReturnValue(null);
 });
 
-/** As rotas que o servidor recusa para `professor` — todas `@Roles('aluno')`. */
-const PROIBIDAS_AO_PROFESSOR = [
-  "/home",
-  "/minhas-aulas",
-  "/quadras",
-  "/reservas",
-];
+/**
+ * As rotas que o servidor recusa para `professor` — todas `@Roles('aluno')`.
+ *
+ * **`/quadras` saiu daqui na SPEC-022, e a razão importa mais que a
+ * remoção.** Depois que ela deixou de estar na barra de qualquer papel,
+ * mantê-la nesta lista faria este teste passar **por acidente**: ele
+ * afirmaria que a barra do professor não oferece uma rota que ninguém
+ * oferece mais. É o vão que o `TEST_PLAN.md` registrou em 2026-08-27 —
+ * prova que continua verde depois de a coisa mudar não está aprovando nada.
+ *
+ * O que se guarda continua sendo a regra, não a lista: a barra do professor
+ * não pode oferecer rota de aluno. `/reservas` ainda é uma delas.
+ */
+const PROIBIDAS_AO_PROFESSOR = ["/home", "/minhas-aulas", "/reservas"];
+
+/** SPEC-022/REQ-001 — os três destinos do aluno, em ordem de tela. */
+const ABAS_DO_ALUNO = ["/home", "/minhas-aulas", "/reservas"];
+
+/** SPEC-022/REQ-002 — o botão grande, e ele é o único jeito de cair na aba de quadras. */
+const DESTINO_DE_RESERVAR = "/reservas?aba=quadras";
 
 const hrefs = () =>
   screen
@@ -85,14 +98,34 @@ describe("DEF-011 — a barra do professor", () => {
   });
 });
 
-describe("a barra do aluno não mudou", () => {
-  it("mantém os cinco destinos", () => {
+describe("SPEC-022 — a barra do aluno em três destinos", () => {
+  it("oferece exatamente Home, Aulas e Reservas — e mais nada", () => {
+    // O outro lado da asserção do professor, e o mais durável: em vez de
+    // listar o que não pode aparecer, exige a lista inteira. Item novo
+    // entra por aqui, não por acidente.
     render(<BottomNav papel="aluno" />);
 
-    for (const destino of PROIBIDAS_AO_PROFESSOR) {
-      expect(hrefs()).toContain(destino);
+    expect(hrefs()).toEqual([...ABAS_DO_ALUNO.slice(0, 2), DESTINO_DE_RESERVAR, ABAS_DO_ALUNO[2]]);
+  });
+
+  it("NÃO oferece mais /quadras — ela virou aba dentro de /reservas", () => {
+    render(<BottomNav papel="aluno" />);
+
+    for (const href of hrefs()) {
+      expect(href.startsWith("/quadras")).toBe(false);
     }
-    expect(screen.getByLabelText("Reservar quadra")).toBeInTheDocument();
+  });
+
+  it("o botão de reservar cai direto na aba de quadras", () => {
+    // REQ-002: reservar continua sendo um toque. Se este `href` voltar a ser
+    // `/quadras`, a pessoa passa pelo redirect à toa; se virar `/reservas`
+    // sem parâmetro, ela cai na aba errada e precisa de um toque a mais.
+    render(<BottomNav papel="aluno" />);
+
+    expect(screen.getByLabelText("Reservar quadra")).toHaveAttribute(
+      "href",
+      DESTINO_DE_RESERVAR,
+    );
   });
 
   it("sem prop, usa o papel guardado no login", () => {
@@ -100,7 +133,7 @@ describe("a barra do aluno não mudou", () => {
     // na primeira pintura, sem esperar o `getMe()`.
     getPapel.mockReturnValue("aluno");
     render(<BottomNav />);
-    expect(hrefs()).toContain("/quadras");
+    expect(hrefs()).toContain("/reservas");
   });
 
   it("company_admin e super_admin também caem na do aluno", () => {
@@ -108,7 +141,7 @@ describe("a barra do aluno não mudou", () => {
     // aqui que a decisão precisa ser tomada — e este teste vai estar errado,
     // que é o jeito certo de uma decisão pendente se anunciar.
     render(<BottomNav papel="company_admin" />);
-    expect(hrefs()).toContain("/quadras");
+    expect(hrefs()).toContain("/reservas");
   });
 });
 
@@ -139,7 +172,9 @@ describe("a barra NUNCA adivinha (correção de 2026-08-26, à noite)", () => {
     render(<BottomNav />);
 
     expect(hrefs()).toContain("/minhas-turmas");
-    expect(hrefs()).not.toContain("/quadras");
+    // `/reservas` e não `/quadras`: depois da SPEC-022, `/quadras` não está
+    // na barra de ninguém, e afirmar a ausência dela não provaria nada.
+    expect(hrefs()).not.toContain("/reservas");
   });
 
   it("a PROP ganha do armazenamento", () => {
@@ -150,7 +185,9 @@ describe("a barra NUNCA adivinha (correção de 2026-08-26, à noite)", () => {
     render(<BottomNav papel="professor" />);
 
     expect(hrefs()).toContain("/minhas-turmas");
-    expect(hrefs()).not.toContain("/quadras");
+    // `/reservas` e não `/quadras`: depois da SPEC-022, `/quadras` não está
+    // na barra de ninguém, e afirmar a ausência dela não provaria nada.
+    expect(hrefs()).not.toContain("/reservas");
   });
 
   it("valor estranho no armazenamento não vira barra de aluno por acidente", () => {

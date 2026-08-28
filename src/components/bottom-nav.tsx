@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import { CalendarCheck, Home, Plus, User, Users } from "lucide-react";
-import { TennisCourtIcon } from "@/components/icons/tennis-court-icon";
 import { TennisBallIcon } from "@/components/icons/tennis-ball-icon";
 import type { Papel } from "@/lib/api-client";
 import { getPapel } from "@/lib/auth-storage";
@@ -13,15 +12,31 @@ import { getPapel } from "@/lib/auth-storage";
 // (DESIGN.md, seção Responsividade: "Cliente: navegação inferior (tab
 // bar)"). Altura 80px e ícone lucide por item — SPEC-007 (design system
 // "Performance Court"). Alvo de toque ~44px+ preservado (acessibilidade).
+/**
+ * SPEC-022 — **de cinco colunas para quatro, e de quatro destinos para
+ * três.**
+ *
+ * A barra antiga tinha "Quadras" e "Reservas" lado a lado, e o botão grande
+ * do meio levava ao mesmo lugar que "Quadras" — duas entradas para uma tela.
+ * Agora `/quadras` e `/reservas` são uma tela só com duas abas, e a barra
+ * oferece Home, Aulas e Reservas.
+ *
+ * **O botão "Reservar" ficou**, e a razão é de produto: reservar quadra é a
+ * ação principal do app. O pedido era simplificar o menu, não tirar o
+ * atalho da ação. O que ele perdeu foi a redundância — hoje é o único jeito
+ * de cair direto na aba de quadras.
+ */
 const ITENS_ESQUERDA = [
   { href: "/home", label: "Home", Icon: Home },
   { href: "/minhas-aulas", label: "Aulas", Icon: TennisBallIcon },
 ] as const;
 
 const ITENS_DIREITA = [
-  { href: "/quadras", label: "Quadras", Icon: TennisCourtIcon },
   { href: "/reservas", label: "Reservas", Icon: CalendarCheck },
 ] as const;
+
+/** O atalho de um toque para escolher quadra (SPEC-022/REQ-002). */
+const DESTINO_DE_RESERVAR = "/reservas?aba=quadras";
 
 /**
  * DEF-011 (2026-08-26) — **a barra do professor.**
@@ -103,7 +118,7 @@ export function BottomNav({ papel }: { papel?: Papel }) {
   return (
     <nav
       aria-label="Navegação principal"
-      className="fixed inset-x-2 bottom-2 z-50 mx-auto grid h-[78px] max-w-[390px] grid-cols-5 items-center gap-1 rounded-[28px] bg-[var(--color-court-dark)]/95 p-2 text-white shadow-[0_18px_48px_rgba(18,20,15,0.28)] ring-1 ring-white/10 backdrop-blur-xl"
+      className="fixed inset-x-2 bottom-2 z-50 mx-auto grid h-[78px] max-w-[390px] grid-cols-4 items-center gap-1 rounded-[28px] bg-[var(--color-court-dark)]/95 p-2 text-white shadow-[0_18px_48px_rgba(18,20,15,0.28)] ring-1 ring-white/10 backdrop-blur-xl"
     >
       {ITENS_ESQUERDA.map(({ href, label, Icon }) => {
         const ativo = pathname === href || pathname.startsWith(`${href}/`);
@@ -122,7 +137,7 @@ export function BottomNav({ papel }: { papel?: Papel }) {
         );
       })}
       <Link
-        href="/quadras"
+        href={DESTINO_DE_RESERVAR}
         aria-label="Reservar quadra"
         className="-mt-8 flex flex-col items-center justify-center gap-1 text-[10px] font-extrabold text-white"
       >

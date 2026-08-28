@@ -2,9 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CalendarDays, CreditCard, MessageCircle, WalletCards } from "lucide-react";
-import { BottomNav } from "@/components/bottom-nav";
 import { CourtLines } from "@/components/court-lines";
-import { TopAppBar } from "@/components/top-app-bar";
 import { Button } from "@/components/ui/button";
 import {
   ApiError,
@@ -86,10 +84,10 @@ export function MyBookingsList() {
   const pendentes = bookings.filter((booking) => booking.statusPagamento === "pendente_pagamento").length;
   const temMeioDePagamento = Boolean(paymentConfig?.linkPagamentoUrl || paymentConfig?.whatsappNumero);
 
+  // SPEC-022 — ver a nota gêmea em `courts-list.tsx`: a moldura passou para
+  // `reservas-tabs.tsx`, porque as duas telas agora dividem uma só.
   return (
-    <main className="app-screen min-h-screen overflow-hidden bg-background pb-36">
-      <TopAppBar />
-
+    <>
       <div className="space-y-5 px-5">
         <section className="relative overflow-hidden rounded-3xl bg-[var(--color-primary-strong)] p-4 text-white shadow-[var(--shadow-lift)]">
           <CourtLines className="opacity-35" />
@@ -202,8 +200,6 @@ export function MyBookingsList() {
           </section>
         )}
       </div>
-
-      <BottomNav />
-    </main>
+    </>
   );
 }
