@@ -41,7 +41,16 @@ import {
  * dois reais: esta tela e o perfil. E ela entra aqui: não renderizá-la
  * manteria metade do defeito — ele chegaria ao perfil e não voltaria.
  */
-export function MinhasTurmasView() {
+/**
+ * SPEC-026 — `abas` é a barra de abas do professor, injetada de fora.
+ *
+ * A alternativa era extrair a moldura desta tela para o componente de abas,
+ * como foi feito em `courts-list`/`my-bookings-list` na SPEC-022. **Aqui não
+ * compensa:** lá as duas telas eram finas e a fusão era estrutural; esta tem
+ * moldura própria, funciona, e mexer nela para ganhar simetria seria trocar
+ * risco por estética.
+ */
+export function MinhasTurmasView({ abas }: { abas?: React.ReactNode } = {}) {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [turmas, setTurmas] = useState<MinhaTurma[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,6 +78,7 @@ export function MinhasTurmasView() {
 
       {/* `pb-28` abre espaço para a barra fixa não cobrir a última turma. */}
       <main className="flex flex-1 flex-col gap-5 px-4 pt-2 pb-28">
+        {abas}
         <section className="relative overflow-hidden rounded-[var(--radius-hero)] bg-[var(--color-court-dark)] p-5 text-white shadow-[var(--shadow-lift)]">
           <CourtLines className="opacity-35" />
           <div className="relative z-10 flex min-h-40 flex-col justify-between gap-6">

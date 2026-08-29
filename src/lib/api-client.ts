@@ -126,6 +126,12 @@ export type TurmaDisponivel =
 export type ErroDeMatricula =
   components["schemas"]["ErroDeMatriculaResponseDto"];
 
+/** SPEC-026 — apelidos do schema, nunca escritos a mao (INV-059). */
+export type DiaDaAgendaDoProfessor =
+  components["schemas"]["DiaDaAgendaDoProfessorDto"];
+export type AulaDoDiaDoProfessor =
+  components["schemas"]["AulaDoDiaDoProfessorDto"];
+
 /** SPEC-025 — apelidos do schema, nunca escritos a mao (INV-059). */
 export type AulaAnterior =
   components["schemas"]["AulaAnteriorResponseDto"];
@@ -497,6 +503,28 @@ export async function salvarChamada(
     body: JSON.stringify({ versao, itens }),
   });
   return (await res.json()) as { versao: string; total: number };
+}
+
+/**
+ * SPEC-026 — o resumo do mes do professor: por dia, quantas aulas e quantas
+ * com chamada pendente.
+ *
+ * A segunda contagem e a razao da tela existir: a grade ele conhece de
+ * cabeca; o que ficou faltando registrar, nao.
+ */
+export async function getAgendaDoProfessor(
+  mes: string,
+): Promise<DiaDaAgendaDoProfessor[]> {
+  const res = await authFetch(`/me/teacher/agenda?mes=${mes}`);
+  return (await res.json()) as DiaDaAgendaDoProfessor[];
+}
+
+/** SPEC-026 — as aulas de um dia, com o `ocupacaoId` que a chamada aceita. */
+export async function getAulasDoDia(
+  data: string,
+): Promise<AulaDoDiaDoProfessor[]> {
+  const res = await authFetch(`/me/teacher/agenda/${data}`);
+  return (await res.json()) as AulaDoDiaDoProfessor[];
 }
 
 export async function listMinhasTurmas(): Promise<MinhaTurma[]> {
