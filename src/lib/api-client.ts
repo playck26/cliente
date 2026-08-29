@@ -126,6 +126,14 @@ export type TurmaDisponivel =
 export type ErroDeMatricula =
   components["schemas"]["ErroDeMatriculaResponseDto"];
 
+/** SPEC-024 — apelidos do schema, nunca escritos a mao (INV-059). */
+export type AceitesPendentes =
+  components["schemas"]["AceitesPendentesResponseDto"];
+export type AceiteRegistrado =
+  components["schemas"]["AceiteRegistradoResponseDto"];
+export type TextoParaAceite =
+  components["schemas"]["TextoParaAceiteDto"];
+
 export type PublicPaymentConfig =
   components["schemas"]["PagamentoPublicoResponseDto"];
 
@@ -303,6 +311,25 @@ async function authFetch(path: string, init: RequestInit = {}): Promise<Response
       window.location.href = "/primeiro-acesso";
     }
     throw await parseError(res, "Crie sua senha para continuar.");
+  }
+
+  // SPEC-024/INV-024b — o portao do aceite, no mesmo molde do de cima.
+  //
+  // **DEPOIS do de senha temporaria de proposito**, e a ordem espelha a do
+  // servidor: quem ainda nao definiu senha propria resolve isso primeiro.
+  // Empilhar as duas pendencias seria pedir que a pessoa aceite um contrato
+  // antes de ter uma conta de verdade.
+  //
+  // Sem este desvio, ligar o portao em producao viraria apagao: o servidor
+  // barraria tudo e a pessoa veria um erro seco, sem caminho para a tela que
+  // resolve o problema dela. E a LIM-024d da spec, e este bloco e a resposta
+  // a ela.
+  if (res.status === 403 && (await temCodigo(res.clone(), "ACEITE_PENDENTE"))) {
+    if (typeof window !== "undefined" && window.location.pathname !== "/aceite") {
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+      window.location.href = "/aceite";
+    }
+    throw await parseError(res, "Leia e aceite os termos para continuar.");
   }
 
   // DEF-008 (2026-08-24) — 403 puro, sem código conhecido, quase sempre é
@@ -487,6 +514,35 @@ export async function listMyClasses(): Promise<MyClass[]> {
  * regras, viraria uma segunda copia delas — e e sempre a copia que fica
  * velha, como o tipo escrito a mao do DEF-012.
  */
+/**
+ * SPEC-024 — o que falta aceitar, **com o texto junto**.
+ *
+ * O texto vem na mesma resposta de proposito: uma segunda requisicao criaria
+ * a janela em que a pessoa le um texto e aceita outro.
+ */
+export async function getAceitesPendentes(): Promise<AceitesPendentes> {
+  const res = await authFetch("/me/aceites/pendentes");
+  return (await res.json()) as AceitesPendentes;
+}
+
+/**
+ * Registra o aceite, **informando as versoes lidas**.
+ *
+ * Sem mandar a versao, um cliente velho aceitaria "o que estiver valendo" — e
+ * a pessoa estaria concordando com um texto que nao viu. O servidor recusa
+ * com VERSAO_DESATUALIZADA quando o texto mudou no meio.
+ */
+export async function registrarAceite(versoes: {
+  termo?: number;
+  contrato?: number;
+}): Promise<AceiteRegistrado> {
+  const res = await authFetch("/me/aceites", {
+    method: "POST",
+    body: JSON.stringify(versoes),
+  });
+  return (await res.json()) as AceiteRegistrado;
+}
+
 export async function listTurmasDisponiveis(): Promise<TurmaDisponivel[]> {
   const res = await authFetch("/me/classes/disponiveis");
   return (await res.json()) as TurmaDisponivel[];
@@ -622,6 +678,14 @@ export async function aceitarConvite(dto: {
   nome?: string;
   email?: string;
   telefone?: string;
+  /**
+   * SPEC-024/REQ-007 — as versoes LIDAS na tela do convite. O servidor as
+   * grava na MESMA transacao que cria a conta: fora dela existiria uma janela
+   * em que a conta existe sem aceite, e o portao mandaria a pessoa aceitar
+   * de novo logo depois de ela ter aceitado.
+   */
+  termoVersao?: number;
+  contratoVersao?: number;
 }): Promise<void> {
   const res = await fetch(`${API_URL}/api/v1/auth/aceitar-convite`, {
     method: "POST",

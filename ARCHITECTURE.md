@@ -64,6 +64,7 @@ page.tsx (server component, fino)
 | `/chamada/[ocupacaoId]` | `chamada-view` | **a chamada** (SPEC-014). Desenhada para uso em quadra: 3 estados visíveis, 1 toque cada, salvar explícito e barra fixa. **SPEC-015/DEF-002 (TASK-000a):** salvar exige todos os alunos marcados — antes gravava chamada pela metade — com atalho "Todos vieram" para o caso comum, e aviso quando a chamada é legada (`completude: desconhecida`) |
 | `/quadras` | — | **SPEC-022**: só um `permanentRedirect` (308) para `/reservas?aba=quadras`. Deixou de ser destino, continua sendo endereço — atalho de tela inicial e link mandado por conversa não podem quebrar (INV-022b) |
 | `/quadras/[id]` | `court-booking` | reservar UMA quadra. **Não** foi afetada pelo redirect do índice: é o passo seguinte do fluxo, não uma aba |
+| `/aceite` | `aceite-view` | **SPEC-024** — a tela para onde o `403 ACEITE_PENDENTE` desvia. **Sem barra de navegacao nem voltar**, mesmo desenho de `/primeiro-acesso`: oferecer uma saida que o servidor recusa e convidar a pessoa a bater numa porta trancada. Sem esta tela, ligar o portao seria apagao sem saida (LIM-024d) |
 | `/perfil` | `perfil-view` + `foto-de-perfil` | **SPEC-018/TASK-003** — a foto do aluno/professor. Alcançável pelo ícone no `TopAppBar`, e não pela `BottomNav` |
 | `/reservas` | `reservas-tabs` → `my-bookings-list` \| `courts-list` (+ `GrupoDeFiltro`) | **SPEC-022** — duas abas numa tela só: "Reservas" (padrão) e "Quadras". A aba mora em `?aba=`, não em estado de componente: é o que dá link compartilhável, "voltar" que desfaz a troca, e um alvo para o redirect de `/quadras`. Só o painel ativo é montado — montar os dois faria duas idas à rede para mostrar uma |
 
@@ -194,6 +195,19 @@ sai da URL, porque endereço limpo é o que a pessoa copia.
 
 **Duas telas usam `useSearchParams`, então as duas exigem `Suspense`** — com
 `fallback`, senão a tela pisca branco sobre fundo escuro antes de pintar.
+
+### O portão do aceite, e por que ele tem tela própria (SPEC-024)
+
+`api-client` ganhou o terceiro desvio de `403`, ao lado de `CONTA_INATIVA` e
+`SENHA_TEMPORARIA`: `ACEITE_PENDENTE` manda para `/aceite`. **Depois do de
+senha temporária de propósito**, e a ordem espelha a do servidor — quem ainda
+não definiu senha própria resolve isso primeiro; empilhar as duas pendências
+seria pedir que a pessoa aceite um contrato antes de ter uma conta de verdade.
+
+**O convite mostra o contrato e registra o aceite junto com a conta**
+(`aceitar-convite-form`). O termo da plataforma **não** vai por ali: ele não
+aparece naquela tela, e registrar aceite de texto não visto destruiria o valor
+do registro. Ele é lido inteiro em `/aceite`, no primeiro acesso.
 
 ### O erro agora chega com código (SPEC-023)
 

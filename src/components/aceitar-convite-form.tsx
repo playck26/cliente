@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Mail, User } from "lucide-react";
+import { FileText, Mail, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -29,6 +29,8 @@ import {
 export function AceitarConviteForm({ token }: { token: string }) {
   const router = useRouter();
   const [convite, setConvite] = useState<ConvitePublico | null>(null);
+  /** SPEC-024/REQ-007 — so vira exigencia quando ha contrato para ler. */
+  const [aceitouContrato, setAceitouContrato] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [conviteInvalido, setConviteInvalido] = useState(false);
   const [nome, setNome] = useState("");
@@ -57,6 +59,12 @@ export function AceitarConviteForm({ token }: { token: string }) {
         senha,
         nome: nome || undefined,
         email: email || undefined,
+        // SPEC-024/REQ-007 — **so o contrato, e so porque esta tela o
+        // mostra.** O termo da plataforma NAO vai daqui: ele nao aparece
+        // nesta tela, e registrar aceite de um texto que a pessoa nao viu
+        // destruiria o valor do registro. Ele e lido e aceito em `/aceite`,
+        // no primeiro acesso, onde aparece inteiro.
+        contratoVersao: convite?.contrato?.versao,
       });
       router.push("/login");
     } catch (err) {
@@ -123,13 +131,52 @@ export function AceitarConviteForm({ token }: { token: string }) {
 
       <CampoSenha id="senha" label="Crie uma senha" valor={senha} onChange={setSenha} disabled={loading} />
 
+      {/*
+        SPEC-024/REQ-007 — o contrato do clube na PROPRIA tela do convite,
+        pedido do Israel. Aparece so quando o clube publicou um: clube sem
+        contrato nao ganha uma caixa vazia dizendo "leia o nada".
+      */}
+      {convite?.contrato ? (
+        <section className="rounded-lg border border-[var(--color-border)] p-3">
+          <div className="flex items-center gap-2">
+            <FileText className="size-4 text-[var(--color-text-secondary)]" aria-hidden="true" />
+            <h2 className="text-sm font-bold">Contrato do clube</h2>
+            <span className="ml-auto text-xs font-bold text-[var(--color-text-secondary)]">
+              versão {convite.contrato.versao}
+            </span>
+          </div>
+          {/*
+            `whitespace-pre-wrap`: o texto e PURO. Markdown e HTML ficam fora
+            de proposito — HTML vindo do gestor seria XSS nesta tela publica,
+            que e a mais exposta do app.
+          */}
+          <p className="mt-2 max-h-48 overflow-y-auto text-[13px] leading-relaxed whitespace-pre-wrap text-[var(--color-text-secondary)]">
+            {convite.contrato.texto}
+          </p>
+          <label className="mt-3 flex items-start gap-2 text-[13px] font-bold">
+            <input
+              type="checkbox"
+              checked={aceitouContrato}
+              onChange={(e) => setAceitouContrato(e.target.checked)}
+              disabled={loading}
+              className="mt-0.5 size-4 shrink-0"
+            />
+            <span>Li e concordo com o contrato do clube.</span>
+          </label>
+        </section>
+      ) : null}
+
       {error ? (
         <p role="alert" className="text-sm text-[var(--color-error)]">
           {error}
         </p>
       ) : null}
 
-      <Button type="submit" disabled={loading} className="w-full">
+      <Button
+        type="submit"
+        disabled={loading || (!!convite?.contrato && !aceitouContrato)}
+        className="w-full"
+      >
         {loading ? "Criando conta..." : "Aceitar convite"}
       </Button>
     </form>
