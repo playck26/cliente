@@ -171,6 +171,23 @@ function AulaCard({
         <div className="mt-4">
           <Estrelas nota={nota} onEscolher={setNota} />
 
+          {/*
+            REQ-008 — **antes do campo de texto, e não depois.**
+
+            A primeira versão punha este aviso ABAIXO do `textarea`, e a
+            validação cruzada pegou: a pessoa já tinha escrito quando lia que
+            o clube veria o nome dela. Cumprir a letra do requisito ("está na
+            tela") e trair a intenção ("antes de escrever") é a forma mais
+            fácil de um aviso não servir para nada.
+
+            A avaliação NÃO é anônima para o clube (decisão do Israel,
+            ADR-017/4), e prometer o contrário por omissão seria o produto
+            mentindo no momento exato em que a pessoa se expõe.
+          */}
+          <p className="mt-3 text-[11px] font-bold text-muted">
+            O clube vê sua nota, seu comentário e seu nome.
+          </p>
+
           <label className="sr-only" htmlFor={`c-${aula.ocupacaoId}`}>
             Comentário sobre a aula
           </label>
@@ -181,18 +198,8 @@ function AulaCard({
             value={comentario}
             onChange={(e) => setComentario(e.target.value)}
             placeholder="Quer contar mais? (opcional)"
-            className="mt-3 w-full rounded-2xl bg-[var(--color-surface-container)] p-3 text-[13px]"
+            className="mt-2 w-full rounded-2xl bg-[var(--color-surface-container)] p-3 text-[13px]"
           />
-
-          {/*
-            REQ-008 — **o aviso fica aqui, antes de escrever**, e não num link
-            nem num rodapé. A avaliação NÃO é anônima para o clube (decisão do
-            Israel, ADR-017/4), e prometer o contrário por omissão seria o
-            produto mentindo no momento exato em que a pessoa se expõe.
-          */}
-          <p className="mt-2 text-[11px] font-bold text-muted">
-            O clube vê sua nota, seu comentário e seu nome.
-          </p>
 
           {erro && (
             <p

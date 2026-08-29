@@ -4034,6 +4034,13 @@ export interface operations {
                     "application/json": components["schemas"]["AvaliacoesDaTurmaResponseDto"];
                 };
             };
+            /** @description Turma inexistente ou de outra empresa — as duas respondem igual. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     ClassesController_frequencia: {
@@ -4369,6 +4376,13 @@ export interface operations {
                     "application/json": components["schemas"]["MediaDaTurmaResponseDto"];
                 };
             };
+            /** @description Turma inexistente ou de outra empresa — as duas respondem igual. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
         };
     };
     MeClassesController_avaliarAula: {
@@ -4401,6 +4415,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ErroDeAvaliacaoResponseDto"];
                 };
+            };
+            /** @description Aula inexistente, de outra empresa, ou ocupação avulsa (que não é aula de turma). Os três respondem igual de propósito. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             409: {
                 headers: {

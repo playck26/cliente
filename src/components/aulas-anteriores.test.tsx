@@ -171,17 +171,51 @@ describe("avaliar", () => {
 });
 
 describe("REQ-008 — o aviso de que não é anônima", () => {
-  it("está na tela de avaliar, antes de escrever", async () => {
-    // Prometer anonimato por omissão seria o produto mentindo no momento
-    // exato em que a pessoa se expõe.
+  /**
+   * **Esta prova foi reescrita depois da validação cruzada, e o motivo vale
+   * mais que a correção.**
+   *
+   * A primeira versão só verificava que o aviso *existia na tela* — e passou
+   * com ele **abaixo** do campo de texto, ou seja, com a pessoa já tendo
+   * escrito quando lia que o clube veria o nome dela. A prova cumpria a
+   * letra do requisito e ignorava a intenção dele.
+   *
+   * Agora ela exige a **ordem no DOM**. É o que o REQ-008 sempre quis dizer
+   * com "antes de escrever".
+   */
+  it("vem ANTES do campo de texto, não depois", async () => {
     listAulasAnteriores.mockResolvedValue([aula()]);
     render(<AulasAnteriores />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Avaliar esta aula" }));
 
+    const aviso = screen.getByText(
+      "O clube vê sua nota, seu comentário e seu nome.",
+    );
+    const campo = screen.getByLabelText("Comentário sobre a aula");
+
+    // `DOCUMENT_POSITION_FOLLOWING` = o campo vem DEPOIS do aviso.
     expect(
-      screen.getByText("O clube vê sua nota, seu comentário e seu nome."),
-    ).toBeInTheDocument();
+      aviso.compareDocumentPosition(campo) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("e também antes do botão de enviar", async () => {
+    listAulasAnteriores.mockResolvedValue([aula()]);
+    render(<AulasAnteriores />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Avaliar esta aula" }));
+
+    const aviso = screen.getByText(
+      "O clube vê sua nota, seu comentário e seu nome.",
+    );
+    const enviar = screen.getByRole("button", { name: "Enviar" });
+
+    expect(
+      aviso.compareDocumentPosition(enviar) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it("e some junto com o formulário, porque só vale ali", async () => {
