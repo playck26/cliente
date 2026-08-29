@@ -1,6 +1,7 @@
 "use client";
 
 import { BottomNav } from "@/components/bottom-nav";
+import { AulasAnteriores } from "@/components/aulas-anteriores";
 import { MyClassesList } from "@/components/my-classes-list";
 import { TopAppBar } from "@/components/top-app-bar";
 import { TurmasDoClube } from "@/components/turmas-do-clube";
@@ -18,18 +19,25 @@ import {
  * pergunta que faltava — *"em que turma eu entro?"* — não tinha tela
  * nenhuma: quem matriculava era o gestor.
  *
- * As duas moram na mesma aba do menu porque são a mesma coisa vista de dois
- * lados: a agenda do que eu já tenho, e a oferta do clube. Uma quarta aba na
- * barra de baixo seria desfazer a SPEC-022 uma semana depois de fazê-la.
+ * As três moram na mesma aba do menu porque são a mesma coisa vista de
+ * ângulos diferentes: o que eu tenho pela frente, o que eu já tive, e o que
+ * o clube oferece. Uma aba a mais na barra de baixo seria desfazer a
+ * SPEC-022 duas semanas depois de fazê-la.
  *
- * **A aba padrão é "Minhas aulas"**, não as turmas: quem abre o app na
- * quinta de manhã quer saber o horário de hoje, não escolher turma nova.
+ * **SPEC-025 acrescentou "Anteriores"**, e ela não é enfeite: `GET
+ * /me/classes` devolve só o futuro, então sem esta aba a avaliação seria uma
+ * funcionalidade sem porta de entrada. Foi o Israel quem reparou, usando.
+ *
+ * **A aba padrão continua sendo a das próximas aulas**: quem abre o app na
+ * quinta de manhã quer saber o horário de hoje, não avaliar o passado nem
+ * escolher turma nova.
  */
 
 const ABAS = [
-  { id: "minhas", rotulo: "Minhas aulas" },
-  { id: "turmas", rotulo: "Turmas do clube" },
-] as const satisfies readonly AbaDaTela<"minhas" | "turmas">[];
+  { id: "minhas", rotulo: "Próximas" },
+  { id: "anteriores", rotulo: "Anteriores" },
+  { id: "turmas", rotulo: "Turmas" },
+] as const satisfies readonly AbaDaTela<"minhas" | "anteriores" | "turmas">[];
 
 type AbaId = (typeof ABAS)[number]["id"];
 
@@ -55,7 +63,7 @@ export function AulasTabs() {
           abas={ABAS}
           ativa={ativa}
           onTrocar={irPara}
-          rotulo="Minhas aulas e turmas do clube"
+          rotulo="Próximas aulas, aulas anteriores e turmas do clube"
         />
       </div>
 
@@ -66,7 +74,13 @@ export function AulasTabs() {
         aria-labelledby={`aba-${ativa}`}
         className="mt-5"
       >
-        {ativa === "turmas" ? <TurmasDoClube /> : <MyClassesList />}
+        {ativa === "turmas" ? (
+          <TurmasDoClube />
+        ) : ativa === "anteriores" ? (
+          <AulasAnteriores />
+        ) : (
+          <MyClassesList />
+        )}
       </div>
 
       <BottomNav />

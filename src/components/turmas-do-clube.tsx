@@ -1,13 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Users } from "lucide-react";
+import { Check, Star, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   ApiError,
   entrarNaTurma,
+  getMediaDaTurma,
   listTurmasDisponiveis,
   sairDaTurma,
+  type MediaDaTurma,
   type TurmaDisponivel,
 } from "@/lib/api-client";
 
@@ -45,10 +47,27 @@ export function TurmasDoClube() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [agindoEm, setAgindoEm] = useState<string | null>(null);
+  /**
+   * SPEC-025 — a média de cada turma, buscada em paralelo depois da lista.
+   *
+   * Fora da lista de propósito: a média é informação **secundária**, e
+   * segurar a tela inteira esperando por ela faria a pessoa esperar mais
+   * para ver o que veio fazer. Turma sem média ainda não desenha estrela.
+   */
+  const [medias, setMedias] = useState<Record<string, MediaDaTurma>>({});
 
   const carregar = () =>
     listTurmasDisponiveis()
-      .then(setTurmas)
+      .then((lista) => {
+        setTurmas(lista);
+        // Cada uma por sua conta: a falha de uma média não pode derrubar a
+        // lista, que é o que a pessoa veio ver.
+        for (const t of lista) {
+          void getMediaDaTurma(t.id)
+            .then((m) => setMedias((atual) => ({ ...atual, [t.id]: m })))
+            .catch(() => undefined);
+        }
+      })
       .catch((e: unknown) =>
         setErro(
           e instanceof ApiError
@@ -142,6 +161,20 @@ export function TurmasDoClube() {
                       </p>
                     )}
                   </div>
+
+                  {medias[turma.id]?.media !== null &&
+                    medias[turma.id] !== undefined && (
+                      <span
+                        className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--color-secondary)]/15 px-2.5 py-1 text-[11px] font-extrabold text-[var(--color-primary-strong)]"
+                        title={`${medias[turma.id].quantidade} avaliações`}
+                      >
+                        <Star className="size-3.5 fill-current" aria-hidden="true" />
+                        {medias[turma.id].media?.toLocaleString("pt-BR", {
+                          minimumFractionDigits: 1,
+                          maximumFractionDigits: 1,
+                        })}
+                      </span>
+                    )}
 
                   {turma.jaEstouNela && (
                     <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--color-secondary-container)] px-2.5 py-1 text-[11px] font-extrabold text-[var(--color-primary-strong)]">

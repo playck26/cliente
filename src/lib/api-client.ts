@@ -126,6 +126,14 @@ export type TurmaDisponivel =
 export type ErroDeMatricula =
   components["schemas"]["ErroDeMatriculaResponseDto"];
 
+/** SPEC-025 — apelidos do schema, nunca escritos a mao (INV-059). */
+export type AulaAnterior =
+  components["schemas"]["AulaAnteriorResponseDto"];
+export type MinhaAvaliacao =
+  components["schemas"]["MinhaAvaliacaoResponseDto"];
+export type MediaDaTurma =
+  components["schemas"]["MediaDaTurmaResponseDto"];
+
 /** SPEC-024 — apelidos do schema, nunca escritos a mao (INV-059). */
 export type AceitesPendentes =
   components["schemas"]["AceitesPendentesResponseDto"];
@@ -541,6 +549,45 @@ export async function registrarAceite(versoes: {
     body: JSON.stringify(versoes),
   });
   return (await res.json()) as AceiteRegistrado;
+}
+
+/**
+ * SPEC-025 — as aulas que ja aconteceram, para poder avalia-las.
+ *
+ * `listMyClasses` devolve so o FUTURO. Sem esta, nao haveria como chegar ate
+ * a aula para dar nota — foi o que o Israel pediu ao ver a tela.
+ *
+ * Cada item ja vem com a nota que a pessoa deu: a tela precisa distinguir
+ * "ainda nao avaliei" de "dei 4", e uma segunda requisicao por aula seria
+ * uma por linha da lista.
+ */
+export async function listAulasAnteriores(): Promise<AulaAnterior[]> {
+  const res = await authFetch("/me/classes/anteriores");
+  return (await res.json()) as AulaAnterior[];
+}
+
+/** SPEC-025 — avalia ou corrige a nota de UMA aula. */
+export async function avaliarAula(
+  ocupacaoId: string,
+  dados: { nota: number; comentario?: string },
+): Promise<MinhaAvaliacao> {
+  const res = await authFetch(`/me/classes/aulas/${ocupacaoId}/avaliacao`, {
+    method: "PUT",
+    body: JSON.stringify(dados),
+  });
+  return (await res.json()) as MinhaAvaliacao;
+}
+
+/**
+ * SPEC-025 — a media da TURMA, agregada das notas das aulas dela.
+ *
+ * A aula nao tem media propria (decisao do Israel). Esta resposta NAO traz
+ * autoria nem comentario — INV-025a, e o servidor garante isso com um DTO
+ * separado, nao com um filtro.
+ */
+export async function getMediaDaTurma(turmaId: string): Promise<MediaDaTurma> {
+  const res = await authFetch(`/me/classes/${turmaId}/avaliacao`);
+  return (await res.json()) as MediaDaTurma;
 }
 
 export async function listTurmasDisponiveis(): Promise<TurmaDisponivel[]> {

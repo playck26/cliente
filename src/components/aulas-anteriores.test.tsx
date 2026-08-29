@@ -1,0 +1,195 @@
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { AulasAnteriores } from "./aulas-anteriores";
+import { ApiError } from "@/lib/api-client";
+
+/**
+ * SPEC-025 — as provas da tela em que o aluno avalia a aula.
+ *
+ * Duas delas guardam decisões que a tela poderia trair em silêncio: o
+ * **aviso de que a avaliação não é anônima** (REQ-008, decisão do Israel) e
+ * a ausência de média por aula — ele foi explícito, "as aulas não têm
+ * média", e uma média aqui seria o produto contradizendo a decisão.
+ */
+
+const listAulasAnteriores = vi.hoisted(() => vi.fn());
+const avaliarAula = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/api-client", async () => {
+  const real =
+    await vi.importActual<typeof import("@/lib/api-client")>(
+      "@/lib/api-client",
+    );
+  return { ...real, listAulasAnteriores, avaliarAula };
+});
+
+function aula(patch: Record<string, unknown> = {}) {
+  return {
+    ocupacaoId: "o1",
+    turmaId: "t1",
+    turmaNome: "Iniciantes",
+    quadraNome: "Quadra 1",
+    data: "2026-08-25",
+    horaInicio: "18:00",
+    horaFim: "19:00",
+    minhaNota: null,
+    meuComentario: null,
+    ...patch,
+  };
+}
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  avaliarAula.mockResolvedValue({ nota: 5, comentario: null, updatedAt: null });
+});
+
+describe("a lista", () => {
+  it("mostra a aula com data, horário e quadra", async () => {
+    listAulasAnteriores.mockResolvedValue([aula()]);
+    render(<AulasAnteriores />);
+
+    expect(await screen.findByText("Iniciantes")).toBeInTheDocument();
+    expect(
+      screen.getByText(/Terça, 25\/08 · 18:00–19:00 · Quadra 1/),
+    ).toBeInTheDocument();
+  });
+
+  it("sem aulas, explica em vez de mostrar lista vazia", async () => {
+    listAulasAnteriores.mockResolvedValue([]);
+    render(<AulasAnteriores />);
+
+    expect(await screen.findByText("Nenhuma aula ainda")).toBeInTheDocument();
+  });
+
+  it("aula já avaliada mostra a própria nota, e o botão muda de texto", async () => {
+    listAulasAnteriores.mockResolvedValue([aula({ minhaNota: 4 })]);
+    render(<AulasAnteriores />);
+
+    expect(await screen.findByText("4")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Mudar minha nota" }),
+    ).toBeInTheDocument();
+  });
+
+  it("aula não avaliada convida a avaliar", async () => {
+    listAulasAnteriores.mockResolvedValue([aula()]);
+    render(<AulasAnteriores />);
+
+    expect(
+      await screen.findByRole("button", { name: "Avaliar esta aula" }),
+    ).toBeInTheDocument();
+  });
+});
+
+describe("a aula NÃO tem média — decisão do Israel", () => {
+  it("nada na tela mostra média de aula", async () => {
+    // "As aulas não têm média, mas as avaliações das aulas influenciam a
+    // média da turma." Uma média aqui seria o produto contradizendo isso.
+    listAulasAnteriores.mockResolvedValue([aula({ minhaNota: 4 })]);
+    const { container } = render(<AulasAnteriores />);
+
+    await screen.findByText("Iniciantes");
+    expect(container.textContent).not.toMatch(/média/i);
+    expect(container.textContent).not.toMatch(/avaliações/i);
+  });
+});
+
+describe("avaliar", () => {
+  it("exige escolher uma estrela antes de habilitar o envio", async () => {
+    listAulasAnteriores.mockResolvedValue([aula()]);
+    render(<AulasAnteriores />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Avaliar esta aula" }));
+
+    expect(screen.getByRole("button", { name: "Enviar" })).toBeDisabled();
+  });
+
+  it("manda a nota escolhida", async () => {
+    listAulasAnteriores.mockResolvedValue([aula()]);
+    render(<AulasAnteriores />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Avaliar esta aula" }));
+    fireEvent.click(screen.getByRole("radio", { name: "4 estrelas" }));
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+
+    await waitFor(() =>
+      expect(avaliarAula).toHaveBeenCalledWith("o1", {
+        nota: 4,
+        comentario: undefined,
+      }),
+    );
+  });
+
+  it("comentário em branco não vira string vazia", async () => {
+    listAulasAnteriores.mockResolvedValue([aula()]);
+    render(<AulasAnteriores />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Avaliar esta aula" }));
+    fireEvent.click(screen.getByRole("radio", { name: "5 estrelas" }));
+    fireEvent.change(screen.getByLabelText("Comentário sobre a aula"), {
+      target: { value: "   " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+
+    await waitFor(() =>
+      expect(avaliarAula).toHaveBeenCalledWith("o1", {
+        nota: 5,
+        comentario: undefined,
+      }),
+    );
+  });
+
+  it("abre preenchida quando já havia nota", async () => {
+    listAulasAnteriores.mockResolvedValue([
+      aula({ minhaNota: 3, meuComentario: "Foi ok" }),
+    ]);
+    render(<AulasAnteriores />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Mudar minha nota" }));
+
+    expect(screen.getByLabelText("Comentário sobre a aula")).toHaveValue(
+      "Foi ok",
+    );
+    expect(screen.getByRole("radio", { name: "3 estrelas" })).toBeChecked();
+  });
+
+  it("erro do servidor aparece com a mensagem dele", async () => {
+    listAulasAnteriores.mockResolvedValue([aula()]);
+    avaliarAula.mockRejectedValue(
+      new ApiError(409, "Você pode avaliar esta aula a partir do dia seguinte.", "AULA_NAO_TERMINOU"),
+    );
+    render(<AulasAnteriores />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Avaliar esta aula" }));
+    fireEvent.click(screen.getByRole("radio", { name: "1 estrela" }));
+    fireEvent.click(screen.getByRole("button", { name: "Enviar" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "a partir do dia seguinte",
+    );
+  });
+});
+
+describe("REQ-008 — o aviso de que não é anônima", () => {
+  it("está na tela de avaliar, antes de escrever", async () => {
+    // Prometer anonimato por omissão seria o produto mentindo no momento
+    // exato em que a pessoa se expõe.
+    listAulasAnteriores.mockResolvedValue([aula()]);
+    render(<AulasAnteriores />);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Avaliar esta aula" }));
+
+    expect(
+      screen.getByText("O clube vê sua nota, seu comentário e seu nome."),
+    ).toBeInTheDocument();
+  });
+
+  it("e some junto com o formulário, porque só vale ali", async () => {
+    listAulasAnteriores.mockResolvedValue([aula()]);
+    render(<AulasAnteriores />);
+
+    expect(
+      screen.queryByText("O clube vê sua nota, seu comentário e seu nome."),
+    ).not.toBeInTheDocument();
+  });
+});
