@@ -120,7 +120,7 @@ export function AceiteView() {
   if (erro && !pendentes) {
     return (
       <main className="app-screen flex min-h-screen items-center justify-center bg-background px-5">
-        <p role="alert" className="text-[13px] font-bold text-[var(--color-danger)]">
+        <p role="alert" className="text-[13px] font-bold text-[var(--color-error)]">
           {erro}
         </p>
       </main>
@@ -139,7 +139,7 @@ export function AceiteView() {
         <h1 className="text-[22px] leading-tight font-extrabold text-foreground">
           {quantos > 1 ? "Antes de continuar" : "Um documento para ler"}
         </h1>
-        <p className="mt-1 text-[13px] font-bold text-muted">
+        <p className="mt-1 text-[13px] font-bold text-[var(--color-text-secondary)]">
           {quantos > 1
             ? "São dois documentos: o termo da plataforma e o contrato do seu clube."
             : "Leia e confirme para continuar usando o aplicativo."}
@@ -167,7 +167,7 @@ export function AceiteView() {
         {erro && (
           <p
             role="alert"
-            className="rounded-2xl bg-[var(--color-danger)]/10 px-4 py-3 text-[13px] font-bold text-[var(--color-danger)]"
+            className="rounded-2xl bg-[var(--color-error)]/10 px-4 py-3 text-[13px] font-bold text-[var(--color-error)]"
           >
             {erro}
           </p>
@@ -220,7 +220,7 @@ function Documento({
       <div className="flex items-center gap-2 text-[var(--color-primary-strong)]">
         {icone}
         <h2 className="text-[14px] font-extrabold">{titulo}</h2>
-        <span className="ml-auto text-[11px] font-extrabold text-muted">
+        <span className="ml-auto text-[11px] font-extrabold text-[var(--color-text-secondary)]">
           versão {versao}
         </span>
       </div>

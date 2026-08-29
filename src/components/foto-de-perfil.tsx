@@ -165,7 +165,7 @@ export function FotoDePerfil({ nome }: { nome?: string }) {
       </p>
 
       {erro ? (
-        <p role="alert" className="max-w-xs text-center text-sm font-semibold text-[var(--color-danger,#c0392b)]">
+        <p role="alert" className="max-w-xs text-center text-sm font-semibold text-[var(--color-error)]">
           {erro}
         </p>
       ) : null}

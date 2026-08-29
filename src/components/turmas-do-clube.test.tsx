@@ -12,6 +12,7 @@ import { ApiError } from "@/lib/api-client";
  */
 
 const listTurmasDisponiveis = vi.hoisted(() => vi.fn());
+const getMediaDaTurma = vi.hoisted(() => vi.fn());
 const entrarNaTurma = vi.hoisted(() => vi.fn());
 const sairDaTurma = vi.hoisted(() => vi.fn());
 
@@ -23,6 +24,7 @@ vi.mock("@/lib/api-client", async () => {
   return {
     ...real,
     listTurmasDisponiveis,
+    getMediaDaTurma,
     entrarNaTurma,
     sairDaTurma,
   };
@@ -45,6 +47,11 @@ function turma(patch: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  getMediaDaTurma.mockResolvedValue({
+    media: null,
+    quantidade: 0,
+    minimoParaMedia: 3,
+  });
   entrarNaTurma.mockResolvedValue(undefined);
   sairDaTurma.mockResolvedValue(undefined);
 });
@@ -185,5 +192,87 @@ describe("estados vazios", () => {
     expect(
       await screen.findByText("Este clube ainda não tem turmas cadastradas."),
     ).toBeInTheDocument();
+  });
+});
+
+/**
+ * **A nota em estrelas — pedido do Israel ao ver a tela em produção.**
+ *
+ * A primeira versão mostrava um selo com o número **só quando havia média**,
+ * e o mínimo de 3 avaliações (D4 da SPEC-025) fazia com que nenhuma turma
+ * exibisse nada. A informação existia e a tela não a apresentava.
+ *
+ * O mínimo continua valendo — ele é de **privacidade** antes de estatística.
+ * O que mudou é que a linha sempre aparece: sem média, ela diz o que falta.
+ */
+describe("a nota da turma", () => {
+  it("mostra as estrelas e a média quando há nota", async () => {
+    listTurmasDisponiveis.mockResolvedValue([turma()]);
+    getMediaDaTurma.mockResolvedValue({
+      media: 4.3,
+      quantidade: 7,
+      minimoParaMedia: 3,
+    });
+    render(<TurmasDoClube />);
+
+    expect(
+      await screen.findByLabelText("Nota 4,3 de 5, em 7 avaliações"),
+    ).toBeInTheDocument();
+    expect(screen.getByText("4,3")).toBeInTheDocument();
+    expect(screen.getByText("(7)")).toBeInTheDocument();
+  });
+
+  it("turma sem nenhuma avaliação diz isso, em vez de sumir", async () => {
+    // Ausência de estrela é dúvida; estrela vazia é informação.
+    listTurmasDisponiveis.mockResolvedValue([turma()]);
+    getMediaDaTurma.mockResolvedValue({
+      media: null,
+      quantidade: 0,
+      minimoParaMedia: 3,
+    });
+    render(<TurmasDoClube />);
+
+    expect(await screen.findByText("Ainda sem avaliações")).toBeInTheDocument();
+    expect(screen.getByLabelText("Ainda sem nota")).toBeInTheDocument();
+  });
+
+  it("abaixo do mínimo, diz QUANTAS faltam — não esconde a contagem", async () => {
+    // "Ainda sem nota" faria a pessoa achar que ninguém avaliou, quando há
+    // duas avaliações esperando a terceira.
+    listTurmasDisponiveis.mockResolvedValue([turma()]);
+    getMediaDaTurma.mockResolvedValue({
+      media: null,
+      quantidade: 2,
+      minimoParaMedia: 3,
+    });
+    render(<TurmasDoClube />);
+
+    expect(await screen.findByText("2 de 3 avaliações")).toBeInTheDocument();
+  });
+
+  it("a média NÃO aparece abaixo do mínimo — o D4 continua valendo", async () => {
+    // O servidor já manda `media: null`; esta prova garante que a tela não
+    // inventa uma média a partir da contagem.
+    listTurmasDisponiveis.mockResolvedValue([turma()]);
+    getMediaDaTurma.mockResolvedValue({
+      media: null,
+      quantidade: 2,
+      minimoParaMedia: 3,
+    });
+    const { container } = render(<TurmasDoClube />);
+
+    await screen.findByText("2 de 3 avaliações");
+    expect(container.textContent).not.toMatch(/\d,\d/);
+  });
+
+  it("enquanto a média não chega, não desenha meia estrela", async () => {
+    // Meia estrela piscando é pior que esperar meio segundo.
+    listTurmasDisponiveis.mockResolvedValue([turma()]);
+    getMediaDaTurma.mockReturnValue(new Promise(() => undefined));
+    render(<TurmasDoClube />);
+
+    await screen.findByText("Iniciantes");
+    expect(screen.queryByLabelText(/Nota/)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Ainda sem nota")).not.toBeInTheDocument();
   });
 });

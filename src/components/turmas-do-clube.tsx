@@ -109,7 +109,7 @@ export function TurmasDoClube() {
 
   if (carregando) {
     return (
-      <div className="px-5 text-[13px] font-bold text-muted">
+      <div className="px-5 text-[13px] font-bold text-[var(--color-text-secondary)]">
         Carregando turmas…
       </div>
     );
@@ -120,7 +120,7 @@ export function TurmasDoClube() {
       {erro && (
         <p
           role="alert"
-          className="rounded-2xl bg-[var(--color-danger)]/10 px-4 py-3 text-[13px] font-bold text-[var(--color-danger)]"
+          className="rounded-2xl bg-[var(--color-error)]/10 px-4 py-3 text-[13px] font-bold text-[var(--color-error)]"
         >
           {erro}
         </p>
@@ -128,7 +128,7 @@ export function TurmasDoClube() {
 
       {turmas.length === 0 ? (
         <section className="rounded-3xl bg-surface p-6 text-center shadow-[var(--shadow-low)] ring-1 ring-border">
-          <p className="text-[13px] font-bold text-muted">
+          <p className="text-[13px] font-bold text-[var(--color-text-secondary)]">
             Este clube ainda não tem turmas cadastradas.
           </p>
         </section>
@@ -151,7 +151,7 @@ export function TurmasDoClube() {
                       {turma.nome}
                     </h3>
                     {turma.encontros.length > 0 && (
-                      <p className="mt-0.5 text-[12px] font-bold text-muted">
+                      <p className="mt-0.5 text-[12px] font-bold text-[var(--color-text-secondary)]">
                         {turma.encontros
                           .map(
                             (encontro) =>
@@ -160,21 +160,8 @@ export function TurmasDoClube() {
                           .join(" · ")}
                       </p>
                     )}
+                    <NotaDaTurma media={medias[turma.id]} />
                   </div>
-
-                  {medias[turma.id]?.media !== null &&
-                    medias[turma.id] !== undefined && (
-                      <span
-                        className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--color-secondary)]/15 px-2.5 py-1 text-[11px] font-extrabold text-[var(--color-primary-strong)]"
-                        title={`${medias[turma.id].quantidade} avaliações`}
-                      >
-                        <Star className="size-3.5 fill-current" aria-hidden="true" />
-                        {medias[turma.id].media?.toLocaleString("pt-BR", {
-                          minimumFractionDigits: 1,
-                          maximumFractionDigits: 1,
-                        })}
-                      </span>
-                    )}
 
                   {turma.jaEstouNela && (
                     <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--color-secondary-container)] px-2.5 py-1 text-[11px] font-extrabold text-[var(--color-primary-strong)]">
@@ -186,13 +173,13 @@ export function TurmasDoClube() {
 
                 {/* A ocupação à vista — o pedido do Israel, em número e em barra. */}
                 <div className="mt-3">
-                  <div className="flex items-center gap-1.5 text-[12px] font-extrabold text-muted">
+                  <div className="flex items-center gap-1.5 text-[12px] font-extrabold text-[var(--color-text-secondary)]">
                     <Users className="size-3.5" aria-hidden="true" />
                     <span>
                       {turma.matriculados} de {turma.capacidade}
                     </span>
                     {lotada && (
-                      <span className="text-[var(--color-danger)]">· sem vagas</span>
+                      <span className="text-[var(--color-error)]">· sem vagas</span>
                     )}
                   </div>
                   <div
@@ -204,7 +191,7 @@ export function TurmasDoClube() {
                     aria-label={`Ocupação da turma ${turma.nome}`}
                   >
                     <div
-                      className={`h-full rounded-full ${lotada ? "bg-[var(--color-danger)]" : "bg-[var(--color-primary-strong)]"}`}
+                      className={`h-full rounded-full ${lotada ? "bg-[var(--color-error)]" : "bg-[var(--color-primary-strong)]"}`}
                       style={{ width: `${ocupado}%` }}
                     />
                   </div>
@@ -235,7 +222,7 @@ export function TurmasDoClube() {
                         achando que falhou.
                       */}
                       {turma.motivo && (
-                        <p className="mt-2 text-center text-[12px] font-bold text-muted">
+                        <p className="mt-2 text-center text-[12px] font-bold text-[var(--color-text-secondary)]">
                           {EXPLICACAO[turma.motivo] ?? "Não disponível"}
                         </p>
                       )}
@@ -246,6 +233,75 @@ export function TurmasDoClube() {
             );
           })}
         </section>
+      )}
+    </div>
+  );
+}
+
+/**
+ * **A nota da turma, em estrelas** — pedido do Israel ao ver a tela.
+ *
+ * A primeira versão só mostrava um selo com o número, **e só quando havia
+ * média**. Resultado: turma nenhuma exibia nada, porque nenhuma tinha as três
+ * avaliações do mínimo. A informação existia e a tela não a apresentava.
+ *
+ * **O mínimo de 3 continua valendo** (D4 da SPEC-025, e ele é de privacidade
+ * antes de estatística): abaixo dele a média não é publicada. O que mudou é
+ * que a linha **sempre aparece** — e, sem média, ela diz o que falta em vez
+ * de sumir. Estrela vazia é informação; ausência de estrela é dúvida.
+ */
+function NotaDaTurma({ media }: { media?: MediaDaTurma }) {
+  // Ainda carregando: não desenha nada. Meia estrela piscando é pior que
+  // esperar meio segundo.
+  if (!media) return null;
+
+  const nota = media.media;
+  const temNota = nota !== null;
+
+  return (
+    <div className="mt-1.5 flex items-center gap-1.5">
+      <span
+        className="inline-flex items-center gap-0.5"
+        aria-label={
+          temNota
+            ? `Nota ${nota!.toLocaleString("pt-BR", { minimumFractionDigits: 1 })} de 5, em ${media.quantidade} avaliações`
+            : "Ainda sem nota"
+        }
+      >
+        {[1, 2, 3, 4, 5].map((n) => (
+          <Star
+            key={n}
+            className={`size-3.5 ${
+              temNota && n <= Math.round(nota!)
+                ? "fill-[var(--color-secondary)] text-[var(--color-secondary)]"
+                : "text-[var(--color-text-secondary)]/35"
+            }`}
+            aria-hidden="true"
+          />
+        ))}
+      </span>
+
+      {temNota ? (
+        <span className="text-[12px] font-extrabold text-[var(--color-primary-strong)]">
+          {nota!.toLocaleString("pt-BR", {
+            minimumFractionDigits: 1,
+            maximumFractionDigits: 1,
+          })}
+          <span className="ml-1 font-bold text-[var(--color-text-secondary)]">
+            ({media.quantidade})
+          </span>
+        </span>
+      ) : (
+        /*
+          Sem média, a tela diz POR QUE — e não some. "Ainda sem nota" faria
+          a pessoa achar que ninguém avaliou, quando pode haver duas
+          avaliações esperando a terceira.
+        */
+        <span className="text-[12px] font-bold text-[var(--color-text-secondary)]">
+          {media.quantidade === 0
+            ? "Ainda sem avaliações"
+            : `${media.quantidade} de ${media.minimoParaMedia} avaliações`}
+        </span>
       )}
     </div>
   );

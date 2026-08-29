@@ -145,7 +145,7 @@ export function AgendaDoProfessor() {
       {erro && (
         <p
           role="alert"
-          className="rounded-2xl bg-[var(--color-danger)]/10 px-4 py-3 text-[13px] font-bold text-[var(--color-danger)]"
+          className="rounded-2xl bg-[var(--color-error)]/10 px-4 py-3 text-[13px] font-bold text-[var(--color-error)]"
         >
           {erro}
         </p>
@@ -160,7 +160,7 @@ export function AgendaDoProfessor() {
             <div
               key={i}
               aria-hidden="true"
-              className="py-1 text-center text-[11px] font-extrabold text-muted"
+              className="py-1 text-center text-[11px] font-extrabold text-[var(--color-text-secondary)]"
             >
               {d}
             </div>
@@ -195,7 +195,12 @@ export function AgendaDoProfessor() {
                     ? "bg-[var(--color-primary-strong)] text-white"
                     : doDia
                       ? "bg-[var(--color-secondary-container)] text-[var(--color-primary-strong)]"
-                      : "text-muted/50"
+                      : // Dia sem aula: de-enfase legitima, mas LEGIVEL. A
+                        // pessoa precisa enxergar o numero para saber que dia
+                        // e — o print do Israel mostrava esta coluna quase
+                        // invisivel, porque a cor era `--muted` (um FUNDO).
+                        // 80% de #4e5951 sobre claro passa o contraste AA.
+                        "text-[var(--color-text-secondary)]/80"
                 } ${ehHoje && !selecionado ? "ring-2 ring-[var(--color-primary-strong)]" : ""}`}
               >
                 {dia}
@@ -206,7 +211,7 @@ export function AgendaDoProfessor() {
                 */}
                 {doDia && doDia.pendentes > 0 && (
                   <Circle
-                    className={`absolute bottom-1.5 size-1.5 fill-current ${selecionado ? "text-white" : "text-[var(--color-danger)]"}`}
+                    className={`absolute bottom-1.5 size-1.5 fill-current ${selecionado ? "text-white" : "text-[var(--color-error)]"}`}
                     aria-hidden="true"
                   />
                 )}
@@ -217,9 +222,9 @@ export function AgendaDoProfessor() {
       </section>
 
       {carregando ? (
-        <p className="text-[13px] font-bold text-muted">Carregando…</p>
+        <p className="text-[13px] font-bold text-[var(--color-text-secondary)]">Carregando…</p>
       ) : dias.length === 0 ? (
-        <p className="text-[13px] font-bold text-muted">
+        <p className="text-[13px] font-bold text-[var(--color-text-secondary)]">
           Nenhuma aula sua neste mês.
         </p>
       ) : null}
@@ -227,7 +232,7 @@ export function AgendaDoProfessor() {
       {diaAberto && (
         <section className="space-y-3" aria-label={`Aulas de ${diaAberto}`}>
           {aulas.length === 0 ? (
-            <p className="text-[13px] font-bold text-muted">Carregando aulas…</p>
+            <p className="text-[13px] font-bold text-[var(--color-text-secondary)]">Carregando aulas…</p>
           ) : (
             aulas.map((aula) => (
               /*
@@ -244,7 +249,7 @@ export function AgendaDoProfessor() {
                     <h3 className="truncate text-[15px] font-extrabold text-foreground">
                       {aula.turmaNome ?? "Aula"}
                     </h3>
-                    <p className="mt-0.5 flex items-center gap-1.5 text-[12px] font-bold text-muted">
+                    <p className="mt-0.5 flex items-center gap-1.5 text-[12px] font-bold text-[var(--color-text-secondary)]">
                       <Users className="size-3.5" aria-hidden="true" />
                       {aula.horaInicio}–{aula.horaFim} · {aula.quadraNome}
                     </p>
@@ -269,7 +274,7 @@ function EstadoDaChamada({ estado }: { estado: string }) {
   const estilo: Record<string, { texto: string; classe: string }> = {
     pendente: {
       texto: "Chamada pendente",
-      classe: "bg-[var(--color-danger)]/10 text-[var(--color-danger)]",
+      classe: "bg-[var(--color-error)]/10 text-[var(--color-error)]",
     },
     feita: {
       texto: "Chamada feita",
@@ -278,7 +283,7 @@ function EstadoDaChamada({ estado }: { estado: string }) {
     },
     legada: {
       texto: "Chamada antiga",
-      classe: "bg-[var(--color-court-dark)]/10 text-muted",
+      classe: "bg-[var(--color-court-dark)]/10 text-[var(--color-text-secondary)]",
     },
   };
   const { texto, classe } = estilo[estado] ?? estilo.pendente;

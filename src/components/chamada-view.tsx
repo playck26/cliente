@@ -172,7 +172,7 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
             metade, e ninguém sabe quem faltou. A tela diz isso em vez de
             apresentar uma lista incompleta como se fosse o registro. */}
         {chamada?.completude === "desconhecida" ? (
-          <p className="rounded-lg border border-[var(--color-outline)] bg-[var(--color-surface-container-high)] p-3 text-sm">
+          <p className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-high)] p-3 text-sm">
             Esta chamada foi lançada antes de o app exigir a lista completa,
             então pode estar pela metade. Confira todos os alunos e salve de
             novo para deixá-la fechada.

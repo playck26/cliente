@@ -62,7 +62,7 @@ export function AulasAnteriores() {
 
   if (carregando) {
     return (
-      <div className="px-5 text-[13px] font-bold text-muted">
+      <div className="px-5 text-[13px] font-bold text-[var(--color-text-secondary)]">
         Carregando suas aulas…
       </div>
     );
@@ -73,7 +73,7 @@ export function AulasAnteriores() {
       {erro && (
         <p
           role="alert"
-          className="rounded-2xl bg-[var(--color-danger)]/10 px-4 py-3 text-[13px] font-bold text-[var(--color-danger)]"
+          className="rounded-2xl bg-[var(--color-error)]/10 px-4 py-3 text-[13px] font-bold text-[var(--color-error)]"
         >
           {erro}
         </p>
@@ -86,7 +86,7 @@ export function AulasAnteriores() {
             aria-hidden="true"
           />
           <h2 className="mt-3 text-lg font-extrabold">Nenhuma aula ainda</h2>
-          <p className="mt-1 text-sm text-muted">
+          <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
             Suas aulas passadas aparecerão aqui para você avaliar.
           </p>
         </section>
@@ -153,7 +153,7 @@ function AulaCard({
           <h3 className="truncate text-[15px] font-extrabold text-foreground">
             {aula.turmaNome ?? "Aula"}
           </h3>
-          <p className="mt-0.5 text-[12px] font-bold text-muted">
+          <p className="mt-0.5 text-[12px] font-bold text-[var(--color-text-secondary)]">
             {formatarData(aula.data)} · {aula.horaInicio}–{aula.horaFim} ·{" "}
             {aula.quadraNome}
           </p>
@@ -184,7 +184,7 @@ function AulaCard({
             ADR-017/4), e prometer o contrário por omissão seria o produto
             mentindo no momento exato em que a pessoa se expõe.
           */}
-          <p className="mt-3 text-[11px] font-bold text-muted">
+          <p className="mt-3 text-[11px] font-bold text-[var(--color-text-secondary)]">
             O clube vê sua nota, seu comentário e seu nome.
           </p>
 
@@ -204,7 +204,7 @@ function AulaCard({
           {erro && (
             <p
               role="alert"
-              className="mt-2 text-[12px] font-bold text-[var(--color-danger)]"
+              className="mt-2 text-[12px] font-bold text-[var(--color-error)]"
             >
               {erro}
             </p>
