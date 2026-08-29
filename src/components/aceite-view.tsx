@@ -10,6 +10,8 @@ import {
   registrarAceite,
   type AceitesPendentes,
 } from "@/lib/api-client";
+import { getPapel } from "@/lib/auth-storage";
+import { rotaInicial } from "@/lib/rota-inicial";
 
 /**
  * SPEC-024/TASK-006 — **a tela que resolve o portão.**
@@ -30,6 +32,26 @@ import {
  */
 export function AceiteView() {
   const router = useRouter();
+  /**
+   * **DEF-018 — para onde ir DEPOIS de aceitar, e por que isto não é
+   * `"/home"`.**
+   *
+   * A primeira versão desta tela mandava todo mundo para `/home`, que é a
+   * home do **aluno**. O professor aceitava o termo e caía no painel do
+   * jogador — foi o que o Israel viu em produção, e é a terceira vez que
+   * este projeto entrega a tela do aluno ao professor (DEF-011 foi a barra;
+   * antes disso, `perfil-view`).
+   *
+   * O mais duro é que `rotaInicial` **já existia, documentada**, e o
+   * comentário dela avisa: *"são três portas de entrada, e um papel novo
+   * esquecido em uma delas manda a pessoa para uma tela que o servidor
+   * recusa"*. Esta tela foi a **quarta porta**, e não usou o helper.
+   *
+   * `getPapel()` é a mesma fonte que a `BottomNav` usa — o papel gravado no
+   * login. Sem papel conhecido, `rotaInicial` cai no destino do aluno, que é
+   * o comportamento que já existia para as outras três portas.
+   */
+  const voltarParaOApp = () => router.replace(rotaInicial(getPapel() ?? "aluno"));
   const [pendentes, setPendentes] = useState<AceitesPendentes | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [marcado, setMarcado] = useState(false);
@@ -43,7 +65,7 @@ export function AceiteView() {
         // noutra aba, ou voltou pelo histórico. Mandar de volta é melhor que
         // mostrar uma tela vazia dizendo "aceite o quê?".
         if (!p.termo && !p.contrato) {
-          router.replace("/home");
+          voltarParaOApp();
         }
       })
       .catch((e: unknown) =>
@@ -78,7 +100,7 @@ export function AceiteView() {
         setMarcado(false);
         return;
       }
-      router.replace("/home");
+      voltarParaOApp();
     } catch (e: unknown) {
       if (e instanceof ApiError && e.code === "VERSAO_DESATUALIZADA") {
         // O texto mudou enquanto ela lia. Recarregar é obrigatório: aceitar a

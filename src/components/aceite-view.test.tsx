@@ -21,6 +21,9 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ replace, push: vi.fn() }),
 }));
 
+const getPapel = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/auth-storage", () => ({ getPapel }));
+
 vi.mock("@/lib/api-client", async () => {
   const real =
     await vi.importActual<typeof import("@/lib/api-client")>(
@@ -34,6 +37,7 @@ const CONTRATO = { versao: 3, texto: "Contrato do clube, versão 3." };
 
 beforeEach(() => {
   vi.clearAllMocks();
+  getPapel.mockReturnValue("aluno");
   registrarAceite.mockResolvedValue({
     termoVersaoAceita: 1,
     contratoVersaoAceita: 3,
@@ -158,6 +162,66 @@ describe("chegar aqui sem nada pendente", () => {
     // Acontece de verdade: aceitou noutra aba, ou voltou pelo histórico.
     getAceitesPendentes.mockResolvedValue({ termo: null, contrato: null });
     render(<AceiteView />);
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/home"));
+  });
+});
+
+/**
+ * **DEF-018 — o professor não pode cair no painel do jogador.**
+ *
+ * Foi o que aconteceu em produção: esta tela mandava todo mundo para
+ * `/home`, que é a home do aluno. O professor aceitava o termo e via o app
+ * de outra pessoa.
+ *
+ * É a **terceira vez** que este projeto entrega a tela do aluno ao professor
+ * (antes: `perfil-view`, depois a `BottomNav` no DEF-011). Por isso além
+ * destas provas de comportamento existe um **gate** em
+ * `lib/rota-inicial.test.ts`, que varre o código: aviso não impediu as três
+ * vezes anteriores.
+ */
+describe("DEF-018 — para onde cada papel volta", () => {
+  it("o professor volta para a grade DELE, não para a home do aluno", async () => {
+    getPapel.mockReturnValue("professor");
+    getAceitesPendentes.mockResolvedValue({ termo: TERMO, contrato: null });
+    render(<AceiteView />);
+
+    fireEvent.click(await screen.findByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/minhas-turmas"));
+    expect(replace).not.toHaveBeenCalledWith("/home");
+  });
+
+  it("o aluno volta para a home dele", async () => {
+    getPapel.mockReturnValue("aluno");
+    getAceitesPendentes.mockResolvedValue({ termo: TERMO, contrato: null });
+    render(<AceiteView />);
+
+    fireEvent.click(await screen.findByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/home"));
+  });
+
+  it("e o mesmo vale para quem chega aqui sem nada pendente", async () => {
+    // O outro caminho de saída da tela, e ele errava igual.
+    getPapel.mockReturnValue("professor");
+    getAceitesPendentes.mockResolvedValue({ termo: null, contrato: null });
+    render(<AceiteView />);
+
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/minhas-turmas"));
+  });
+
+  it("papel desconhecido cai no destino do aluno, como as outras portas", async () => {
+    // Sessão antiga, de antes de o papel ser guardado. É o comportamento que
+    // login e primeiro-acesso já tinham — esta tela só passou a segui-lo.
+    getPapel.mockReturnValue(null);
+    getAceitesPendentes.mockResolvedValue({ termo: TERMO, contrato: null });
+    render(<AceiteView />);
+
+    fireEvent.click(await screen.findByRole("checkbox"));
+    fireEvent.click(screen.getByRole("button", { name: "Continuar" }));
 
     await waitFor(() => expect(replace).toHaveBeenCalledWith("/home"));
   });
