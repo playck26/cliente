@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
-import { CalendarCheck, Home, Plus, User, Users } from "lucide-react";
+import { CalendarCheck, Home, User, Users } from "lucide-react";
 import { TennisBallIcon } from "@/components/icons/tennis-ball-icon";
 import type { Papel } from "@/lib/api-client";
 import { getPapel } from "@/lib/auth-storage";
@@ -13,18 +13,22 @@ import { getPapel } from "@/lib/auth-storage";
 // bar)"). Altura 80px e ícone lucide por item — SPEC-007 (design system
 // "Performance Court"). Alvo de toque ~44px+ preservado (acessibilidade).
 /**
- * SPEC-022 — **de cinco colunas para quatro, e de quatro destinos para
- * três.**
+ * **A barra do aluno, depois da revisão visual do Israel (2026-08-29).**
  *
- * A barra antiga tinha "Quadras" e "Reservas" lado a lado, e o botão grande
- * do meio levava ao mesmo lugar que "Quadras" — duas entradas para uma tela.
- * Agora `/quadras` e `/reservas` são uma tela só com duas abas, e a barra
- * oferece Home, Aulas e Reservas.
+ * Histórico curto, porque ele explica o desenho de hoje:
  *
- * **O botão "Reservar" ficou**, e a razão é de produto: reservar quadra é a
- * ação principal do app. O pedido era simplificar o menu, não tirar o
- * atalho da ação. O que ele perdeu foi a redundância — hoje é o único jeito
- * de cair direto na aba de quadras.
+ * - até a SPEC-022 eram **cinco colunas para quatro destinos** — o botão
+ *   grande do meio e a aba "Quadras" levavam ao mesmo lugar;
+ * - a SPEC-022 reduziu a três itens e manteve o botão central como atalho
+ *   de um toque para reservar;
+ * - **a revisão em produção derrubou o botão.** Com `/quadras` virando aba
+ *   dentro de `/reservas`, ele deixou de ser um atalho para outro lugar e
+ *   passou a ser uma segunda porta para a tela vizinha.
+ *
+ * No lugar dele entrou **Perfil**, que morava só no cabeçalho. São quatro
+ * colunas iguais, sem saliência: o que era motivo para o perfil não caber
+ * ("a barra é `grid-cols-5` com botão central saliente") deixou de existir
+ * junto com o botão.
  */
 const ITENS_ESQUERDA = [
   { href: "/home", label: "Home", Icon: Home },
@@ -33,10 +37,8 @@ const ITENS_ESQUERDA = [
 
 const ITENS_DIREITA = [
   { href: "/reservas", label: "Reservas", Icon: CalendarCheck },
+  { href: "/perfil", label: "Perfil", Icon: User },
 ] as const;
-
-/** O atalho de um toque para escolher quadra (SPEC-022/REQ-002). */
-const DESTINO_DE_RESERVAR = "/reservas?aba=quadras";
 
 /**
  * DEF-011 (2026-08-26) — **a barra do professor.**
@@ -136,16 +138,6 @@ export function BottomNav({ papel }: { papel?: Papel }) {
           </Link>
         );
       })}
-      <Link
-        href={DESTINO_DE_RESERVAR}
-        aria-label="Reservar quadra"
-        className="-mt-8 flex flex-col items-center justify-center gap-1 text-[10px] font-extrabold text-white"
-      >
-        <span className="flex size-16 items-center justify-center rounded-[24px] bg-[var(--color-primary-strong)] text-white shadow-[var(--shadow-glow)] ring-4 ring-background transition-transform active:scale-95">
-          <Plus className="size-7" strokeWidth={2.5} aria-hidden="true" />
-        </span>
-        Reservar
-      </Link>
       {ITENS_DIREITA.map(({ href, label, Icon }) => {
         const ativo = pathname === href || pathname.startsWith(`${href}/`);
         return (
@@ -167,9 +159,14 @@ export function BottomNav({ papel }: { papel?: Papel }) {
 }
 
 /**
- * Duas colunas em vez de cinco, e **sem o botão de reservar**: o professor
- * não reserva quadra. Um botão grande no meio que leva a 403 é pior que
- * botão nenhum — ele convida.
+ * Duas colunas, contra as quatro do aluno.
+ *
+ * O argumento original desta função era "e **sem o botão de reservar**: o
+ * professor não reserva quadra; botão grande que leva a 403 é pior que botão
+ * nenhum, ele convida". **O botão saiu da barra do aluno em 2026-08-29**,
+ * então esse argumento não distingue mais nada — fica registrado como
+ * história, não como razão. A razão que sobra, e basta, é que o professor
+ * alcança duas rotas e o aluno alcança quatro.
  */
 function NavDoProfessor({ pathname }: { pathname: string }) {
   return (

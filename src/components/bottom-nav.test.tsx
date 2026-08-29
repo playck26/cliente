@@ -43,11 +43,15 @@ beforeEach(() => {
  */
 const PROIBIDAS_AO_PROFESSOR = ["/home", "/minhas-aulas", "/reservas"];
 
-/** SPEC-022/REQ-001 — os três destinos do aluno, em ordem de tela. */
-const ABAS_DO_ALUNO = ["/home", "/minhas-aulas", "/reservas"];
-
-/** SPEC-022/REQ-002 — o botão grande, e ele é o único jeito de cair na aba de quadras. */
-const DESTINO_DE_RESERVAR = "/reservas?aba=quadras";
+/**
+ * Os destinos do aluno, em ordem de tela.
+ *
+ * **Eram três até 2026-08-29**, mais o botão central de reservar. A revisão
+ * em produção derrubou o botão — com `/quadras` virando aba dentro de
+ * `/reservas`, ele deixou de ser atalho e virou uma segunda porta para a
+ * tela vizinha — e `/perfil` desceu do cabeçalho para a vaga que sobrou.
+ */
+const ABAS_DO_ALUNO = ["/home", "/minhas-aulas", "/reservas", "/perfil"];
 
 const hrefs = () =>
   screen
@@ -76,13 +80,13 @@ describe("DEF-011 — a barra do professor", () => {
     expect(hrefs()).toContain("/perfil");
   });
 
-  it("NÃO tem o botão de reservar", () => {
-    // Botão grande no meio que leva a 403 é pior que botão nenhum: convida.
-    render(<BottomNav papel="professor" />);
-    expect(
-      screen.queryByLabelText("Reservar quadra"),
-    ).not.toBeInTheDocument();
-  });
+  // A prova "NÃO tem o botão de reservar" foi REMOVIDA em 2026-08-29, e o
+  // motivo importa mais que a remoção: o botão deixou de existir para
+  // QUALQUER papel. Mantê-la faria este arquivo afirmar que a barra do
+  // professor não oferece uma coisa que ninguém oferece — verde por
+  // acidente, exatamente o vão que o `TEST_PLAN.md` registrou em
+  // 2026-08-27. O que continua guardado é a regra, logo acima: a barra dele
+  // não oferece rota de aluno.
 
   it("todo item que ela mostra é alcançável pelo professor", () => {
     // O outro lado da primeira asserção, e o mais durável: em vez de listar
@@ -98,14 +102,31 @@ describe("DEF-011 — a barra do professor", () => {
   });
 });
 
-describe("SPEC-022 — a barra do aluno em três destinos", () => {
-  it("oferece exatamente Home, Aulas e Reservas — e mais nada", () => {
+describe("a barra do aluno, quatro destinos (revisão de 2026-08-29)", () => {
+  it("oferece exatamente Home, Aulas, Reservas e Perfil — e mais nada", () => {
     // O outro lado da asserção do professor, e o mais durável: em vez de
     // listar o que não pode aparecer, exige a lista inteira. Item novo
     // entra por aqui, não por acidente.
     render(<BottomNav papel="aluno" />);
 
-    expect(hrefs()).toEqual([...ABAS_DO_ALUNO.slice(0, 2), DESTINO_DE_RESERVAR, ABAS_DO_ALUNO[2]]);
+    expect(hrefs()).toEqual(ABAS_DO_ALUNO);
+  });
+
+  it("NÃO tem mais o botão de reservar", () => {
+    // Ele existiu entre a SPEC-022 e 2026-08-29. Esta prova guarda a
+    // remoção: se alguém o trouxer de volta sem decidir isso, cai aqui.
+    render(<BottomNav papel="aluno" />);
+
+    expect(screen.queryByLabelText("Reservar quadra")).not.toBeInTheDocument();
+    for (const href of hrefs()) {
+      expect(href).not.toContain("?aba=");
+    }
+  });
+
+  it("o perfil desceu do cabeçalho para a barra", () => {
+    render(<BottomNav papel="aluno" />);
+
+    expect(hrefs()).toContain("/perfil");
   });
 
   it("NÃO oferece mais /quadras — ela virou aba dentro de /reservas", () => {
@@ -114,18 +135,6 @@ describe("SPEC-022 — a barra do aluno em três destinos", () => {
     for (const href of hrefs()) {
       expect(href.startsWith("/quadras")).toBe(false);
     }
-  });
-
-  it("o botão de reservar cai direto na aba de quadras", () => {
-    // REQ-002: reservar continua sendo um toque. Se este `href` voltar a ser
-    // `/quadras`, a pessoa passa pelo redirect à toa; se virar `/reservas`
-    // sem parâmetro, ela cai na aba errada e precisa de um toque a mais.
-    render(<BottomNav papel="aluno" />);
-
-    expect(screen.getByLabelText("Reservar quadra")).toHaveAttribute(
-      "href",
-      DESTINO_DE_RESERVAR,
-    );
   });
 
   it("sem prop, usa o papel guardado no login", () => {

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CalendarDays, CreditCard, MessageCircle, WalletCards } from "lucide-react";
+import { CapaDaQuadra } from "@/components/capa-da-quadra";
 import { CourtLines } from "@/components/court-lines";
 import { Button } from "@/components/ui/button";
 import {
@@ -132,7 +133,20 @@ export function MyBookingsList() {
               return (
                 <article key={booking.id} className="overflow-hidden rounded-3xl bg-surface shadow-[var(--shadow-low)] ring-1 ring-border">
                   <div className={`relative h-[118px] overflow-hidden text-white ${index % 2 === 0 ? "bg-[var(--color-court-clay)]" : "bg-[var(--color-court-blue)]"}`}>
-                    <CourtLines />
+                    {/*
+                      Revisão de 2026-08-29 — a reserva mostra a MESMA capa
+                      que a lista de quadras. A pessoa escolhe pela foto e
+                      depois não reconhecia o que reservou: eram dois
+                      desenhos para a mesma quadra.
+
+                      Nada de novo veio do servidor para isto. Esta tela já
+                      buscava as quadras (para o nome e o esporte), então a
+                      imagem já estava aqui do lado — faltava usá-la.
+
+                      `CapaDaQuadra` cai em `<CourtLines/>` sozinha quando a
+                      quadra não tem foto, que é exatamente o que havia antes.
+                    */}
+                    <CapaDaQuadra imagemUrl={quadra?.imagemUrl ?? null} nome={quadra?.nome ?? "Quadra"} />
                     <span className={`absolute top-3 right-4 z-10 rounded-full px-3 py-1.5 text-[11px] font-extrabold ${pago ? "bg-white text-[var(--color-primary-strong)]" : "bg-[var(--color-court-dark)] text-white"}`}>
                       {STATUS_LABEL[booking.statusPagamento]}
                     </span>

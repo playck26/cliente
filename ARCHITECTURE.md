@@ -65,7 +65,7 @@ page.tsx (server component, fino)
 | `/quadras` | — | **SPEC-022**: só um `permanentRedirect` (308) para `/reservas?aba=quadras`. Deixou de ser destino, continua sendo endereço — atalho de tela inicial e link mandado por conversa não podem quebrar (INV-022b) |
 | `/quadras/[id]` | `court-booking` | reservar UMA quadra. **Não** foi afetada pelo redirect do índice: é o passo seguinte do fluxo, não uma aba |
 | `/aceite` | `aceite-view` | **SPEC-024** — a tela para onde o `403 ACEITE_PENDENTE` desvia. **Sem barra de navegacao nem voltar**, mesmo desenho de `/primeiro-acesso`: oferecer uma saida que o servidor recusa e convidar a pessoa a bater numa porta trancada. Sem esta tela, ligar o portao seria apagao sem saida (LIM-024d) |
-| `/perfil` | `perfil-view` + `foto-de-perfil` | **SPEC-018/TASK-003** — a foto do aluno/professor. Alcançável pelo ícone no `TopAppBar`, e não pela `BottomNav` |
+| `/perfil` | `perfil-view` + `foto-de-perfil` | **SPEC-018/TASK-003** — a foto do aluno/professor. Alcançável pela `BottomNav` desde 2026-08-29 (antes era pelo ícone no `TopAppBar`) |
 | `/reservas` | `reservas-tabs` → `my-bookings-list` \| `courts-list` (+ `GrupoDeFiltro`) | **SPEC-022** — duas abas numa tela só: "Reservas" (padrão) e "Quadras". A aba mora em `?aba=`, não em estado de componente: é o que dá link compartilhável, "voltar" que desfaz a troca, e um alvo para o redirect de `/quadras`. Só o painel ativo é montado — montar os dois faria duas idas à rede para mostrar uma |
 
 ## 4. Estado
@@ -181,6 +181,22 @@ Três camadas hoje:
 **A ordem entre 2 e 3 é o conserto.** Invertida, o pré-voo reprova o arquivo
 que a remoção consertaria em seguida — que era, literalmente, o defeito.
 
+### O cabeçalho tem um botão só (revisão de 2026-08-29)
+
+`top-app-bar` mantém a marca do clube à esquerda (SPEC-018/TASK-006 — *"o
+aluno abre o app da escola dele"*) e, à direita, **apenas o logout**.
+
+Saíram dois botões por motivos diferentes: **o sino**, que estava ali desde a
+SPEC-007 documentado como *inerte* — não existe notificação no backend, e
+ícone que ignora o toque ensina a pessoa a não tocar nos outros; e **o ícone
+de perfil**, porque `/perfil` desceu para a barra.
+
+**O logout pergunta antes**, e o atrito é deliberado: ele aparece em toda
+tela, na altura do polegar, e um toque acidental derrubaria a sessão de quem
+não tem recuperação de senha por e-mail (ADR-013). A confirmação é o próprio
+botão virando "Sair da conta?", não um diálogo. Se a rede cair, a pessoa sai
+assim mesmo — o padrão do `perfil-view`.
+
 ### Abas na URL, num lugar só (SPEC-022 → SPEC-023)
 
 `abas-na-url.tsx` guarda a mecânica que a SPEC-022 criou para `/reservas` e
@@ -226,11 +242,17 @@ quebrar.
 `bottom-nav.tsx` desenha **duas** barras: a do aluno e a do professor
 (`/minhas-turmas` e `/perfil`).
 
-**A do aluno tem três destinos desde a SPEC-022** — `/home`,
-`/minhas-aulas`, `/reservas` — mais o botão saliente "Reservar", que aponta
-para `/reservas?aba=quadras`. Eram cinco colunas para quatro destinos: o
-botão do meio e a aba "Quadras" levavam ao mesmo lugar. Hoje são quatro
-colunas, e o botão é o único caminho de um toque para a aba de quadras.
+**A do aluno tem quatro destinos** — `/home`, `/minhas-aulas`, `/reservas`
+e `/perfil` — em quatro colunas iguais, sem saliência.
+
+O caminho até aqui explica o desenho: eram **cinco colunas para quatro
+destinos** (o botão central e a aba "Quadras" levavam ao mesmo lugar); a
+SPEC-022 reduziu a três itens e manteve o botão; e a **revisão visual em
+produção (2026-08-29) derrubou o botão** — com `/quadras` virando aba dentro
+de `/reservas`, ele deixou de ser atalho para outro lugar e virou uma segunda
+porta para a tela vizinha. `/perfil` desceu do cabeçalho para a vaga que
+sobrou, e com isso caiu o motivo pelo qual ele não cabia ali ("a barra é
+`grid-cols-5` com botão central saliente").
 
 **Antes ela era cega a papel, e isso prendia o professor.** Ele entrava em
 `/perfil` para trocar a própria foto — a única tela que aluno e professor
