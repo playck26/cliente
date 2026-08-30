@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AulasAnteriores } from "./aulas-anteriores";
-import { ApiError } from "@/lib/api-client";
+import { ApiError, type AulaAnterior } from "@/lib/api-client";
 
 /**
  * SPEC-027 — `listAulasAnteriores` passou a devolver `{ data, page, pageSize,
@@ -11,7 +11,7 @@ import { ApiError } from "@/lib/api-client";
  * no envelope. Reescrever 13 chamadas para falar de paginação faria cada
  * prova carregar um detalhe que ela não está julgando.
  */
-const responderCom = (aulas: unknown[]) =>
+const responderCom = (aulas: AulaAnterior[]) =>
   listAulasAnteriores.mockResolvedValue({
     data: aulas,
     page: 1,
@@ -40,7 +40,22 @@ vi.mock("@/lib/api-client", async () => {
   return { ...real, listAulasAnteriores, avaliarAula };
 });
 
-function aula(patch: Record<string, unknown> = {}) {
+/**
+ * **ACHADO 3 DA 3ª VALIDAÇÃO CRUZADA (ALTA) — a fixture agora carrega o
+ * contrato.**
+ *
+ * Era `Record<string, unknown>` entrando e `unknown[]` saindo, e o `tsc`
+ * não tinha como cobrar `naoRealizada` — o campo que decide se esta tela
+ * oferece ou não o formulário de avaliação. Apagar os dois ramos da produção
+ * deixava as 13 provas daqui verdes, e a tela voltava a oferecer
+ * "Avaliar/Mudar minha nota" numa aula que o servidor recusa com
+ * `409 AULA_NAO_REALIZADA`.
+ *
+ * `Partial<AulaAnterior>` no `patch`: o retorno continua sendo uma
+ * `AulaAnterior` completa, e agora é o compilador que garante isso — nenhum
+ * campo novo do contrato pode entrar sem passar por aqui.
+ */
+function aula(patch: Partial<AulaAnterior> = {}): AulaAnterior {
   return {
     ocupacaoId: "o1",
     turmaId: "t1",
@@ -51,6 +66,7 @@ function aula(patch: Record<string, unknown> = {}) {
     horaFim: "19:00",
     minhaNota: null,
     meuComentario: null,
+    naoRealizada: false,
     ...patch,
   };
 }
@@ -95,6 +111,95 @@ describe("a lista", () => {
     expect(
       await screen.findByRole("button", { name: "Avaliar esta aula" }),
     ).toBeInTheDocument();
+  });
+});
+
+/**
+ * **SPEC-030 / achado 3 da 3ª validação cruzada (ALTA) — os dois ramos de
+ * `naoRealizada` não tinham prova nenhuma.**
+ *
+ * A produção ganhou dois `if` nesta tela — o selo "Não realizada" e a
+ * ausência do formulário — e a suíte inteira ficava verde se os dois
+ * sumissem. O aluno voltaria a receber "Avaliar esta aula" numa aula que
+ * não aconteceu, tocaria, e levaria `409 AULA_NAO_REALIZADA` do servidor:
+ * a armadilha do DEF-011, lista que oferece o que o servidor recusa.
+ *
+ * Cada prova daqui vem em par — o caso não realizado e o caso normal —
+ * porque um ramo só provado de um lado passa igual se ele recusar sempre.
+ */
+describe("a aula que não aconteceu (SPEC-030)", () => {
+  it("fica na lista, marcada, e NÃO oferece avaliar", async () => {
+    responderCom([aula({ naoRealizada: true })]);
+    render(<AulasAnteriores />);
+
+    // Fica: `GET /me/classes` só devolve o futuro, então excluí-la daqui a
+    // faria sumir das duas listas do aluno — que pode ter ido até o clube.
+    expect(await screen.findByText("Iniciantes")).toBeInTheDocument();
+    expect(screen.getByText("Não realizada")).toBeInTheDocument();
+    expect(
+      screen.getByText("Esta aula não aconteceu, então não há o que avaliar."),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Avaliar esta aula" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("a aula normal continua oferecendo avaliar, e sem o selo", async () => {
+    responderCom([aula()]);
+    render(<AulasAnteriores />);
+
+    expect(
+      await screen.findByRole("button", { name: "Avaliar esta aula" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Não realizada")).not.toBeInTheDocument();
+  });
+
+  /**
+   * **Julgamento pedido na 3ª rodada, e aceito: a nota antiga fica
+   * invisível enquanto a aula está `nao_houve`, e volta se alguém
+   * reverter.**
+   *
+   * O dado não é apagado — o servidor continua com ele. O que muda é o que
+   * a tela afirma: uma nota exibida ao lado de "não aconteceu" seria a tela
+   * dizendo que o aluno avaliou uma aula que não existiu.
+   */
+  it("aula não realizada esconde a nota antiga em vez de apagá-la", async () => {
+    responderCom([aula({ naoRealizada: true, minhaNota: 4 })]);
+    render(<AulasAnteriores />);
+
+    await screen.findByText("Iniciantes");
+    expect(screen.getByText("Não realizada")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Mudar minha nota" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("revertida, a MESMA nota volta a aparecer", async () => {
+    // O par do julgamento acima: reverter o estado factual torna a
+    // avaliação pertinente de novo, e ela está lá inteira.
+    responderCom([aula({ naoRealizada: false, minhaNota: 4 })]);
+    render(<AulasAnteriores />);
+
+    expect(await screen.findByText("4")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Mudar minha nota" }),
+    ).toBeInTheDocument();
+  });
+
+  it("uma não realizada no meio não afeta as vizinhas", async () => {
+    // A lista mistura os dois casos no uso real. Sem esta, um ramo que
+    // apagasse o formulário da lista INTEIRA passaria nas provas acima.
+    responderCom([
+      aula({ ocupacaoId: "o1", turmaNome: "Chuva", naoRealizada: true }),
+      aula({ ocupacaoId: "o2", turmaNome: "Normal" }),
+    ]);
+    render(<AulasAnteriores />);
+
+    await screen.findByText("Chuva");
+    expect(screen.getByText("Não realizada")).toBeInTheDocument();
+    expect(
+      screen.getAllByRole("button", { name: "Avaliar esta aula" }),
+    ).toHaveLength(1);
   });
 });
 
