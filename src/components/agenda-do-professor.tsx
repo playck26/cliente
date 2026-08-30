@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Circle, Users } from "lucide-react";
 import {
@@ -10,6 +10,7 @@ import {
   type AulaDoDiaDoProfessor,
   type DiaDaAgendaDoProfessor,
 } from "@/lib/api-client";
+import { hojeNoClube } from "@/lib/fuso";
 
 /**
  * SPEC-026 — **o calendário do professor.**
@@ -34,29 +35,16 @@ const MESES = [
 ];
 
 /**
- * **O mês de hoje, no fuso do clube.**
- *
- * Não é `new Date().toISOString()`: o servidor e o navegador podem discordar
- * do dia, e à noite o UTC já virou. É a mesma armadilha que
- * `date-time.util.ts` documenta no backend, e que já derrubou um teste meu.
- * Aqui ela apareceria como o calendário abrindo em outubro no dia 30 de
+ * **O mês de hoje sai de `@/lib/fuso`** — não é `new Date().toISOString()`:
+ * o servidor e o navegador podem discordar do dia, e à noite o UTC já virou.
+ * Aqui isso apareceria como o calendário abrindo em outubro no dia 30 de
  * setembro à noite.
+ *
+ * DEF-020: esta função nasceu **dentro** deste componente, e enquanto ela
+ * morou aqui a tela de reserva continuou errando o mesmo dia com o mesmo
+ * `toISOString()`. Regra certa trancada num componente não protege a tela
+ * ao lado — por isso virou módulo.
  */
-const FUSO = "America/Sao_Paulo";
-
-function hojeNoClube(): { ano: number; mes: number; dia: number } {
-  const [ano, mes, dia] = new Intl.DateTimeFormat("en-CA", {
-    timeZone: FUSO,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  })
-    .format(new Date())
-    .split("-")
-    .map(Number);
-  return { ano, mes, dia };
-}
-
 function chaveDoMes(ano: number, mes: number): string {
   return `${ano}-${String(mes).padStart(2, "0")}`;
 }
@@ -74,32 +62,79 @@ export function AgendaDoProfessor() {
   const [aulas, setAulas] = useState<AulaDoDiaDoProfessor[]>([]);
   const [erro, setErro] = useState<string | null>(null);
   const [carregando, setCarregando] = useState(true);
+  const [aulasCarregando, setAulasCarregando] = useState(false);
+  const [erroDoDia, setErroDoDia] = useState<string | null>(null);
+
+  /**
+   * DEF-021 — **qual pedido de dia ainda vale.**
+   *
+   * Achado 1 da validação cruzada da SPEC-026, e é o tipo de defeito que
+   * nunca aparece em teste manual: o professor toca dia 1, toca dia 2, e a
+   * resposta do dia 1 chega **por último**. O cabeçalho dizia "Aulas de
+   * 02/09" e os cartões embaixo eram os do dia 1 — com links para
+   * `/chamada/:id` das aulas do dia errado.
+   *
+   * O dano não é visual. É o professor **lançando presença na aula errada**,
+   * numa tela que parecia certa. Um contador basta: só a resposta do último
+   * pedido pinta.
+   */
+  const pedidoDoDia = useRef(0);
 
   useEffect(() => {
-    // Sem `setState` síncrono aqui: trocar de mês zera `carregando` e o dia
-    // aberto **no evento** (`mudarMes`), que é onde a decisão acontece.
-    // A regra `react-hooks/set-state-in-effect` está certa, e desligá-la
-    // seria trocar um aviso legítimo por conveniência.
+    // Mesma corrida do dia, uma escala acima: duas setas rápidas e a
+    // resposta do mês anterior pode chegar depois, pintando o calendário
+    // que não está mais na tela. `atual` é o padrão do próprio React para
+    // isso — a limpeza roda antes do efeito seguinte.
+    let atual = true;
     getAgendaDoProfessor(chaveDoMes(ano, mes))
-      .then(setDias)
-      .catch((e: unknown) =>
-        setErro(
-          e instanceof ApiError ? e.message : "Não foi possível carregar.",
-        ),
-      )
-      .finally(() => setCarregando(false));
+      .then((d) => {
+        if (atual) setDias(d);
+      })
+      .catch((e: unknown) => {
+        if (atual)
+          setErro(
+            e instanceof ApiError ? e.message : "Não foi possível carregar.",
+          );
+      })
+      .finally(() => {
+        if (atual) setCarregando(false);
+      });
+    return () => {
+      atual = false;
+    };
   }, [ano, mes]);
 
   function abrirDia(data: string) {
+    // Fechar também invalida o pedido em voo: sem isso, a resposta de um dia
+    // que o professor acabou de fechar reabriria a lista.
+    const meuPedido = ++pedidoDoDia.current;
+
     if (diaAberto === data) {
       setDiaAberto(null);
+      setAulas([]);
+      setAulasCarregando(false);
+      setErroDoDia(null);
       return;
     }
+
     setDiaAberto(data);
     setAulas([]);
+    setAulasCarregando(true);
+    setErroDoDia(null);
+
     void getAulasDoDia(data)
-      .then(setAulas)
-      .catch(() => setAulas([]));
+      .then((r) => {
+        if (pedidoDoDia.current !== meuPedido) return;
+        setAulas(r);
+        setAulasCarregando(false);
+      })
+      .catch(() => {
+        if (pedidoDoDia.current !== meuPedido) return;
+        // Antes isto era `setAulas([])`, e a tela mostrava "Carregando
+        // aulas…" para sempre — falha silenciosa disfarçada de espera.
+        setErroDoDia("Não foi possível carregar as aulas deste dia.");
+        setAulasCarregando(false);
+      });
   }
 
   function mudarMes(passo: number) {
@@ -108,7 +143,14 @@ export function AgendaDoProfessor() {
     // que a virada de ano quebraria à mão, e há prova para os dois lados.
     const novo = new Date(Date.UTC(ano, mes - 1 + passo, 1));
     setCarregando(true);
+    // DEF-021: trocar de mês invalida o pedido de dia em voo. Sem isto, a
+    // resposta de um dia de agosto chegaria depois da troca e abriria uma
+    // lista de aulas embaixo do calendário de setembro.
+    pedidoDoDia.current += 1;
     setDiaAberto(null);
+    setAulas([]);
+    setAulasCarregando(false);
+    setErroDoDia(null);
     setAno(novo.getUTCFullYear());
     setMes(novo.getUTCMonth() + 1);
   }
@@ -231,8 +273,22 @@ export function AgendaDoProfessor() {
 
       {diaAberto && (
         <section className="space-y-3" aria-label={`Aulas de ${diaAberto}`}>
-          {aulas.length === 0 ? (
+          {aulasCarregando ? (
             <p className="text-[13px] font-bold text-[var(--color-text-secondary)]">Carregando aulas…</p>
+          ) : erroDoDia ? (
+            <p
+              role="alert"
+              className="rounded-2xl bg-[var(--color-error)]/10 px-4 py-3 text-[13px] font-bold text-[var(--color-error)]"
+            >
+              {erroDoDia}
+            </p>
+          ) : aulas.length === 0 ? (
+            // Não deveria acontecer — só dias com aula são clicáveis. Mas
+            // "não deveria" já produziu tela em branco antes, e uma frase
+            // custa menos que a dúvida.
+            <p className="text-[13px] font-bold text-[var(--color-text-secondary)]">
+              Nenhuma aula neste dia.
+            </p>
           ) : (
             aulas.map((aula) => (
               /*

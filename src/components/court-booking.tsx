@@ -17,21 +17,29 @@ import {
   type Court,
   type PublicPaymentConfig,
 } from "@/lib/api-client";
+import { hojeNoClubeIso, isoDeOffsetNoClube } from "@/lib/fuso";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 
 const DIAS_SEMANA_CURTO = ["DOM", "SEG", "TER", "QUA", "QUI", "SEX", "SÁB"];
 
-function hojeIso(): string {
-  return new Date().toISOString().slice(0, 10);
+/**
+ * DEF-020 — **as 30 datas, no fuso do clube e por montagem da tela.**
+ *
+ * Duas correções no mesmo lugar:
+ *
+ * 1. **O fuso.** Isto era `new Date().toISOString()`, que converte para UTC:
+ *    das 21h à meia-noite a lista já começava **amanhã**, e quem abria o app
+ *    às 21h30 não conseguia mais reservar os horários que ainda restavam
+ *    hoje. O `isoDeOffset` antigo era pior — somava dias em horário local
+ *    (`getDate()`) e lia em UTC (`toISOString()`), duas convenções em três
+ *    linhas.
+ * 2. **O momento do cálculo.** Era uma constante de módulo, avaliada uma vez
+ *    no import. App deixado aberto atravessava a meia-noite ainda oferecendo
+ *    a lista do dia anterior.
+ */
+function datasDisponiveis(): string[] {
+  return Array.from({ length: 30 }, (_, i) => isoDeOffsetNoClube(i));
 }
-
-function isoDeOffset(diasAPartirDeHoje: number): string {
-  const data = new Date();
-  data.setDate(data.getDate() + diasAPartirDeHoje);
-  return data.toISOString().slice(0, 10);
-}
-
-const DATAS_DISPONIVEIS = Array.from({ length: 30 }, (_, i) => isoDeOffset(i));
 
 function labelDoDia(iso: string): { dia: string; numero: string } {
   const [ano, mes, dia] = iso.split("-").map(Number);
@@ -50,7 +58,9 @@ export function CourtBooking({ id }: { id: string }) {
   const router = useRouter();
   const [quadra, setQuadra] = useState<Court | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [data, setData] = useState(hojeIso());
+  const [data, setData] = useState(() => hojeNoClubeIso());
+  // Resolvidas na montagem, não no import: ver `datasDisponiveis`.
+  const [datasDaGrade] = useState(datasDisponiveis);
   const [availability, setAvailability] = useState<Availability | null>(null);
   const [availLoading, setAvailLoading] = useState(true);
   const [availError, setAvailError] = useState<string | null>(null);
@@ -180,7 +190,7 @@ export function CourtBooking({ id }: { id: string }) {
                 <h2 className="text-xl font-extrabold">Escolha a data</h2>
               </div>
               <div className="no-scrollbar -mx-5 flex gap-2 overflow-x-auto px-5 pb-1">
-                {DATAS_DISPONIVEIS.map((iso, index) => {
+                {datasDaGrade.map((iso, index) => {
                   const { dia, numero } = labelDoDia(iso);
                   const selecionado = iso === data;
                   return (
