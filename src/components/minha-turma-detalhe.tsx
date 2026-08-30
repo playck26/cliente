@@ -201,13 +201,21 @@ export function MinhaTurmaDetalheView({ id }: { id: string }) {
                           <span
                             className={`text-xs font-semibold ${o.podeLancar ? "text-[var(--color-primary-strong)]" : "text-[var(--color-text-secondary)]"}`}
                           >
+                            {/* SPEC-030 — `nao_houve` vem ANTES de
+                                `chamadaFeita`, e tem que vir: uma aula não
+                                realizada tem cabeçalho e zero presenças,
+                                então cairia em "chamada feita · 0/5" — a
+                                contagem sugeriria que o professor lançou uma
+                                chamada vazia, que é o oposto do que houve. */}
                             {o.cancelada
                               ? "aula cancelada"
-                              : o.chamadaFeita
-                                ? `chamada feita · ${o.marcados}/${o.totalAlunos}`
-                                : o.podeLancar
-                                  ? "fazer chamada"
-                                  : "ainda não aconteceu"}
+                              : o.estado === "nao_houve"
+                                ? "aula não realizada"
+                                : o.chamadaFeita
+                                  ? `chamada feita · ${o.marcados}/${o.totalAlunos}`
+                                  : o.podeLancar
+                                    ? "fazer chamada"
+                                    : "ainda não aconteceu"}
                           </span>
                         </CardContent>
                       </Card>

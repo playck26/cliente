@@ -464,3 +464,39 @@ describe("SPEC-027 — aula futura não cobra chamada", () => {
     expect(screen.queryByLabelText(/sem chamada/)).not.toBeInTheDocument();
   });
 });
+
+// TEST (SPEC-030) — o estado que apaga o ponto vermelho.
+//
+// Era este dia que ficava "Chamada pendente" para sempre: a aula existia na
+// grade, nao aconteceu, e o produto nao tinha como registrar isso. O badge
+// precisa ser NEUTRO — o vermelho quer dizer "voce esqueceu", e aqui o
+// professor respondeu.
+describe("SPEC-030 — aula nao realizada no calendario", () => {
+  it("mostra 'Aula não realizada', e nao cai no fallback de 'Ainda não começou'", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-09-15T12:00:00.000Z"));
+    getAgendaDoProfessor.mockResolvedValue([
+      { data: "2026-09-01", aulas: 1, pendentes: 0 },
+    ]);
+    getAulasDoDia.mockResolvedValue([
+      {
+        ocupacaoId: "ocup-3",
+        turmaId: "t1",
+        turmaNome: "Infantil A",
+        quadraNome: "Quadra 1",
+        horaInicio: "09:00",
+        horaFim: "10:00",
+        chamada: "nao_houve",
+      },
+    ]);
+
+    render(<AgendaDoProfessor />);
+    fireEvent.click(await screen.findByLabelText("1: 1 aula"));
+
+    expect(await screen.findByText("Aula não realizada")).toBeInTheDocument();
+    // O fallback do badge e neutro de proposito; sem o estado registrado,
+    // uma aula do mes passado apareceria como "Ainda não começou".
+    expect(screen.queryByText("Ainda não começou")).not.toBeInTheDocument();
+    expect(screen.queryByText("Chamada pendente")).not.toBeInTheDocument();
+  });
+});

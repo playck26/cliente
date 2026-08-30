@@ -11,6 +11,7 @@ import {
   ApiError,
   getChamada,
   salvarChamada,
+  registrarNaoHouveAula,
   type Chamada,
   type StatusPresenca,
 } from "@/lib/api-client";
@@ -119,9 +120,51 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
     }
   }
 
+  /**
+   * SPEC-030 — **registrar que a aula não aconteceu.**
+   *
+   * Confirmação explícita antes de mandar. É a única ação desta tela que não
+   * é um toque reversível: as outras marcam presença e podem ser
+   * remarcadas até salvar, esta grava direto. E ela responde por todos os
+   * alunos de uma vez.
+   */
+  async function naoHouveAula() {
+    if (!chamada) return;
+    if (
+      !window.confirm(
+        "Registrar que esta aula NÃO aconteceu?\n\n" +
+          "Ela sai da lista de chamadas pendentes e não conta na frequência " +
+          "de ninguém. Você pode desfazer lançando a chamada normalmente.",
+      )
+    ) {
+      return;
+    }
+    setErro(null);
+    setConflito(false);
+    setSalvando(true);
+    try {
+      await registrarNaoHouveAula(chamada.ocupacaoId);
+      // Relê em vez de remendar o estado local: o servidor é quem sabe a
+      // `versao` nova, e ela é o que permite desfazer sem levar 409.
+      setChamada(await getChamada(chamada.ocupacaoId));
+      setMarcas({});
+      setSalvo(false);
+    } catch (err) {
+      setErro(
+        err instanceof ApiError
+          ? err.message
+          : "Não foi possível registrar. Tente de novo.",
+      );
+    } finally {
+      setSalvando(false);
+    }
+  }
+
   const marcados = Object.keys(marcas).length;
   const total = chamada?.alunos.length ?? 0;
   const faltamMarcar = total - marcados;
+  /** SPEC-030 — alguém já declarou que esta aula não aconteceu. */
+  const naoHouve = chamada?.completude === "nao_houve";
   // INV-026: o servidor recusa chamada incompleta. A tela impede antes de a
   // pessoa tentar, porque descobrir isso por erro de rede, em quadra, é o
   // pior momento possível.
@@ -176,6 +219,18 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
             Esta chamada foi lançada antes de o app exigir a lista completa,
             então pode estar pela metade. Confira todos os alunos e salve de
             novo para deixá-la fechada.
+          </p>
+        ) : null}
+
+        {/* SPEC-030 — o estado, e o caminho de volta junto com ele. Dizer
+            "não aconteceu" sem dizer como desfazer transformaria um engano
+            de toque em um dia perdido. */}
+        {naoHouve ? (
+          <p className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-high)] p-3 text-sm">
+            <strong>Esta aula está registrada como não realizada.</strong> Ela
+            não aparece mais como chamada pendente e não conta na frequência
+            de ninguém. Se foi engano, marque os alunos abaixo e salve — a
+            chamada normal volta a valer.
           </p>
         ) : null}
 
@@ -283,6 +338,22 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
               onClick={marcarTodosPresentes}
             >
               Todos vieram
+            </Button>
+          ) : null}
+          {/* SPEC-030 — some quando a aula JÁ está marcada como não
+              realizada: repetir a ação não faria nada, e um botão que não
+              faz nada ensina a desconfiar dos outros. Some também quando o
+              professor já marcou alguém, porque aí a resposta dele é outra —
+              e o servidor recusaria com `CHAMADA_COM_PRESENCA`. */}
+          {!naoHouve && marcados === 0 ? (
+            <Button
+              type="button"
+              variant="ghost"
+              className="min-h-11 w-full text-[var(--color-text-secondary)]"
+              disabled={salvando}
+              onClick={() => void naoHouveAula()}
+            >
+              A aula não aconteceu
             </Button>
           ) : null}
         </div>
