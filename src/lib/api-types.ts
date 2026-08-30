@@ -2023,6 +2023,8 @@ export interface components {
             horaFim: string;
             cancelada: boolean;
             chamadaFeita: boolean;
+            /** @enum {string} */
+            estado: "futura" | "em_andamento" | "pendente" | "feita" | "legada" | "nao_houve" | "cancelada";
             /** @example Carlos Lima */
             registradoPor: string | null;
             alunos: components["schemas"]["AlunoNoHistoricoResponseDto"][];
