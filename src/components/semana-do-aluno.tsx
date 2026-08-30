@@ -178,10 +178,22 @@ export function SemanaDoAluno({ aulas }: { aulas: MyClass[] }) {
                 ) : (
                   doDia.map((aula) => (
                     <div key={aula.ocupacaoId} className="min-w-0">
-                      <p className="truncate text-[14px] font-extrabold text-[var(--color-text-primary)]">
+                      <p
+                        className={`truncate text-[14px] font-extrabold ${aula.naoRealizada ? "text-[var(--color-text-secondary)] line-through" : "text-[var(--color-text-primary)]"}`}
+                      >
                         {aula.horaInicio}–{aula.horaFim} ·{" "}
                         {aula.turmaNome ?? "Turma"}
                       </p>
+                      {/* SPEC-030 / achado 1 da 2ª validação cruzada — esta
+                          vista ignorava `naoRealizada` e mostrava a aula
+                          como qualquer outra. O risco: o aluno se organiza
+                          pela semana e vai ao clube numa aula que o gestor já
+                          marcou como não realizada. */}
+                      {aula.naoRealizada ? (
+                        <p className="mt-0.5 text-[12px] font-extrabold text-[var(--color-text-secondary)]">
+                          Aula não realizada
+                        </p>
+                      ) : null}
                       <p className="mt-0.5 flex items-center gap-1.5 text-[12px] font-semibold text-[var(--color-text-secondary)]">
                         <TennisCourtIcon
                           className="size-3.5 shrink-0"

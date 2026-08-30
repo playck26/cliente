@@ -197,15 +197,34 @@ function AulaCard({
           </p>
         </div>
 
-        {aula.minhaNota !== null && (
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--color-secondary-container)] px-2.5 py-1 text-[11px] font-extrabold text-[var(--color-primary-strong)]">
-            <Star className="size-3.5 fill-current" aria-hidden="true" />
-            {aula.minhaNota}
+        {/* SPEC-030 / achado 1 da 2ª validação cruzada — a aula não realizada
+            FICA na lista, marcada. A primeira correção a excluía, e como
+            `GET /me/classes` só devolve o futuro, ela sumia das duas listas do
+            aluno, que pode ter ido até o clube. O selo vem antes da nota
+            porque, quando a aula não aconteceu, a nota deixou de significar
+            alguma coisa sobre ela. */}
+        {aula.naoRealizada ? (
+          <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--color-surface-container-high)] px-2.5 py-1 text-[11px] font-extrabold text-[var(--color-text-secondary)]">
+            Não realizada
           </span>
+        ) : (
+          aula.minhaNota !== null && (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--color-secondary-container)] px-2.5 py-1 text-[11px] font-extrabold text-[var(--color-primary-strong)]">
+              <Star className="size-3.5 fill-current" aria-hidden="true" />
+              {aula.minhaNota}
+            </span>
+          )
         )}
       </div>
 
-      {aberta ? (
+      {/* Não oferece o formulário: o servidor recusaria com
+          `409 AULA_NAO_REALIZADA`, e os dois lados precisam concordar — lista
+          que oferece o que o servidor recusa é a armadilha do DEF-011. */}
+      {aula.naoRealizada ? (
+        <p className="mt-4 text-[13px] font-semibold text-[var(--color-text-secondary)]">
+          Esta aula não aconteceu, então não há o que avaliar.
+        </p>
+      ) : aberta ? (
         <div className="mt-4">
           <Estrelas nota={nota} onEscolher={setNota} />
 

@@ -189,3 +189,58 @@ describe("ChamadaView — a aula não aconteceu (SPEC-030)", () => {
     );
   });
 });
+
+// **ACHADO 3 DA 2ª VALIDAÇÃO CRUZADA (MÉDIA)** — o estado da tela depois do
+// `salvar`. A prova anterior terminava conferindo que o mock foi chamado;
+// não julgava o que a tela passava a mostrar.
+describe("ChamadaView — a tela depois de salvar (SPEC-030)", () => {
+  beforeEach(() => {
+    getChamadaMock.mockReset();
+    salvarChamadaMock.mockReset();
+    naoHouveMock.mockReset();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("o botão SOME depois de salvar — o servidor já recusaria", async () => {
+    getChamadaMock.mockResolvedValue(chamadaCom(["Ana"]));
+    salvarChamadaMock.mockResolvedValue({ versao: "1:99", total: 1 });
+    render(<ChamadaView ocupacaoId="oc1" />);
+
+    await screen.findByText("Ana");
+    fireEvent.click(screen.getAllByRole("button", { name: "Veio" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Salvar chamada" }));
+
+    await waitFor(() => expect(salvarChamadaMock).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("button", { name: "A aula não aconteceu" }),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
+  it("DESFAZER `nao_houve` pelo PUT normal tira o aviso da tela", async () => {
+    // Era o pior dos dois: o professor desfazia e a tela continuava dizendo
+    // "registrada como não realizada" — a mensagem contrária ao que ele
+    // acabara de fazer — até recarregar.
+    getChamadaMock.mockResolvedValue(
+      chamadaCom(["Ana"], { completude: "nao_houve" }),
+    );
+    salvarChamadaMock.mockResolvedValue({ versao: "1:99", total: 1 });
+    render(<ChamadaView ocupacaoId="oc1" />);
+
+    await screen.findByText("Ana");
+    expect(screen.getByText(/registrada como não realizada/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Veio" })[0]);
+    fireEvent.click(screen.getByRole("button", { name: "Salvar chamada" }));
+
+    await waitFor(() =>
+      expect(
+        screen.queryByText(/registrada como não realizada/i),
+      ).not.toBeInTheDocument(),
+    );
+  });
+});

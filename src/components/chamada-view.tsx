@@ -105,7 +105,29 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
       // A versão nova volta do servidor: sem atualizá-la, o próximo salvar
       // desta mesma tela bateria de frente com a INV-019 e daria 409 contra
       // a própria escrita anterior.
-      setChamada({ ...chamada, versao: res.versao });
+      //
+      // **SPEC-030 / achado 3 da 2ª validação cruzada (MÉDIA).** Só a versão
+      // era atualizada, e o resto da tela ficava no estado ANTERIOR ao
+      // salvamento. Duas consequências, as duas silenciosas:
+      //
+      // 1. o botão "A aula não aconteceu" continuava visível, embora o
+      //    servidor já fosse recusá-lo com `CHAMADA_COM_PRESENCA`;
+      // 2. ao desfazer uma aula `nao_houve` por este caminho, a tela seguia
+      //    dizendo "registrada como não realizada" até recarregar — o
+      //    professor via a mensagem contrária ao que acabara de fazer.
+      //
+      // Não relê do servidor: **sabemos exatamente o que foi gravado**, e um
+      // GET a mais na pior rede do produto (em quadra) não paga o que já
+      // temos em mãos.
+      setChamada({
+        ...chamada,
+        versao: res.versao,
+        completude: "completa",
+        alunos: chamada.alunos.map((a) => ({
+          ...a,
+          status: marcas[a.alunoId] ?? a.status,
+        })),
+      });
       setSalvo(true);
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
