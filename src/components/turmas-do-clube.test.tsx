@@ -236,33 +236,56 @@ describe("a nota da turma", () => {
     expect(screen.getByLabelText("Ainda sem nota")).toBeInTheDocument();
   });
 
-  it("abaixo do mínimo, diz QUANTAS faltam — não esconde a contagem", async () => {
-    // "Ainda sem nota" faria a pessoa achar que ninguém avaliou, quando há
-    // duas avaliações esperando a terceira.
+  /**
+   * **SPEC-028 — estas duas provas foram INVERTIDAS, e o motivo fica junto.**
+   *
+   * Elas exigiam o contrário: que a média NÃO aparecesse com 2 avaliações, e
+   * que a tela dissesse "2 de 3 avaliações". Era o mínimo de 3 (D4 da
+   * SPEC-025), removido por decisão do Israel em 2026-08-30 — ele viu a tela e
+   * perguntou *"o que seria 2 de 3 aval?"*.
+   *
+   * Invertidas em vez de apagadas: quem abrir o `git log` daqui a seis meses
+   * vai encontrar uma prova que dizia o oposto, e precisa achar o porquê no
+   * mesmo lugar.
+   *
+   * **O que se perdeu:** o mínimo era privacidade. Com uma nota, a média É
+   * aquela nota. Sinalizado a ele antes; decisão dele.
+   */
+  it("com 2 avaliações, a média APARECE — antes era escondida", async () => {
     listTurmasDisponiveis.mockResolvedValue([turma()]);
-    getMediaDaTurma.mockResolvedValue({
-      media: null,
-      quantidade: 2,
-      minimoParaMedia: 3,
-    });
+    getMediaDaTurma.mockResolvedValue({ media: 4.5, quantidade: 2 });
     render(<TurmasDoClube />);
 
-    expect(await screen.findByText("2 de 3 avaliações")).toBeInTheDocument();
+    expect(await screen.findByText("4,5")).toBeInTheDocument();
+    expect(screen.getByText("(2)")).toBeInTheDocument();
+    // E a contagem some do lugar onde ela fingia ser nota.
+    expect(screen.queryByText(/de 3 avaliações/)).not.toBeInTheDocument();
   });
 
-  it("a média NÃO aparece abaixo do mínimo — o D4 continua valendo", async () => {
-    // O servidor já manda `media: null`; esta prova garante que a tela não
-    // inventa uma média a partir da contagem.
+  it("com UMA avaliação também — é o caso que custa a privacidade", async () => {
+    // Explícito de propósito: numa turma de dois alunos, esta média é a nota
+    // de um deles, e o professor sabe de quem. Está aqui para ninguém achar
+    // que foi descuido.
     listTurmasDisponiveis.mockResolvedValue([turma()]);
-    getMediaDaTurma.mockResolvedValue({
-      media: null,
-      quantidade: 2,
-      minimoParaMedia: 3,
-    });
+    getMediaDaTurma.mockResolvedValue({ media: 2, quantidade: 1 });
+    render(<TurmasDoClube />);
+
+    expect(await screen.findByText("2,0")).toBeInTheDocument();
+    expect(
+      screen.getByLabelText("Nota 2,0 de 5, em 1 avaliação"),
+    ).toBeInTheDocument();
+  });
+
+  it("as estrelas preenchem PROPORCIONALMENTE, não arredondado", async () => {
+    // O defeito anterior: `n <= Math.round(nota)` desenhava a MESMA imagem
+    // para 4,3 e 4,4. Agora a largura da fileira dourada é a nota / 5.
+    listTurmasDisponiveis.mockResolvedValue([turma()]);
+    getMediaDaTurma.mockResolvedValue({ media: 3.5, quantidade: 4 });
     const { container } = render(<TurmasDoClube />);
 
-    await screen.findByText("2 de 3 avaliações");
-    expect(container.textContent).not.toMatch(/\d,\d/);
+    await screen.findByText("3,5");
+    const dourada = container.querySelector<HTMLElement>("[style*='width']");
+    expect(dourada?.style.width).toBe("70%");
   });
 
   it("enquanto a média não chega, não desenha meia estrela", async () => {

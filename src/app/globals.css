@@ -41,6 +41,13 @@
   --color-error: #ed0040;
   --color-success: #009c3f;
   --color-warning: #b8862e;
+  /* SPEC-028 — o dourado das estrelas de avaliacao.
+     Token proprio, e nao `--color-secondary` (#00bd90, verde-agua) nem
+     `--color-warning` (#b8862e, ambar escuro de aviso): estrela de nota nao e
+     nem cor de marca nem alerta, e o Israel pediu dourado explicitamente.
+     #e8a317 tem contraste suficiente sobre o fundo claro e sobre o
+     `secondary-container`, que sao os dois lugares onde a estrela aparece. */
+  --color-rating: #e8a317;
   --color-border: #dee3db;
   --color-court-dark: #11160f;
   --color-court-clay: #b9673b;
