@@ -75,7 +75,20 @@ page.tsx (server component, fino)
 | Server state | `useState` + `useEffect` por tela, via `lib/api-client.ts` |
 | Sessão | `lib/auth-storage.ts` — access token em `localStorage`; refresh em cookie `httpOnly` |
 | UI local | `useState` no componente |
+| **Aba e vista** | **na URL** (`?aba=`, `?vista=`), não em `useState` |
 | Global | **não existe** |
+
+**A URL guarda o que a pessoa escolheu ver.** `abas-na-url.tsx` (aba) e o
+`useVista` de `my-classes-list.tsx` (lista × semana) seguem a mesma regra: link
+compartilhável, "voltar" que desfaz a troca, valor desconhecido cai no padrão
+em silêncio, e **o padrão sai do endereço** — endereço limpo é o que a pessoa
+copia. Quem escreve preserva o resto da query em vez de reescrevê-la.
+
+**Data e hora saem de `lib/fuso.ts`, nunca de `new Date().toISOString()`**
+(DEF-020). `toISOString()` converte para UTC, e no Brasil isso já é o dia
+seguinte das 21h à meia-noite — a tela de reserva pulava o dia de hoje. O
+gate `lib/fuso.test.ts` varre `src/` e recusa quem calcular "hoje" fora
+daquele arquivo.
 
 **Nada de global**, mesma situação do `admin`. O token fica em
 `localStorage` (`auth-storage.ts`); o refresh token é cookie `httpOnly` que
