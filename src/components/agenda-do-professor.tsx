@@ -384,6 +384,21 @@ function EstadoDaChamada({ estado }: { estado: string }) {
       texto: "Chamada antiga",
       classe: "bg-[var(--color-court-dark)]/10 text-[var(--color-text-secondary)]",
     },
+    /*
+      SPEC-030 — a aula que não aconteceu. **Neutro, nunca vermelho:** o
+      vermelho quer dizer "você esqueceu", e aqui o professor não esqueceu de
+      nada — ele respondeu. Era exatamente este dia que ficava pendente para
+      sempre, porque o produto não tinha como registrar chuva.
+
+      Sem o estado aqui, o `nao_houve` cairia no fallback e a aula apareceria
+      como "Ainda não começou" — errado, e do jeito mais confuso possível
+      numa aula do mês passado.
+    */
+    nao_houve: {
+      texto: "Aula não realizada",
+      classe:
+        "bg-[var(--color-surface-container-high)] text-[var(--color-text-secondary)]",
+    },
   };
   /*
     Fallback NEUTRO, não `pendente`. Se o servidor um dia mandar um estado

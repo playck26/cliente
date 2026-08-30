@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, CalendarDays, Check, CircleSlash, Minus, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,7 @@ import {
   ApiError,
   getChamada,
   salvarChamada,
+  registrarNaoHouveAula,
   type Chamada,
   type StatusPresenca,
 } from "@/lib/api-client";
@@ -50,6 +51,30 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
   const [erro, setErro] = useState<string | null>(null);
   const [conflito, setConflito] = useState(false);
   const [salvo, setSalvo] = useState(false);
+  /**
+   * **SPEC-030 / achado 2 da 3ª validação cruzada (MÉDIA) — o rascunho que a
+   * tela dava por salvo.**
+   *
+   * Salvar manda a chamada inteira e leva o tempo da pior rede do produto.
+   * Nesse meio-tempo os botões de cada aluno continuam vivos — de propósito:
+   * travar a tela em quadra, com sinal ruim, seria pior. Só que a resposta
+   * chegava e a tela dizia "Salvo" ao lado da marca NOVA, a que o servidor
+   * nunca recebeu. O professor lia "Salvo" sobre "Faltou" e ia embora com
+   * "Veio" gravado.
+   *
+   * Um contador em `ref`, e não em `state`, porque o que se compara é o
+   * valor no instante do envio contra o valor no instante da resposta —
+   * `state` capturado no fechamento daria justamente a fotografia velha que
+   * criou o defeito.
+   */
+  const edicoes = useRef(0);
+  /**
+   * SPEC-030 / achado 4 da 4ª validação cruzada — o `nao-houve` gravou, mas
+   * a releitura não voltou. A tela não sabe o estado novo e **sabe que não
+   * sabe**: some com a ação em vez de oferecê-la de novo sobre uma escrita
+   * que já aconteceu.
+   */
+  const [releituraFalhou, setReleituraFalhou] = useState(false);
 
   useEffect(() => {
     getChamada(ocupacaoId)
@@ -71,6 +96,13 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
   }, [ocupacaoId]);
 
   function marcar(alunoId: string, status: StatusPresenca) {
+    // **Achado 5 da 4ª validação cruzada (BAIXA) — interação não é
+    // alteração.** Era `edicoes.current += 1` seco: tocar de novo em "Veio"
+    // no aluno que já estava "Veio" contava como edição, e o botão voltava
+    // de "Salvo" para "Salvar chamada" anunciando um rascunho pendente que
+    // não existe. Em quadra, toque repetido é o normal — a pessoa confere.
+    if (marcas[alunoId] === status) return;
+    edicoes.current += 1;
     setSalvo(false);
     setMarcas((atual) => ({ ...atual, [alunoId]: status }));
   }
@@ -82,6 +114,10 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
    */
   function marcarTodosPresentes() {
     if (!chamada) return;
+    // Mesma regra do `marcar`: se todos já estão presentes, o atalho não
+    // altera nada e não pode sujar o estado de "Salvo".
+    if (chamada.alunos.every((a) => marcas[a.alunoId] === "presente")) return;
+    edicoes.current += 1;
     setSalvo(false);
     setMarcas(
       Object.fromEntries(
@@ -95,8 +131,12 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
     setErro(null);
     setConflito(false);
     setSalvando(true);
+    // O retrato do que está saindo. Tudo o que a resposta afirmar vale sobre
+    // ESTE conjunto, não sobre o que a tela mostrar quando ela chegar.
+    const enviadas = marcas;
+    const edicoesNoEnvio = edicoes.current;
     try {
-      const itens = Object.entries(marcas).map(([alunoId, status]) => ({
+      const itens = Object.entries(enviadas).map(([alunoId, status]) => ({
         alunoId,
         status,
       }));
@@ -104,8 +144,38 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
       // A versão nova volta do servidor: sem atualizá-la, o próximo salvar
       // desta mesma tela bateria de frente com a INV-019 e daria 409 contra
       // a própria escrita anterior.
-      setChamada({ ...chamada, versao: res.versao });
-      setSalvo(true);
+      //
+      // **SPEC-030 / achado 3 da 2ª validação cruzada (MÉDIA).** Só a versão
+      // era atualizada, e o resto da tela ficava no estado ANTERIOR ao
+      // salvamento. Duas consequências, as duas silenciosas:
+      //
+      // 1. o botão "A aula não aconteceu" continuava visível, embora o
+      //    servidor já fosse recusá-lo com `CHAMADA_COM_PRESENCA`;
+      // 2. ao desfazer uma aula `nao_houve` por este caminho, a tela seguia
+      //    dizendo "registrada como não realizada" até recarregar — o
+      //    professor via a mensagem contrária ao que acabara de fazer.
+      //
+      // Não relê do servidor: **sabemos exatamente o que foi gravado**, e um
+      // GET a mais na pior rede do produto (em quadra) não paga o que já
+      // temos em mãos.
+      setChamada({
+        ...chamada,
+        versao: res.versao,
+        completude: "completa",
+        alunos: chamada.alunos.map((a) => ({
+          ...a,
+          status: enviadas[a.alunoId] ?? a.status,
+        })),
+      });
+      // **Achado 2 da 3ª validação cruzada (MÉDIA).** Era `setSalvo(true)`
+      // seco. Se a pessoa marcou alguém enquanto o PUT estava no ar, o que
+      // está na tela não é o que o servidor gravou — e "Salvo" ao lado da
+      // marca nova é a tela afirmando uma coisa falsa sobre o servidor.
+      //
+      // Não desfaz o rascunho e não bloqueia: o botão volta a "Salvar
+      // chamada", que é a verdade (há mudança pendente) e o caminho
+      // (toque de novo).
+      setSalvo(edicoes.current === edicoesNoEnvio);
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
         setConflito(true);
@@ -119,9 +189,96 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
     }
   }
 
+  /**
+   * SPEC-030 — **registrar que a aula não aconteceu.**
+   *
+   * Confirmação explícita antes de mandar. É a única ação desta tela que não
+   * é um toque reversível: as outras marcam presença e podem ser
+   * remarcadas até salvar, esta grava direto. E ela responde por todos os
+   * alunos de uma vez.
+   */
+  async function naoHouveAula() {
+    if (!chamada) return;
+    if (
+      !window.confirm(
+        "Registrar que esta aula NÃO aconteceu?\n\n" +
+          "Ela sai da lista de chamadas pendentes e não conta na frequência " +
+          "de ninguém. Você pode desfazer lançando a chamada normalmente.",
+      )
+    ) {
+      return;
+    }
+    setErro(null);
+    setConflito(false);
+    setSalvando(true);
+    const edicoesNoEnvio = edicoes.current;
+    try {
+      await registrarNaoHouveAula(chamada.ocupacaoId);
+    } catch (err) {
+      setErro(
+        err instanceof ApiError
+          ? err.message
+          : "Não foi possível registrar. Tente de novo.",
+      );
+      setSalvando(false);
+      return;
+    }
+
+    // **Achado 4 da 4ª validação cruzada (MÉDIA) — a escrita já aconteceu, e
+    // daqui para baixo NADA pode dizer o contrário.**
+    //
+    // O `try` era um só, em volta do PUT e da releitura. Quando a rede caía
+    // só no GET — que é o caso comum em quadra, porque são duas idas —, a
+    // tela mostrava "Não foi possível registrar", conservava o estado
+    // anterior e voltava a oferecer a ação. **O servidor tinha registrado.**
+    // O professor tocaria de novo, e o segundo toque encontraria a aula já
+    // marcada.
+    //
+    // Um erro que nega uma escrita confirmada é pior que erro nenhum: ele
+    // manda a pessoa desfazer o que deu certo.
+    try {
+      // Relê porque o servidor é quem sabe a `versao` nova, e ela é o que
+      // permite desfazer sem levar 409.
+      setChamada(await getChamada(chamada.ocupacaoId));
+      // Mesma corrida do `salvar`, do outro lado: limpar as marcas apagaria,
+      // em silêncio, o que a pessoa tocou enquanto a requisição estava no
+      // ar. Só limpa se ninguém tocou em nada — e aí não há o que perder.
+      if (edicoes.current === edicoesNoEnvio) setMarcas({});
+      setSalvo(false);
+    } catch {
+      // A releitura falhou, e só ela. Diz o que é verdade: está registrado,
+      // e o que está na tela pode estar velho.
+      setErro(
+        "Registrado. Não foi possível atualizar a tela — recarregue para ver " +
+          "o estado atual.",
+      );
+      setReleituraFalhou(true);
+    } finally {
+      setSalvando(false);
+    }
+  }
+
   const marcados = Object.keys(marcas).length;
   const total = chamada?.alunos.length ?? 0;
   const faltamMarcar = total - marcados;
+  /** SPEC-030 — alguém já declarou que esta aula não aconteceu. */
+  const naoHouve = chamada?.completude === "nao_houve";
+  /**
+   * **SPEC-030 / achado 3 da validação cruzada (MÉDIA).**
+   *
+   * A condição do botão era `marcados === 0`, e `marcados` conta as marcas
+   * LOCAIS. Um toque errado em "Veio" — sem salvar nada — fazia o botão
+   * sumir, e como `marcar()` só adiciona, **não havia como desmarcar**: o
+   * caminho de "a aula não aconteceu" ficava perdido até recarregar a
+   * página, em quadra, com sinal ruim.
+   *
+   * Agora a condição é o SERVIDOR: só some quando há presença de fato
+   * gravada. É também o que o servidor recusa (`CHAMADA_COM_PRESENCA`) — a
+   * tela deixou de esconder por conta própria o que a API ainda aceitaria.
+   */
+  const temPresencaSalva = Boolean(
+    chamada?.alunos.some((a) => a.status !== null),
+  );
   // INV-026: o servidor recusa chamada incompleta. A tela impede antes de a
   // pessoa tentar, porque descobrir isso por erro de rede, em quadra, é o
   // pior momento possível.
@@ -176,6 +333,18 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
             Esta chamada foi lançada antes de o app exigir a lista completa,
             então pode estar pela metade. Confira todos os alunos e salve de
             novo para deixá-la fechada.
+          </p>
+        ) : null}
+
+        {/* SPEC-030 — o estado, e o caminho de volta junto com ele. Dizer
+            "não aconteceu" sem dizer como desfazer transformaria um engano
+            de toque em um dia perdido. */}
+        {naoHouve ? (
+          <p className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-high)] p-3 text-sm">
+            <strong>Esta aula está registrada como não realizada.</strong> Ela
+            não aparece mais como chamada pendente e não conta na frequência
+            de ninguém. Se foi engano, marque os alunos abaixo e salve — a
+            chamada normal volta a valer.
           </p>
         ) : null}
 
@@ -283,6 +452,24 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
               onClick={marcarTodosPresentes}
             >
               Todos vieram
+            </Button>
+          ) : null}
+          {/* SPEC-030 — some quando a aula JÁ está marcada como não
+              realizada: repetir a ação não faria nada, e um botão que não
+              faz nada ensina a desconfiar dos outros. Some também quando há
+              presença **salva**, porque aí o servidor recusaria com
+              `CHAMADA_COM_PRESENCA`. Marca local não conta: ela é
+              reversível, e sumir com o botão por causa dela deixava o
+              professor sem saída (achado 3 da validação cruzada). */}
+          {!naoHouve && !temPresencaSalva && !releituraFalhou ? (
+            <Button
+              type="button"
+              variant="ghost"
+              className="min-h-11 w-full text-[var(--color-text-secondary)]"
+              disabled={salvando}
+              onClick={() => void naoHouveAula()}
+            >
+              A aula não aconteceu
             </Button>
           ) : null}
         </div>

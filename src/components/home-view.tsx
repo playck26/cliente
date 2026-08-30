@@ -90,7 +90,18 @@ export function HomeView() {
   }, []);
 
   const primeiroNome = usuario?.nome.split(" ")[0];
-  const proximaAula = aulas[0] ?? null;
+  /**
+   * **SPEC-030 / achado 1 da 2ª validação cruzada.**
+   *
+   * Era `aulas[0]`, e a lista vem ordenada por data — então uma aula já
+   * marcada como NÃO REALIZADA podia ocupar o destaque "Próxima aula" na
+   * primeira tela do app. O aluno se organizaria por ela.
+   *
+   * A aula não some da lista completa (ela continua em "Minhas aulas",
+   * marcada): o que ela deixa de fazer é **ser chamada de próxima**, porque
+   * não vai acontecer.
+   */
+  const proximaAula = aulas.find((a) => !a.naoRealizada) ?? null;
 
   return (
     <main className="app-screen min-h-screen overflow-hidden bg-background pb-36">

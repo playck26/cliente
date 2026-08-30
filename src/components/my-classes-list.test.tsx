@@ -38,6 +38,7 @@ const aula = {
   data: "2026-09-02",
   horaInicio: "18:00",
   horaFim: "19:00",
+  naoRealizada: false,
 };
 
 beforeEach(() => {
@@ -137,5 +138,34 @@ describe("qual vista é mostrada", () => {
     render(<MyClassesList />);
 
     expect(await screen.findByLabelText("Próximas aulas")).toBeInTheDocument();
+  });
+});
+
+// TEST (SPEC-030 / achado 2 da validação cruzada, ALTA) — o aluno vê que a
+// aula não aconteceu.
+//
+// A dúvida 2 da spec decidiu isso e o campo nunca foi criado: em "Próximas" a
+// aula seguia como "Agendada", e no dia seguinte sumia das "Anteriores"
+// (`aulasAnteriores` filtra `nao_houve` para não oferecer avaliação). O aluno
+// pode ter ido até o clube, e o produto nunca lhe dizia o que houve.
+describe("SPEC-030 — a aula não realizada, na vista do aluno", () => {
+  it("mostra 'Não realizada' no lugar de 'Agendada'", async () => {
+    listMyClasses.mockResolvedValue([{ ...aula, naoRealizada: true }]);
+
+    render(<MyClassesList />);
+
+    expect(await screen.findByText("Não realizada")).toBeInTheDocument();
+    expect(screen.queryByText("Agendada")).not.toBeInTheDocument();
+  });
+
+  it("a aula normal continua dizendo 'Agendada'", async () => {
+    // O par negativo: sem ele, um selo que dissesse "Não realizada" sempre
+    // passaria na prova acima.
+    listMyClasses.mockResolvedValue([aula]);
+
+    render(<MyClassesList />);
+
+    expect(await screen.findByText("Agendada")).toBeInTheDocument();
+    expect(screen.queryByText("Não realizada")).not.toBeInTheDocument();
   });
 });

@@ -25,6 +25,10 @@ const aula = (patch: Record<string, unknown> = {}) => ({
   data: "2026-09-02",
   horaInicio: "18:00",
   horaFim: "19:00",
+  // SPEC-030: campo obrigatório no contrato do aluno. O `tsc` cobrou esta
+  // fixture, que é o comportamento desejado — contrato novo não pode entrar
+  // sem que quem monta payload de teste seja obrigado a decidir o valor.
+  naoRealizada: false,
   ...patch,
 });
 
@@ -139,5 +143,29 @@ describe("navegar entre semanas", () => {
     fireEvent.click(screen.getByText("Voltar para esta semana"));
 
     expect(screen.getByText("30/08 – 05/09")).toBeInTheDocument();
+  });
+});
+
+// **ACHADO 1 DA 2ª VALIDAÇÃO CRUZADA (ALTA)** — esta vista ignorava
+// `naoRealizada`.
+//
+// O risco não é cosmético: o aluno se organiza pela semana. Uma aula que o
+// gestor já marcou como não realizada aparecia como qualquer outra, e ele iria
+// ao clube.
+//
+// A prova que faltava era exatamente esta — e é a que o validador escreveu e
+// viu cair.
+describe("SPEC-030 — a aula não realizada na Semana", () => {
+  it("marca a aula, em vez de mostrá-la como normal", () => {
+    render(<SemanaDoAluno aulas={[aula({ naoRealizada: true })]} />);
+
+    expect(screen.getByText("Aula não realizada")).toBeInTheDocument();
+  });
+
+  it("a aula normal continua sem marca nenhuma", () => {
+    // O par negativo: sem ele, marcar TUDO passaria na prova acima.
+    render(<SemanaDoAluno aulas={[aula()]} />);
+
+    expect(screen.queryByText("Aula não realizada")).not.toBeInTheDocument();
   });
 });

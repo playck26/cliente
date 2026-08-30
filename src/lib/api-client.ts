@@ -518,6 +518,36 @@ export async function salvarChamada(
 }
 
 /**
+ * SPEC-030 — **a aula não aconteceu.**
+ *
+ * Choveu, o professor ficou doente, o clube fechou: a aula existe na grade e
+ * não houve. Antes disto o produto não tinha resposta para esse dia, e o
+ * calendário ficava com o ponto vermelho de "chamada pendente" **para
+ * sempre** — o professor só conseguia zerar mentindo que deu a aula.
+ *
+ * **Sem corpo, de propósito.** A rota inteira é a afirmação. Mandar isto
+ * como um campo no `salvarChamada` faria "salvei com zero alunos" e "a aula
+ * não aconteceu" viajarem pelo mesmo caminho, que é exatamente a confusão
+ * que a SPEC-015 já pagou uma vez para desfazer.
+ *
+ * **Não é cancelar a aula.** Cancelar libera a quadra e é do gestor sobre a
+ * grade; isto só diz o que aconteceu (LIM-030b).
+ *
+ * `versao` não entra: não há o que sobrescrever de outra aba — o servidor
+ * recusa se houver presença lançada (`CHAMADA_COM_PRESENCA`), e é essa
+ * recusa que protege o trabalho de quem chegou primeiro.
+ */
+export async function registrarNaoHouveAula(
+  ocupacaoId: string,
+): Promise<{ ocupacaoId: string; completude: string }> {
+  const res = await authFetch(
+    `/me/teacher/attendance/${ocupacaoId}/nao-houve`,
+    { method: "PUT" },
+  );
+  return (await res.json()) as { ocupacaoId: string; completude: string };
+}
+
+/**
  * SPEC-026 — o resumo do mes do professor: por dia, quantas aulas e quantas
  * com chamada pendente.
  *
