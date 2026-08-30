@@ -53,6 +53,35 @@ export function MyBookingsList() {
       // SPEC-027: o `.filter` de canceladas saiu daqui e foi para o servidor
       // (`excluirCanceladas=true`). Filtrar no cliente depois de paginar faria
       // uma página de 20 mostrar 12 itens com o rodapé dizendo "1–20 de 47".
+      /**
+       * **A página em que estou ainda existe?** (validação cruzada da
+       * SPEC-027, achado 1.)
+       *
+       * Cenário: 21 reservas ativas, a pessoa está na página 2 e cancela a
+       * única que há ali. O servidor passa a responder `page=2, total=20,
+       * data=[]` — e a tela, que decide o estado vazio por
+       * `bookings.length === 0`, dizia **"Nenhuma reserva ainda"** e escondia
+       * a paginação. Com 20 reservas vivas na página 1.
+       *
+       * Cancelar é a única ação desta tela que ENCOLHE a lista, e por isso o
+       * defeito é só dela — em "aulas anteriores" avaliar não remove nada.
+       *
+       * Corrigido no dono do dado, não no controle: a `Paginacao` recebe
+       * números prontos e não tem como saber que a página sumiu. E `total`
+       * cobre o encolhimento de várias páginas de uma vez, o que
+       * `pagina - 1` não cobriria.
+       */
+      const ultimaPagina = Math.max(
+        1,
+        Math.ceil(bookingsResult.total / bookingsResult.pageSize),
+      );
+      if (pagina > ultimaPagina) {
+        // `loading` continua ligado de propósito: o efeito vai recarregar, e
+        // desligar aqui pintaria o vazio falso por um quadro.
+        setPagina(ultimaPagina);
+        return;
+      }
+
       setBookings(
         [...bookingsResult.data].sort((a, b) =>
           (a.data + a.horaInicio).localeCompare(b.data + b.horaInicio),
@@ -61,9 +90,9 @@ export function MyBookingsList() {
       setTotal(bookingsResult.total);
       setTamanho(bookingsResult.pageSize);
       setCourts(courtsResult.data);
+      setLoading(false);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Não foi possível carregar suas reservas.");
-    } finally {
       setLoading(false);
     }
   }
