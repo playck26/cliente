@@ -483,9 +483,21 @@ export type Ocorrencia =
  */
 export type Chamada = components["schemas"]["ChamadaResponseDto"];
 
-export async function listOcorrencias(turmaId: string, dias = 30): Promise<Ocorrencia[]> {
-  const res = await authFetch(`/me/teacher/classes/${turmaId}/ocorrencias?dias=${dias}`);
-  return (await res.json()) as Ocorrencia[];
+/**
+ * SPEC-027 — paginada. `dias` e `page` coexistem de propósito: `dias` diz
+ * QUANTO histórico existe (teto de 90 no servidor), `page` diz quanto vem por
+ * vez. Trocar uma pela outra perderia a metade útil.
+ */
+export async function listOcorrencias(
+  turmaId: string,
+  dias = 30,
+  page = 1,
+  pageSize = 20,
+): Promise<Paginated<Ocorrencia>> {
+  const res = await authFetch(
+    `/me/teacher/classes/${turmaId}/ocorrencias?dias=${dias}&page=${page}&pageSize=${pageSize}`,
+  );
+  return (await res.json()) as Paginated<Ocorrencia>;
 }
 
 export async function getChamada(ocupacaoId: string): Promise<Chamada> {
@@ -589,9 +601,14 @@ export async function registrarAceite(versoes: {
  * "ainda nao avaliei" de "dei 4", e uma segunda requisicao por aula seria
  * uma por linha da lista.
  */
-export async function listAulasAnteriores(): Promise<AulaAnterior[]> {
-  const res = await authFetch("/me/classes/anteriores");
-  return (await res.json()) as AulaAnterior[];
+export async function listAulasAnteriores(
+  page = 1,
+  pageSize = 20,
+): Promise<Paginated<AulaAnterior>> {
+  const res = await authFetch(
+    `/me/classes/anteriores?page=${page}&pageSize=${pageSize}`,
+  );
+  return (await res.json()) as Paginated<AulaAnterior>;
 }
 
 /** SPEC-025 — avalia ou corrige a nota de UMA aula. */
@@ -661,8 +678,21 @@ export async function createBooking(dto: {
   return (await res.json()) as { reservas: Booking[] };
 }
 
-export async function listMyBookings(): Promise<Paginated<Booking>> {
-  const res = await authFetch("/bookings?pageSize=100");
+/**
+ * SPEC-027 — paginada de verdade.
+ *
+ * Era `?pageSize=100`, que é paginação desligada com outro nome: cem reservas
+ * de uma vez, e a lista quebraria em silêncio na centésima primeira. E o
+ * filtro de canceladas passou para o servidor (`excluirCanceladas`) — a tela
+ * filtrava depois de receber, e com paginação isso faria a contagem mentir.
+ */
+export async function listMyBookings(
+  page = 1,
+  pageSize = 20,
+): Promise<Paginated<Booking>> {
+  const res = await authFetch(
+    `/bookings?page=${page}&pageSize=${pageSize}&excluirCanceladas=true`,
+  );
   return (await res.json()) as Paginated<Booking>;
 }
 

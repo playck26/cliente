@@ -4,6 +4,23 @@ import { AulasAnteriores } from "./aulas-anteriores";
 import { ApiError } from "@/lib/api-client";
 
 /**
+ * SPEC-027 — `listAulasAnteriores` passou a devolver `{ data, page, pageSize,
+ * total }`.
+ *
+ * As provas continuam escrevendo **a lista de aulas**, e este helper embrulha
+ * no envelope. Reescrever 13 chamadas para falar de paginação faria cada
+ * prova carregar um detalhe que ela não está julgando.
+ */
+const responderCom = (aulas: unknown[]) =>
+  listAulasAnteriores.mockResolvedValue({
+    data: aulas,
+    page: 1,
+    pageSize: 20,
+    total: aulas.length,
+  });
+
+
+/**
  * SPEC-025 — as provas da tela em que o aluno avalia a aula.
  *
  * Duas delas guardam decisões que a tela poderia trair em silêncio: o
@@ -45,7 +62,7 @@ beforeEach(() => {
 
 describe("a lista", () => {
   it("mostra a aula com data, horário e quadra", async () => {
-    listAulasAnteriores.mockResolvedValue([aula()]);
+    responderCom([aula()]);
     render(<AulasAnteriores />);
 
     expect(await screen.findByText("Iniciantes")).toBeInTheDocument();
@@ -55,14 +72,14 @@ describe("a lista", () => {
   });
 
   it("sem aulas, explica em vez de mostrar lista vazia", async () => {
-    listAulasAnteriores.mockResolvedValue([]);
+    responderCom([]);
     render(<AulasAnteriores />);
 
     expect(await screen.findByText("Nenhuma aula ainda")).toBeInTheDocument();
   });
 
   it("aula já avaliada mostra a própria nota, e o botão muda de texto", async () => {
-    listAulasAnteriores.mockResolvedValue([aula({ minhaNota: 4 })]);
+    responderCom([aula({ minhaNota: 4 })]);
     render(<AulasAnteriores />);
 
     expect(await screen.findByText("4")).toBeInTheDocument();
@@ -72,7 +89,7 @@ describe("a lista", () => {
   });
 
   it("aula não avaliada convida a avaliar", async () => {
-    listAulasAnteriores.mockResolvedValue([aula()]);
+    responderCom([aula()]);
     render(<AulasAnteriores />);
 
     expect(
@@ -85,7 +102,7 @@ describe("a aula NÃO tem média — decisão do Israel", () => {
   it("nada na tela mostra média de aula", async () => {
     // "As aulas não têm média, mas as avaliações das aulas influenciam a
     // média da turma." Uma média aqui seria o produto contradizendo isso.
-    listAulasAnteriores.mockResolvedValue([aula({ minhaNota: 4 })]);
+    responderCom([aula({ minhaNota: 4 })]);
     const { container } = render(<AulasAnteriores />);
 
     await screen.findByText("Iniciantes");
@@ -96,7 +113,7 @@ describe("a aula NÃO tem média — decisão do Israel", () => {
 
 describe("avaliar", () => {
   it("exige escolher uma estrela antes de habilitar o envio", async () => {
-    listAulasAnteriores.mockResolvedValue([aula()]);
+    responderCom([aula()]);
     render(<AulasAnteriores />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Avaliar esta aula" }));
@@ -105,7 +122,7 @@ describe("avaliar", () => {
   });
 
   it("manda a nota escolhida", async () => {
-    listAulasAnteriores.mockResolvedValue([aula()]);
+    responderCom([aula()]);
     render(<AulasAnteriores />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Avaliar esta aula" }));
@@ -121,7 +138,7 @@ describe("avaliar", () => {
   });
 
   it("comentário em branco não vira string vazia", async () => {
-    listAulasAnteriores.mockResolvedValue([aula()]);
+    responderCom([aula()]);
     render(<AulasAnteriores />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Avaliar esta aula" }));
@@ -140,7 +157,7 @@ describe("avaliar", () => {
   });
 
   it("abre preenchida quando já havia nota", async () => {
-    listAulasAnteriores.mockResolvedValue([
+    responderCom([
       aula({ minhaNota: 3, meuComentario: "Foi ok" }),
     ]);
     render(<AulasAnteriores />);
@@ -154,7 +171,7 @@ describe("avaliar", () => {
   });
 
   it("erro do servidor aparece com a mensagem dele", async () => {
-    listAulasAnteriores.mockResolvedValue([aula()]);
+    responderCom([aula()]);
     avaliarAula.mockRejectedValue(
       new ApiError(409, "Você pode avaliar esta aula a partir do dia seguinte.", "AULA_NAO_TERMINOU"),
     );
@@ -184,7 +201,7 @@ describe("REQ-008 — o aviso de que não é anônima", () => {
    * com "antes de escrever".
    */
   it("vem ANTES do campo de texto, não depois", async () => {
-    listAulasAnteriores.mockResolvedValue([aula()]);
+    responderCom([aula()]);
     render(<AulasAnteriores />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Avaliar esta aula" }));
@@ -202,7 +219,7 @@ describe("REQ-008 — o aviso de que não é anônima", () => {
   });
 
   it("e também antes do botão de enviar", async () => {
-    listAulasAnteriores.mockResolvedValue([aula()]);
+    responderCom([aula()]);
     render(<AulasAnteriores />);
 
     fireEvent.click(await screen.findByRole("button", { name: "Avaliar esta aula" }));
@@ -219,7 +236,7 @@ describe("REQ-008 — o aviso de que não é anônima", () => {
   });
 
   it("e some junto com o formulário, porque só vale ali", async () => {
-    listAulasAnteriores.mockResolvedValue([aula()]);
+    responderCom([aula()]);
     render(<AulasAnteriores />);
 
     expect(

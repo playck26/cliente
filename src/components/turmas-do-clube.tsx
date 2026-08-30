@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Star, Users } from "lucide-react";
+import { Check, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { NotaDaTurma } from "@/components/nota-da-turma";
 import {
   ApiError,
   entrarNaTurma,
@@ -233,75 +234,6 @@ export function TurmasDoClube() {
             );
           })}
         </section>
-      )}
-    </div>
-  );
-}
-
-/**
- * **A nota da turma, em estrelas** — pedido do Israel ao ver a tela.
- *
- * A primeira versão só mostrava um selo com o número, **e só quando havia
- * média**. Resultado: turma nenhuma exibia nada, porque nenhuma tinha as três
- * avaliações do mínimo. A informação existia e a tela não a apresentava.
- *
- * **O mínimo de 3 continua valendo** (D4 da SPEC-025, e ele é de privacidade
- * antes de estatística): abaixo dele a média não é publicada. O que mudou é
- * que a linha **sempre aparece** — e, sem média, ela diz o que falta em vez
- * de sumir. Estrela vazia é informação; ausência de estrela é dúvida.
- */
-function NotaDaTurma({ media }: { media?: MediaDaTurma }) {
-  // Ainda carregando: não desenha nada. Meia estrela piscando é pior que
-  // esperar meio segundo.
-  if (!media) return null;
-
-  const nota = media.media;
-  const temNota = nota !== null;
-
-  return (
-    <div className="mt-1.5 flex items-center gap-1.5">
-      <span
-        className="inline-flex items-center gap-0.5"
-        aria-label={
-          temNota
-            ? `Nota ${nota!.toLocaleString("pt-BR", { minimumFractionDigits: 1 })} de 5, em ${media.quantidade} avaliações`
-            : "Ainda sem nota"
-        }
-      >
-        {[1, 2, 3, 4, 5].map((n) => (
-          <Star
-            key={n}
-            className={`size-3.5 ${
-              temNota && n <= Math.round(nota!)
-                ? "fill-[var(--color-secondary)] text-[var(--color-secondary)]"
-                : "text-[var(--color-text-secondary)]/35"
-            }`}
-            aria-hidden="true"
-          />
-        ))}
-      </span>
-
-      {temNota ? (
-        <span className="text-[12px] font-extrabold text-[var(--color-primary-strong)]">
-          {nota!.toLocaleString("pt-BR", {
-            minimumFractionDigits: 1,
-            maximumFractionDigits: 1,
-          })}
-          <span className="ml-1 font-bold text-[var(--color-text-secondary)]">
-            ({media.quantidade})
-          </span>
-        </span>
-      ) : (
-        /*
-          Sem média, a tela diz POR QUE — e não some. "Ainda sem nota" faria
-          a pessoa achar que ninguém avaliou, quando pode haver duas
-          avaliações esperando a terceira.
-        */
-        <span className="text-[12px] font-bold text-[var(--color-text-secondary)]">
-          {media.quantidade === 0
-            ? "Ainda sem avaliações"
-            : `${media.quantidade} de ${media.minimoParaMedia} avaliações`}
-        </span>
       )}
     </div>
   );

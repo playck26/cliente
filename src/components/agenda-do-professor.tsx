@@ -290,16 +290,20 @@ export function AgendaDoProfessor() {
               Nenhuma aula neste dia.
             </p>
           ) : (
-            aulas.map((aula) => (
+            aulas.map((aula) => {
               /*
-                REQ-003 — do dia à chamada em um toque. `/chamada/:id` já
-                existe desde a SPEC-014; esta tela só precisava levar até lá.
+                SPEC-027 — **aula futura nao vira link.**
+
+                O pedido do Israel foi "nem com possibilidade de realizar
+                chamada". Deixar o cartao clicavel e barrar so no `PUT`
+                cumpriria a regra e trairia a pessoa: ela abriria a chamada,
+                marcaria os alunos e levaria 422 no fim, com o trabalho
+                perdido. O caminho tem que nao existir.
+
+                O servidor barra do mesmo jeito (INV-017 + `aulaJaComecou`) —
+                isto aqui e a metade honesta, aquela e a metade segura.
               */
-              <Link
-                key={aula.ocupacaoId}
-                href={`/chamada/${aula.ocupacaoId}`}
-                className="block rounded-3xl bg-surface p-4 shadow-[var(--shadow-low)] ring-1 ring-border transition-transform active:scale-[0.99]"
-              >
+              const cartao = (
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h3 className="truncate text-[15px] font-extrabold text-foreground">
@@ -312,8 +316,33 @@ export function AgendaDoProfessor() {
                   </div>
                   <EstadoDaChamada estado={aula.chamada} />
                 </div>
-              </Link>
-            ))
+              );
+
+              const moldura =
+                "block rounded-3xl bg-surface p-4 shadow-[var(--shadow-low)] ring-1 ring-border";
+
+              if (aula.chamada === "futura") {
+                return (
+                  <div key={aula.ocupacaoId} className={moldura}>
+                    {cartao}
+                  </div>
+                );
+              }
+
+              /*
+                REQ-003 — do dia à chamada em um toque. `/chamada/:id` já
+                existe desde a SPEC-014; esta tela só precisava levar até lá.
+              */
+              return (
+                <Link
+                  key={aula.ocupacaoId}
+                  href={`/chamada/${aula.ocupacaoId}`}
+                  className={`${moldura} transition-transform active:scale-[0.99]`}
+                >
+                  {cartao}
+                </Link>
+              );
+            })
           )}
         </section>
       )}
@@ -328,6 +357,20 @@ export function AgendaDoProfessor() {
  */
 function EstadoDaChamada({ estado }: { estado: string }) {
   const estilo: Record<string, { texto: string; classe: string }> = {
+    /*
+      SPEC-027 — os dois estados novos, e o pedido do Israel foi literal:
+      "a aula que ainda não aconteceu não deve ficar com chamada pendente".
+      Ele viu o app marcando pendência numa aula de 31/08 no dia 29.
+    */
+    futura: {
+      texto: "Ainda não começou",
+      classe:
+        "bg-[var(--color-surface-container)] text-[var(--color-text-secondary)]",
+    },
+    em_andamento: {
+      texto: "Aula em andamento",
+      classe: "bg-[var(--color-secondary)]/25 text-[var(--color-primary-strong)]",
+    },
     pendente: {
       texto: "Chamada pendente",
       classe: "bg-[var(--color-error)]/10 text-[var(--color-error)]",
@@ -342,7 +385,12 @@ function EstadoDaChamada({ estado }: { estado: string }) {
       classe: "bg-[var(--color-court-dark)]/10 text-[var(--color-text-secondary)]",
     },
   };
-  const { texto, classe } = estilo[estado] ?? estilo.pendente;
+  /*
+    Fallback NEUTRO, não `pendente`. Se o servidor um dia mandar um estado
+    que esta versão do app não conhece, pintar de vermelho seria acusar o
+    professor de esquecimento por causa de um deploy fora de ordem.
+  */
+  const { texto, classe } = estilo[estado] ?? estilo.futura;
 
   return (
     <span

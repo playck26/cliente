@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Paginacao } from "@/components/paginacao";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -45,6 +46,15 @@ export function MinhaTurmaDetalheView({ id }: { id: string }) {
   const [turma, setTurma] = useState<MinhaTurmaDetalhe | null>(null);
   const [ocorrencias, setOcorrencias] = useState<Ocorrencia[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [pagina, setPagina] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [tamanho, setTamanho] = useState(20);
+  const [ocorrenciasCarregando, setOcorrenciasCarregando] = useState(true);
+
+  const trocarPagina = (nova: number) => {
+    setOcorrenciasCarregando(true);
+    setPagina(nova);
+  };
 
   useEffect(() => {
     getMinhaTurma(id)
@@ -56,12 +66,36 @@ export function MinhaTurmaDetalheView({ id }: { id: string }) {
             : "Não foi possível carregar a turma.",
         );
       });
+  }, [id]);
+
+  /**
+   * SPEC-027 — as ocorrências viraram lista paginada.
+   *
+   * Era a lista mais longa do painel do professor: uma turma de 3x por semana
+   * enche 38 linhas na janela padrão de 30 dias, e ele rolava tudo para achar
+   * a aula de ontem.
+   *
+   * Efeito separado do da turma **de propósito**: trocar de página não deve
+   * rebuscar a turma nem piscar o cabeçalho.
+   */
+  useEffect(() => {
     // Falha aqui não derruba a tela: a lista de alunos continua útil sem as
     // ocorrências, e a chamada é a parte que pode esperar um retry.
-    listOcorrencias(id)
-      .then(setOcorrencias)
-      .catch(() => setOcorrencias([]));
-  }, [id]);
+    //
+    // Sem `setState` síncrono aqui: quem marca "carregando" é `trocarPagina`,
+    // no evento, que é onde a decisão acontece. A regra
+    // `react-hooks/set-state-in-effect` está certa, e desligá-la seria trocar
+    // um aviso legítimo por conveniência — foi o que a SPEC-026 já decidiu na
+    // agenda do professor.
+    listOcorrencias(id, 30, pagina)
+      .then((r) => {
+        setOcorrencias(r.data);
+        setTotal(r.total);
+        setTamanho(r.pageSize);
+      })
+      .catch(() => setOcorrencias([]))
+      .finally(() => setOcorrenciasCarregando(false));
+  }, [id, pagina]);
 
   return (
     <div className="app-screen flex min-h-full flex-col bg-[var(--color-background)]">
@@ -199,6 +233,15 @@ export function MinhaTurmaDetalheView({ id }: { id: string }) {
                     );
                   })}
                 </ul>
+
+                <Paginacao
+                  page={pagina}
+                  pageSize={tamanho}
+                  total={total}
+                  ocupado={ocorrenciasCarregando}
+                  onMudar={trocarPagina}
+                  rotulo="aulas e chamadas"
+                />
               </>
             ) : null}
 

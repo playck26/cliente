@@ -16,10 +16,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import {
   ApiError,
   getMe,
+  getMediaDaTurma,
   listMinhasTurmas,
+  type MediaDaTurma,
   type MinhaTurma,
   type Usuario,
 } from "@/lib/api-client";
+import { NotaDaTurma } from "@/components/nota-da-turma";
 
 /**
  * SPEC-013 — a grade do professor.
@@ -55,12 +58,25 @@ export function MinhasTurmasView({ abas }: { abas?: React.ReactNode } = {}) {
   const [turmas, setTurmas] = useState<MinhaTurma[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * As médias, buscadas em paralelo DEPOIS da grade — a nota é informação
+   * secundária, e segurar a tela esperando por ela faria o professor esperar
+   * mais para ver o que veio ver.
+   */
+  const [medias, setMedias] = useState<Record<string, MediaDaTurma>>({});
 
   useEffect(() => {
     Promise.all([getMe(), listMinhasTurmas()])
       .then(([usuarioData, turmasData]) => {
         setUsuario(usuarioData);
         setTurmas(turmasData);
+        // Cada uma por sua conta: a falha de uma média não pode derrubar a
+        // grade. Mesmo padrão de `turmas-do-clube`.
+        for (const t of turmasData) {
+          void getMediaDaTurma(t.id)
+            .then((m) => setMedias((atual) => ({ ...atual, [t.id]: m })))
+            .catch(() => undefined);
+        }
       })
       .catch((err: unknown) => {
         setError(
@@ -217,6 +233,20 @@ export function MinhasTurmasView({ abas }: { abas?: React.ReactNode } = {}) {
                             {turma.totalAlunos}/{turma.capacidade}
                           </span>
                         </span>
+                        {/*
+                          Pedido do Israel (2026-08-30): "as turmas devem
+                          apresentar as avaliações, se tiver".
+
+                          O professor vê a MÉDIA, e só ela — sem autoria e sem
+                          comentário (INV-025a). Quem escreveu o quê é do
+                          painel admin, e essa decisão não muda por ele ser o
+                          professor da turma: justamente por ser, saber quem
+                          deu nota baixa mudaria a relação com o aluno.
+
+                          Buscadas fora da lista, uma por turma, e a falha de
+                          uma não derruba a grade — que é o que ele veio ver.
+                        */}
+                        <NotaDaTurma media={medias[turma.id]} />
                       </div>
                       <ChevronRight
                         className="size-5 shrink-0 text-[var(--color-primary-strong)]"

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Paginacao } from "@/components/paginacao";
 import { CalendarDays, CreditCard, MessageCircle, WalletCards } from "lucide-react";
 import { CapaDaQuadra } from "@/components/capa-da-quadra";
 import { CourtLines } from "@/components/court-lines";
@@ -40,17 +41,25 @@ export function MyBookingsList() {
   const [error, setError] = useState<string | null>(null);
   const [cancelingId, setCancelingId] = useState<string | null>(null);
   const [pagamentoAbertoId, setPagamentoAbertoId] = useState<string | null>(null);
+  const [pagina, setPagina] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [tamanho, setTamanho] = useState(20);
 
   async function load() {
     setLoading(true);
     setError(null);
     try {
-      const [bookingsResult, courtsResult] = await Promise.all([listMyBookings(), listCourts()]);
+      const [bookingsResult, courtsResult] = await Promise.all([listMyBookings(pagina), listCourts()]);
+      // SPEC-027: o `.filter` de canceladas saiu daqui e foi para o servidor
+      // (`excluirCanceladas=true`). Filtrar no cliente depois de paginar faria
+      // uma página de 20 mostrar 12 itens com o rodapé dizendo "1–20 de 47".
       setBookings(
-        bookingsResult.data
-          .filter((booking) => booking.statusPagamento !== "cancelado")
-          .sort((a, b) => (a.data + a.horaInicio).localeCompare(b.data + b.horaInicio)),
+        [...bookingsResult.data].sort((a, b) =>
+          (a.data + a.horaInicio).localeCompare(b.data + b.horaInicio),
+        ),
       );
+      setTotal(bookingsResult.total);
+      setTamanho(bookingsResult.pageSize);
       setCourts(courtsResult.data);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Não foi possível carregar suas reservas.");
@@ -62,6 +71,11 @@ export function MyBookingsList() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagina]);
+
+  useEffect(() => {
+    // A config de pagamento não muda com a página — buscar uma vez.
     getPublicPaymentConfig().then(setPaymentConfig).catch(() => undefined);
   }, []);
 
@@ -211,6 +225,15 @@ export function MyBookingsList() {
                 </article>
               );
             })}
+
+            <Paginacao
+              page={pagina}
+              pageSize={tamanho}
+              total={total}
+              ocupado={loading}
+              onMudar={setPagina}
+              rotulo="minhas reservas"
+            />
           </section>
         )}
       </div>

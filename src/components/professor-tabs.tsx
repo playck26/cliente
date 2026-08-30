@@ -17,9 +17,16 @@ import {
  * O pedido do Israel era *"Calendário → Turma → Alunos → Presença"*, e as
  * três últimas já existiam desde a SPEC-014. Faltava a primeira.
  *
- * **A Agenda é a aba PADRÃO, e isso é o pedido, não preferência minha.** Ele
- * pediu que o professor comece escolhendo o dia — antes ele começava
- * escolhendo a turma. Quem quiser a lista de turmas continua a um toque.
+ * **A ordem mudou em 2026-08-30, a pedido do Israel: "Minhas turmas" vem
+ * primeiro, à esquerda.** Com ela vem a aba padrão — a primeira à esquerda é
+ * o que a barra comunica como início, e uma barra cuja primeira aba não é a
+ * que abre confunde sem ganhar nada.
+ *
+ * O que estava escrito aqui antes, e vale registrar porque era uma decisão
+ * dele também: a Agenda tinha virado padrão na SPEC-026 para que o professor
+ * começasse escolhendo o **dia**, e não a turma. Isso não se perdeu — a
+ * Agenda continua a um toque, e o `?aba=agenda` na URL segue abrindo direto
+ * nela.
  *
  * **`papel="professor"` literal na barra**, como já fazia a
  * `minhas-turmas-view`: esta área é dele por definição, o servidor não deixa
@@ -29,13 +36,13 @@ import {
  */
 
 const ABAS = [
-  { id: "agenda", rotulo: "Agenda" },
   { id: "turmas", rotulo: "Minhas turmas" },
-] as const satisfies readonly AbaDaTela<"agenda" | "turmas">[];
+  { id: "agenda", rotulo: "Agenda" },
+] as const satisfies readonly AbaDaTela<"turmas" | "agenda">[];
 
 type AbaId = (typeof ABAS)[number]["id"];
 
-export const ABA_PADRAO_DO_PROFESSOR: AbaId = "agenda";
+export const ABA_PADRAO_DO_PROFESSOR: AbaId = "turmas";
 
 export function normalizarAbaDoProfessor(valor: string | null): AbaId {
   return normalizarAba(ABAS, ABA_PADRAO_DO_PROFESSOR, valor);

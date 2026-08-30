@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Paginacao } from "@/components/paginacao";
 import { CalendarDays, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,10 +44,29 @@ export function AulasAnteriores() {
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [abertaId, setAbertaId] = useState<string | null>(null);
+  /**
+   * SPEC-027 — paginação, a pedido do Israel.
+   *
+   * Esta era a lista do aluno que mais crescia: 90 dias de histórico de quem
+   * treina 3x por semana já passam de 35 cartões, e **cada cartão carrega um
+   * formulário de avaliação** — 35 formulários montados de uma vez num
+   * celular.
+   */
+  const [pagina, setPagina] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [tamanho, setTamanho] = useState(20);
 
-  const carregar = () =>
-    listAulasAnteriores()
-      .then(setAulas)
+  const carregar = (p = pagina) =>
+    listAulasAnteriores(p)
+      .then((r) => {
+        setAulas(r.data);
+        setTotal(r.total);
+        setTamanho(r.pageSize);
+        // Fechar o cartão aberto ao trocar de página: ele pertence à lista
+        // anterior, e deixar aberto por `id` faria um formulário meio
+        // preenchido reaparecer sobre outra aula.
+        setAbertaId(null);
+      })
       .catch((e: unknown) =>
         setErro(
           e instanceof ApiError ? e.message : "Não foi possível carregar.",
@@ -55,10 +75,16 @@ export function AulasAnteriores() {
       .finally(() => setCarregando(false));
 
   useEffect(() => {
-    void carregar();
+    void carregar(pagina);
     // `carregar` fora das dependências: ela é recriada a cada render e
     // entraria em laço. Mesmo padrão das outras listas deste app.
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagina]);
+
+  const irParaPagina = (nova: number) => {
+    setCarregando(true);
+    setPagina(nova);
+  };
 
   if (carregando) {
     return (
@@ -104,10 +130,22 @@ export function AulasAnteriores() {
               }
               onAvaliada={() => {
                 setAbertaId(null);
-                void carregar();
+                // Recarrega a MESMA página: avaliar não muda a ordenação nem
+                // a contagem, e voltar para a página 1 tiraria a pessoa de
+                // onde ela estava.
+                void carregar(pagina);
               }}
             />
           ))}
+
+          <Paginacao
+            page={pagina}
+            pageSize={tamanho}
+            total={total}
+            ocupado={carregando}
+            onMudar={irParaPagina}
+            rotulo="aulas anteriores"
+          />
         </section>
       )}
     </div>

@@ -166,13 +166,30 @@ export function HomeView() {
           </section>
         )}
 
-        <section aria-label="Atalhos" className="grid grid-cols-4 gap-3">
+        {/*
+          Pedido do Israel (2026-08-30): esta faixa ficava solta entre o
+          cartão da próxima aula e o da agenda, com ícones pequenos sobre o
+          fundo da página — quatro cartõezinhos brancos perdidos entre dois
+          cartões brancos maiores.
+
+          Agora é uma **faixa só**, com fundo próprio, que é o que a separa
+          dos cartões vizinhos. O fundo verde-claro (`secondary-container`) é
+          o mesmo token que já marca destaque no app, e os círculos brancos
+          por cima ganham contraste em vez de sumir.
+
+          Ícones de 20px para 26px, e o rótulo subiu de 11px para 12px: eram
+          alvos de toque pequenos demais para a coisa mais usada da tela.
+        */}
+        <section
+          aria-label="Atalhos"
+          className="grid grid-cols-4 gap-2 rounded-3xl bg-[var(--color-secondary-container)] px-3 py-4"
+        >
           {ATALHOS.map(({ href, label, Icon }) => (
             <Link key={label} href={href} className="group flex min-w-0 flex-col items-center gap-2 text-center">
-              <span className="flex size-12 items-center justify-center rounded-2xl bg-surface text-[var(--color-primary-strong)] shadow-[var(--shadow-low)] ring-1 ring-border transition-transform group-active:scale-95">
-                <Icon className="size-5" strokeWidth={2.25} aria-hidden="true" />
+              <span className="flex size-14 items-center justify-center rounded-2xl bg-surface text-[var(--color-primary-strong)] shadow-[var(--shadow-low)] transition-transform group-active:scale-95">
+                <Icon className="size-[26px]" strokeWidth={2.25} aria-hidden="true" />
               </span>
-              <span className="w-full text-[11px] font-bold text-[var(--color-text-secondary)]">{label}</span>
+              <span className="w-full text-[12px] font-extrabold text-[var(--color-primary-strong)]">{label}</span>
             </Link>
           ))}
         </section>
