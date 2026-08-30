@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { CalendarDays, Clock } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { CalendarDays, CalendarRange, Clock, List } from "lucide-react";
 import { TennisCourtIcon } from "@/components/icons/tennis-court-icon";
 import { CourtLines } from "@/components/court-lines";
 import { TennisBallIcon } from "@/components/icons/tennis-ball-icon";
+import { SemanaDoAluno } from "@/components/semana-do-aluno";
 import { ApiError, listMyClasses, type MyClass } from "@/lib/api-client";
 
 const DIAS_SEMANA = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
@@ -15,11 +17,44 @@ function formatarData(data: string): string {
   return `${diaSemana}, ${String(dia).padStart(2, "0")}/${String(mes).padStart(2, "0")}`;
 }
 
+/**
+ * SPEC-029 — **a vista mora na URL**, como as abas (`abas-na-url.tsx`).
+ *
+ * Mesmo raciocínio, e ele já está escrito lá: link compartilhável, "voltar"
+ * que desfaz a troca, e a vista padrão fora do endereço para o que a pessoa
+ * copia ficar limpo. Guardar em `useState` faria o botão do navegador
+ * atravessar a troca sem desfazê-la.
+ */
+type Vista = "lista" | "semana";
+
+function useVista(): { vista: Vista; irPara: (v: Vista) => void } {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const vista: Vista = searchParams.get("vista") === "semana" ? "semana" : "lista";
+
+  const irPara = (nova: Vista) => {
+    if (nova === vista) return;
+    // Preserva o resto da query (`?aba=`, por exemplo) em vez de reescrever o
+    // endereço inteiro — foi assim que a barra de abas evitou de apagar o que
+    // não é dela.
+    const params = new URLSearchParams(searchParams.toString());
+    if (nova === "lista") params.delete("vista");
+    else params.set("vista", nova);
+    const qs = params.toString();
+    router.push(qs ? `/minhas-aulas?${qs}` : "/minhas-aulas", {
+      scroll: false,
+    });
+  };
+
+  return { vista, irPara };
+}
+
 // REQ-002 (SPEC-005): aluno lista as próprias próximas aulas. View-only.
 export function MyClassesList() {
   const [aulas, setAulas] = useState<MyClass[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { vista, irPara } = useVista();
 
   useEffect(() => {
     listMyClasses()
@@ -69,6 +104,45 @@ export function MyClassesList() {
           </div>
         </section>
 
+        {/*
+          SPEC-029 — **o alternador de vista**, pedido do Israel.
+
+          Dois botões visíveis em vez de um que troca de rótulo: um botão só,
+          escrito "Semana", não diz se essa é a vista atual ou o destino — e a
+          pessoa descobre tocando. `aria-pressed` conta a mesma coisa para
+          quem usa leitor de tela.
+
+          Fica escondido enquanto carrega e no erro: alternar entre duas
+          telas vazias não é escolha.
+        */}
+        {!loading && !error && aulas.length > 0 ? (
+          <div
+            role="group"
+            aria-label="Como ver as aulas"
+            className="flex gap-2 rounded-2xl bg-[var(--color-surface-container)] p-1"
+          >
+            {([
+              { id: "lista", rotulo: "Lista", Icone: List },
+              { id: "semana", rotulo: "Semana", Icone: CalendarRange },
+            ] as const).map(({ id, rotulo, Icone }) => (
+              <button
+                key={id}
+                type="button"
+                aria-pressed={vista === id}
+                onClick={() => irPara(id)}
+                className={`flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl text-[13px] font-extrabold transition-colors ${
+                  vista === id
+                    ? "bg-surface text-[var(--color-primary-strong)] shadow-[var(--shadow-low)]"
+                    : "text-[var(--color-text-secondary)]"
+                }`}
+              >
+                <Icone className="size-4" aria-hidden="true" />
+                {rotulo}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
         {error ? (
           <p role="alert" className="rounded-2xl bg-surface p-4 text-sm font-semibold text-[var(--color-error)] shadow-[var(--shadow-low)] ring-1 ring-border">{error}</p>
         ) : loading ? (
@@ -83,6 +157,8 @@ export function MyClassesList() {
             <h2 className="mt-4 text-lg font-extrabold">Nenhuma aula agendada</h2>
             <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Quando seu clube programar uma aula, ela aparecerá aqui.</p>
           </section>
+        ) : vista === "semana" ? (
+          <SemanaDoAluno aulas={aulas} />
         ) : (
           <section className="space-y-3" aria-label="Próximas aulas">
             {aulas.map((aula, index) => (
