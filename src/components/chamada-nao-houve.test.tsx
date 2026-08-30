@@ -40,7 +40,9 @@ function chamadaCom(alunos: string[], extras: Record<string, unknown> = {}) {
     alunos: alunos.map((nome, i) => ({
       alunoId: `a${i}`,
       nome,
-      status: null,
+      // `string | null` e não `null`: uma prova precisa gravar "presente"
+      // aqui, e inferir `null` faria o `tsc` recusar — foi ele que pegou.
+      status: null as string | null,
       naTurmaHoje: true,
     })),
     ...extras,
@@ -139,20 +141,32 @@ describe("ChamadaView — a aula não aconteceu (SPEC-030)", () => {
     ).not.toBeInTheDocument();
   });
 
-  // O servidor recusaria com `CHAMADA_COM_PRESENCA` (LIM-030d). A tela não
-  // oferece o que seria recusado — descobrir isso por erro, em quadra, é o
-  // pior momento possível.
-  it("some o botão assim que o professor marca alguém", async () => {
+  // **ACHADO 3 DA VALIDAÇÃO CRUZADA (MÉDIA).** A condição era `marcados === 0`
+  // — as marcas LOCAIS. Um toque errado em "Veio", sem salvar nada, fazia o
+  // botão sumir; e como `marcar()` só adiciona, não havia como desmarcar. O
+  // caminho ficava perdido até recarregar, em quadra, com sinal ruim.
+  it("um toque local por engano NÃO faz o botão sumir", async () => {
     getChamadaMock.mockResolvedValue(chamadaCom(["Ana", "Bruno"]));
     render(<ChamadaView ocupacaoId="oc1" />);
 
     await screen.findByText("Ana");
+    fireEvent.click(screen.getAllByRole("button", { name: "Veio" })[0]);
+
     expect(
       screen.getByRole("button", { name: "A aula não aconteceu" }),
     ).toBeInTheDocument();
+  });
 
-    fireEvent.click(screen.getAllByRole("button", { name: "Veio" })[0]);
+  // O servidor recusaria com `CHAMADA_COM_PRESENCA` (LIM-030d). A tela não
+  // oferece o que seria recusado — mas quem decide é o estado SALVO, não o
+  // rascunho local.
+  it("some quando há presença SALVA — que é o que o servidor recusa", async () => {
+    const comPresenca = chamadaCom(["Ana", "Bruno"]);
+    comPresenca.alunos[0].status = "presente";
+    getChamadaMock.mockResolvedValue(comPresenca);
+    render(<ChamadaView ocupacaoId="oc1" />);
 
+    await screen.findByText("Ana");
     expect(
       screen.queryByRole("button", { name: "A aula não aconteceu" }),
     ).not.toBeInTheDocument();

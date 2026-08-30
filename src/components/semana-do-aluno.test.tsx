@@ -25,6 +25,10 @@ const aula = (patch: Record<string, unknown> = {}) => ({
   data: "2026-09-02",
   horaInicio: "18:00",
   horaFim: "19:00",
+  // SPEC-030: campo obrigatório no contrato do aluno. O `tsc` cobrou esta
+  // fixture, que é o comportamento desejado — contrato novo não pode entrar
+  // sem que quem monta payload de teste seja obrigado a decidir o valor.
+  naoRealizada: false,
   ...patch,
 });
 

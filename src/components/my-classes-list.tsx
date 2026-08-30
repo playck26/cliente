@@ -180,7 +180,18 @@ export function MyClassesList() {
                 </div>
                 <div className="mt-4 flex min-h-11 items-center justify-between rounded-2xl bg-[var(--color-surface-container)] px-4">
                   <span className="text-[13px] font-bold text-[var(--color-text-secondary)]">{aula.horaInicio}–{aula.horaFim}</span>
-                  <span className="rounded-full bg-white px-3 py-1 text-[11px] font-extrabold text-[var(--color-primary-strong)] ring-1 ring-border">Agendada</span>
+                  {/* SPEC-030 / achado 2 da validação cruzada — a aula que
+                      NÃO aconteceu. Sem isto ela aparecia aqui como
+                      "Agendada" até o dia passar, e no dia seguinte sumia
+                      das "Anteriores" (o filtro da avaliação) sem nunca
+                      dizer o que houve. O aluno pode ter ido até o clube. */}
+                  {aula.naoRealizada ? (
+                    <span className="rounded-full bg-[var(--color-surface-container-high)] px-3 py-1 text-[11px] font-extrabold text-[var(--color-text-secondary)] ring-1 ring-border">
+                      Não realizada
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-white px-3 py-1 text-[11px] font-extrabold text-[var(--color-primary-strong)] ring-1 ring-border">Agendada</span>
+                  )}
                 </div>
               </article>
             ))}

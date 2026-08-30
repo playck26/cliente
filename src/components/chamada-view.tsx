@@ -165,6 +165,22 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
   const faltamMarcar = total - marcados;
   /** SPEC-030 — alguém já declarou que esta aula não aconteceu. */
   const naoHouve = chamada?.completude === "nao_houve";
+  /**
+   * **SPEC-030 / achado 3 da validação cruzada (MÉDIA).**
+   *
+   * A condição do botão era `marcados === 0`, e `marcados` conta as marcas
+   * LOCAIS. Um toque errado em "Veio" — sem salvar nada — fazia o botão
+   * sumir, e como `marcar()` só adiciona, **não havia como desmarcar**: o
+   * caminho de "a aula não aconteceu" ficava perdido até recarregar a
+   * página, em quadra, com sinal ruim.
+   *
+   * Agora a condição é o SERVIDOR: só some quando há presença de fato
+   * gravada. É também o que o servidor recusa (`CHAMADA_COM_PRESENCA`) — a
+   * tela deixou de esconder por conta própria o que a API ainda aceitaria.
+   */
+  const temPresencaSalva = Boolean(
+    chamada?.alunos.some((a) => a.status !== null),
+  );
   // INV-026: o servidor recusa chamada incompleta. A tela impede antes de a
   // pessoa tentar, porque descobrir isso por erro de rede, em quadra, é o
   // pior momento possível.
@@ -342,10 +358,12 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
           ) : null}
           {/* SPEC-030 — some quando a aula JÁ está marcada como não
               realizada: repetir a ação não faria nada, e um botão que não
-              faz nada ensina a desconfiar dos outros. Some também quando o
-              professor já marcou alguém, porque aí a resposta dele é outra —
-              e o servidor recusaria com `CHAMADA_COM_PRESENCA`. */}
-          {!naoHouve && marcados === 0 ? (
+              faz nada ensina a desconfiar dos outros. Some também quando há
+              presença **salva**, porque aí o servidor recusaria com
+              `CHAMADA_COM_PRESENCA`. Marca local não conta: ela é
+              reversível, e sumir com o botão por causa dela deixava o
+              professor sem saída (achado 3 da validação cruzada). */}
+          {!naoHouve && !temPresencaSalva ? (
             <Button
               type="button"
               variant="ghost"
