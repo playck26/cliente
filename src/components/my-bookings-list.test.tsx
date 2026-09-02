@@ -317,3 +317,66 @@ describe("MyBookingsList — passado e canceladas (SPEC-041)", () => {
     expect(screen.getByText("Nada no histórico ainda")).toBeInTheDocument();
   });
 });
+
+/**
+ * SPEC-042 — **o que já aconteceu não se cancela, mas ainda se cobra.**
+ *
+ * O Israel achou minutos depois do deploy da SPEC-041: a aba "Anteriores" que
+ * eu tinha acabado de criar oferecia "Cancelar" numa reserva que já tinha
+ * acontecido. Não era regressão — antes essas reservas apareciam na lista
+ * única com os mesmos botões —, mas a aba nova deu nome e lugar ao que estava
+ * diluído, e aí ficou óbvio.
+ *
+ * **Cancelar e cobrar não são o mesmo caso**, e é por isso que só um dos dois
+ * sai: cancelar o que já aconteceu apaga uma cobrança legítima; cobrar quem
+ * jogou e não pagou é o fluxo normal do clube.
+ */
+describe("MyBookingsList — o passado não é operável (SPEC-042)", () => {
+  const passadaPendente = {
+    ...reserva("pendente_pagamento"),
+    id: "passada",
+    data: "2026-08-20",
+  };
+
+  beforeEach(() => {
+    listMyBookingsMock.mockReset().mockResolvedValue({
+      page: 1,
+      pageSize: 20,
+      total: 1,
+      data: [passadaPendente],
+    });
+    getPublicPaymentConfigMock.mockReset().mockResolvedValue({
+      linkPagamentoUrl: "https://pagar.example",
+      whatsappNumero: "5511999999999",
+    });
+    listCourtsMock.mockReset().mockResolvedValue({ data: [], total: 0 });
+    cancelBookingMock.mockReset().mockResolvedValue(undefined);
+  });
+
+  it("em Anteriores, não oferece Cancelar", async () => {
+    render(<MyBookingsList aba="anteriores" />);
+
+    await screen.findByLabelText("Reservas anteriores");
+    expect(
+      screen.queryByRole("button", { name: "Cancelar" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("mas continua oferecendo pagar — quem jogou e não pagou, deve", async () => {
+    render(<MyBookingsList aba="anteriores" />);
+
+    expect(
+      await screen.findByRole("button", { name: /Pagar agora/ }),
+    ).toBeInTheDocument();
+  });
+
+  it("na aba Reservas, a mesma reserva pendente continua cancelável", async () => {
+    // O contraponto. Sem ele, esconder o botão em toda parte passaria neste
+    // arquivo — e o aluno perderia o cancelamento que ele tem direito de fazer.
+    render(<MyBookingsList aba="reservas" />);
+
+    expect(
+      await screen.findByRole("button", { name: "Cancelar" }),
+    ).toBeInTheDocument();
+  });
+});
