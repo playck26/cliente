@@ -21,7 +21,8 @@ vi.mock("@/lib/api-client", async () => {
   return {
     ...real,
     listMyBookings: (...a: unknown[]) => listMyBookingsMock(...a),
-    getPublicPaymentConfig: (...a: unknown[]) => getPublicPaymentConfigMock(...a),
+    getPublicPaymentConfig: (...a: unknown[]) =>
+      getPublicPaymentConfigMock(...a),
     listCourts: (...a: unknown[]) => listCourtsMock(...a),
     cancelBooking: (...a: unknown[]) => cancelBookingMock(...a),
   };
@@ -50,7 +51,10 @@ describe("MyBookingsList — o que a tela diz sobre pagamento (DEF-005)", () => 
   });
 
   it("reserva pendente SEM meio de pagamento não diz que está paga", async () => {
-    listMyBookingsMock.mockResolvedValue({ total: 1, data: [reserva("pendente_pagamento")] });
+    listMyBookingsMock.mockResolvedValue({
+      total: 1,
+      data: [reserva("pendente_pagamento")],
+    });
     getPublicPaymentConfigMock.mockResolvedValue({
       linkPagamentoUrl: null,
       whatsappNumero: null,
@@ -59,13 +63,18 @@ describe("MyBookingsList — o que a tela diz sobre pagamento (DEF-005)", () => 
     render(<MyBookingsList />);
 
     await waitFor(() =>
-      expect(screen.getByText(/Combine o pagamento com o clube/i)).toBeInTheDocument(),
+      expect(
+        screen.getByText(/Combine o pagamento com o clube/i),
+      ).toBeInTheDocument(),
     );
     expect(screen.queryByText("Pagamento ok")).not.toBeInTheDocument();
   });
 
   it("reserva pendente COM meio de pagamento oferece pagar", async () => {
-    listMyBookingsMock.mockResolvedValue({ total: 1, data: [reserva("pendente_pagamento")] });
+    listMyBookingsMock.mockResolvedValue({
+      total: 1,
+      data: [reserva("pendente_pagamento")],
+    });
     getPublicPaymentConfigMock.mockResolvedValue({
       linkPagamentoUrl: "https://exemplo.com",
       whatsappNumero: null,
@@ -74,7 +83,9 @@ describe("MyBookingsList — o que a tela diz sobre pagamento (DEF-005)", () => 
     render(<MyBookingsList />);
 
     await waitFor(() =>
-      expect(screen.getByRole("button", { name: /Pagar agora/i })).toBeInTheDocument(),
+      expect(
+        screen.getByRole("button", { name: /Pagar agora/i }),
+      ).toBeInTheDocument(),
     );
     expect(screen.queryByText("Pagamento ok")).not.toBeInTheDocument();
   });
@@ -135,21 +146,27 @@ describe("MyBookingsList — a página que deixou de existir", () => {
       .mockResolvedValueOnce({ page: 1, pageSize: 20, total: 20, data: cheia });
 
     render(<MyBookingsList />);
-    await screen.findByLabelText("Reservas ativas");
+    // SPEC-041/AC-008: a seção deixou de se chamar "Reservas ativas" — com
+    // canceladas visíveis, "ativa" virou mentira.
+    await screen.findByLabelText("Reservas");
 
     fireEvent.click(
       await screen.findByLabelText("Próxima página de minhas reservas"),
     );
-    await waitFor(() => expect(listMyBookingsMock).toHaveBeenCalledWith(2));
+    await waitFor(() =>
+      expect(listMyBookingsMock).toHaveBeenCalledWith(2, 20, "futuras"),
+    );
 
     fireEvent.click(
       (await screen.findAllByRole("button", { name: "Cancelar" }))[0],
     );
 
     // O que a pessoa NÃO pode ver: "não há nada" com 20 reservas vivas.
-    await waitFor(() => expect(listMyBookingsMock).toHaveBeenCalledWith(1));
+    await waitFor(() =>
+      expect(listMyBookingsMock).toHaveBeenCalledWith(1, 20, "futuras"),
+    );
     expect(
-      screen.queryByText("Nenhuma reserva ainda"),
+      screen.queryByText("Nenhuma reserva por vir"),
     ).not.toBeInTheDocument();
   });
 
@@ -167,7 +184,136 @@ describe("MyBookingsList — a página que deixou de existir", () => {
     render(<MyBookingsList />);
 
     expect(
-      await screen.findByText("Nenhuma reserva ainda"),
+      await screen.findByText("Nenhuma reserva por vir"),
     ).toBeInTheDocument();
+  });
+});
+
+/**
+ * SPEC-041 — **os dois defeitos que o Israel achou em produção, e o terceiro
+ * que a validação cruzada achou no caminho.**
+ *
+ * 1. reserva passada aparecendo como se ainda fosse acontecer;
+ * 2. reserva cancelada sumindo por completo;
+ * 3. o `.sort` do cliente desfazendo, dentro de cada página, a ordem que o
+ *    servidor tinha acabado de dar.
+ */
+describe("MyBookingsList — passado e canceladas (SPEC-041)", () => {
+  const canceladaFutura = {
+    ...reserva("cancelado"),
+    id: "cancelada",
+    data: "2026-09-20",
+  };
+
+  beforeEach(() => {
+    listMyBookingsMock.mockReset();
+    getPublicPaymentConfigMock.mockReset().mockResolvedValue({
+      linkPagamentoUrl: "https://pagar.example",
+      whatsappNumero: "5511999999999",
+    });
+    listCourtsMock.mockReset().mockResolvedValue({ data: [], total: 0 });
+    cancelBookingMock.mockReset().mockResolvedValue(undefined);
+  });
+
+  function responder(data: unknown[], total = data.length) {
+    listMyBookingsMock.mockResolvedValue({
+      page: 1,
+      pageSize: 20,
+      total,
+      data,
+    });
+  }
+
+  it("AC-005: para de pedir para esconder as canceladas, e pede o recorte", async () => {
+    responder([]);
+
+    render(<MyBookingsList />);
+
+    await waitFor(() => expect(listMyBookingsMock).toHaveBeenCalled());
+    expect(listMyBookingsMock).toHaveBeenCalledWith(1, 20, "futuras");
+  });
+
+  it("AC-006: cancelada aparece marcada — e o grid de ações some INTEIRO", async () => {
+    responder([canceladaFutura]);
+
+    render(<MyBookingsList />);
+
+    // Ela existe na tela: era o defeito 2.
+    expect(await screen.findByText("Cancelada")).toBeInTheDocument();
+    expect(screen.getByText("Esta reserva foi cancelada.")).toBeInTheDocument();
+
+    // O "Cancelar" duplicado seria só feio. O grave é o outro lado do grid:
+    // cancelada cai em `!pago`, e a tela ofereceria cobrança por uma reserva
+    // que o clube desmarcou.
+    expect(
+      screen.queryByRole("button", { name: "Cancelar" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Pagar agora/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Combine o pagamento com o clube"),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Pagamento ok")).not.toBeInTheDocument();
+  });
+
+  it("AC-007: cancelada com horário futuro fica em Reservas, não em Anteriores (D3)", async () => {
+    responder([canceladaFutura]);
+
+    render(<MyBookingsList aba="reservas" />);
+
+    // O corte do servidor é só temporal; status é apresentação. Uma reserva de
+    // sexta cancelada hoje continua sendo de sexta — mandá-la para o histórico
+    // faria o aluno procurar no lugar errado.
+    expect(await screen.findByLabelText("Reservas")).toBeInTheDocument();
+    expect(screen.getByText("Cancelada")).toBeInTheDocument();
+  });
+
+  it("AC-008: o cabeçalho conta o TOTAL, não o tamanho da página", async () => {
+    // 20 na página, 47 no total: a frase antiga dizia "20 reservas ativas".
+    responder(
+      Array.from({ length: 20 }, (_, i) => ({
+        ...reserva("pago"),
+        id: `b${i}`,
+      })),
+      47,
+    );
+
+    render(<MyBookingsList />);
+
+    expect(await screen.findByText("47 reservas")).toBeInTheDocument();
+    expect(screen.queryByText(/reservas ativas/)).not.toBeInTheDocument();
+  });
+
+  it("AC-003: a tela pinta na ordem que o servidor mandou, sem reordenar", async () => {
+    // O servidor manda decrescente (aba Anteriores). Com o `.sort` que morava
+    // aqui, a tela repintava crescente e a lista virava um serrote por página.
+    responder([
+      { ...reserva("pago"), id: "c", data: "2026-09-20", horaInicio: "18:00" },
+      { ...reserva("pago"), id: "b", data: "2026-09-15", horaInicio: "09:00" },
+      { ...reserva("pago"), id: "a", data: "2026-09-10", horaInicio: "07:00" },
+    ]);
+
+    render(<MyBookingsList aba="anteriores" />);
+
+    await screen.findByLabelText("Reservas anteriores");
+    const horarios = screen
+      .getAllByText(/^\d{2}:\d{2}–\d{2}:\d{2}$/)
+      .map((el) => el.textContent);
+    expect(horarios).toEqual(["18:00–10:00", "09:00–10:00", "07:00–10:00"]);
+  });
+
+  it("a aba Anteriores pede o outro recorte e fala a própria língua", async () => {
+    responder([]);
+
+    render(<MyBookingsList aba="anteriores" />);
+
+    await waitFor(() =>
+      expect(listMyBookingsMock).toHaveBeenCalledWith(1, 20, "anteriores"),
+    );
+    expect(await screen.findByText("O que já passou")).toBeInTheDocument();
+    // O vazio de uma aba não serve à outra: "suas próximas reservas aparecerão
+    // aqui" é a frase errada para quem abriu o histórico.
+    expect(screen.getByText("Nada no histórico ainda")).toBeInTheDocument();
   });
 });

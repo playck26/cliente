@@ -29,10 +29,28 @@ import {
  * cópias da mesma decisão.
  */
 
+/**
+ * **SPEC-041 acrescentou "Anteriores", e ela nasceu de um defeito.**
+ *
+ * A lista do aluno não tinha corte temporal: uma reserva de semana passada,
+ * com pagamento pendente, continuava aparecendo como se ainda fosse acontecer.
+ * O Israel achou usando. O molde é o mesmo de `aulas-tabs.tsx` (SPEC-025), que
+ * já tinha resolvido a mesma pergunta uma tela ao lado — a assimetria é que
+ * era o defeito.
+ *
+ * **A primeira aba continua se chamando "Reservas", por decisão do Israel
+ * (D-I4).** "Próximas" seria mais preciso se o corte fosse pelo início da
+ * ocupação, mas ele é pelo **fim**: quem está na quadra às 20h numa reserva de
+ * 19h às 21h ainda a vê aqui. Chamar de "próxima" o que é atual seria trocar
+ * um rótulo impreciso por outro — e "Reservas" já está em produção.
+ */
 const ABAS = [
   { id: "reservas", rotulo: "Reservas" },
+  { id: "anteriores", rotulo: "Anteriores" },
   { id: "quadras", rotulo: "Quadras" },
-] as const satisfies readonly AbaDaTela<"reservas" | "quadras">[];
+] as const satisfies readonly AbaDaTela<
+  "reservas" | "anteriores" | "quadras"
+>[];
 
 type AbaId = (typeof ABAS)[number]["id"];
 
@@ -72,7 +90,16 @@ export function ReservasTabs() {
         aria-labelledby={`aba-${ativa}`}
         className="mt-5"
       >
-        {ativa === "quadras" ? <CourtsList /> : <MyBookingsList />}
+        {ativa === "quadras" ? (
+          <CourtsList />
+        ) : (
+          // A `key` força remontar ao trocar de aba, e isso é de propósito:
+          // sem ela o React reaproveitaria a instância, e a página em que a
+          // pessoa estava em "Reservas" viria junto para "Anteriores",
+          // pedindo a página 3 de uma lista que pode ter uma só.
+          // Consequência aceita: a paginação reinicia na troca (LIM-041g).
+          <MyBookingsList key={ativa} aba={ativa} />
+        )}
       </div>
 
       <BottomNav />
