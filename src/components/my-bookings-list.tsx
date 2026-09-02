@@ -293,6 +293,20 @@ export function MyBookingsList({
               const pago = booking.statusPagamento === "pago";
               // SPEC-041/AC-006 — cancelada é exibida, e **não é operável**.
               const cancelada = booking.statusPagamento === "cancelado";
+              /**
+               * SPEC-042 — **o que já aconteceu não se cancela.**
+               *
+               * Quem decide se é passado é o **servidor**: esta reserva está
+               * aqui porque `quando=anteriores` a trouxe, e o corte foi feito
+               * com o relógio do clube em `recorteTemporal`. A tela não
+               * recalcula hora nenhuma — recalcular seria a segunda cópia da
+               * regra, que é o defeito que o gate de fuso existe para impedir.
+               *
+               * **Cancelar sai, cobrar fica.** Não são o mesmo caso: cancelar
+               * o que já aconteceu apaga uma cobrança legítima; cobrar quem
+               * jogou e não pagou é o fluxo normal do clube.
+               */
+              const jaAconteceu = aba === "anteriores";
               const pagamentoAberto = pagamentoAbertoId === booking.id;
               return (
                 <article
@@ -387,18 +401,22 @@ export function MyBookingsList({
                         {TEXTO_RESERVA_CANCELADA}
                       </p>
                     ) : (
-                      <div className="mt-4 grid grid-cols-2 gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={cancelingId === booking.id}
-                          onClick={() => void handleCancel(booking.id)}
-                          className="h-11 rounded-2xl font-extrabold"
-                        >
-                          {cancelingId === booking.id
-                            ? "Cancelando..."
-                            : "Cancelar"}
-                        </Button>
+                      <div
+                        className={`mt-4 grid gap-2 ${jaAconteceu ? "grid-cols-1" : "grid-cols-2"}`}
+                      >
+                        {jaAconteceu ? null : (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={cancelingId === booking.id}
+                            onClick={() => void handleCancel(booking.id)}
+                            className="h-11 rounded-2xl font-extrabold"
+                          >
+                            {cancelingId === booking.id
+                              ? "Cancelando..."
+                              : "Cancelar"}
+                          </Button>
+                        )}
                         {/* DEF-005 — este ternário tinha dois ramos para três
                           casos. A condição era `!pago && temMeioDePagamento`, e
                           o `else` dizia "Pagamento ok" — verdade para quem
