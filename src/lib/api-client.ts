@@ -36,10 +36,8 @@ export type Usuario = components["schemas"]["UsuarioPublicoResponseDto"];
  * repetir o defeito: a rota `/me/teacher/classes/:id` não estava no contrato
  * da 1ª versão da spec.
  */
-export type EncontroDaTurma =
-  components["schemas"]["TurmaEncontroResponseDto"];
-export type MinhaTurma =
-  components["schemas"]["TurmaDoProfessorResponseDto"];
+export type EncontroDaTurma = components["schemas"]["TurmaEncontroResponseDto"];
+export type MinhaTurma = components["schemas"]["TurmaDoProfessorResponseDto"];
 export type MinhaTurmaDetalhe =
   components["schemas"]["TurmaDoProfessorDetalheResponseDto"];
 
@@ -105,8 +103,7 @@ export type AvailabilitySlot =
  * As duas viram a mesma lista vazia depois que a tela filtra os ocupados, e
  * sem o campo apareceriam como a mesma grade sem explicação.
  */
-export type Availability =
-  components["schemas"]["DisponibilidadeResponseDto"];
+export type Availability = components["schemas"]["DisponibilidadeResponseDto"];
 
 export type Booking = components["schemas"]["OcupacaoResponseDto"];
 
@@ -133,20 +130,16 @@ export type AulaDoDiaDoProfessor =
   components["schemas"]["AulaDoDiaDoProfessorDto"];
 
 /** SPEC-025 — apelidos do schema, nunca escritos a mao (INV-059). */
-export type AulaAnterior =
-  components["schemas"]["AulaAnteriorResponseDto"];
-export type MinhaAvaliacao =
-  components["schemas"]["MinhaAvaliacaoResponseDto"];
-export type MediaDaTurma =
-  components["schemas"]["MediaDaTurmaResponseDto"];
+export type AulaAnterior = components["schemas"]["AulaAnteriorResponseDto"];
+export type MinhaAvaliacao = components["schemas"]["MinhaAvaliacaoResponseDto"];
+export type MediaDaTurma = components["schemas"]["MediaDaTurmaResponseDto"];
 
 /** SPEC-024 — apelidos do schema, nunca escritos a mao (INV-059). */
 export type AceitesPendentes =
   components["schemas"]["AceitesPendentesResponseDto"];
 export type AceiteRegistrado =
   components["schemas"]["AceiteRegistradoResponseDto"];
-export type TextoParaAceite =
-  components["schemas"]["TextoParaAceiteDto"];
+export type TextoParaAceite = components["schemas"]["TextoParaAceiteDto"];
 
 export type PublicPaymentConfig =
   components["schemas"]["PagamentoPublicoResponseDto"];
@@ -183,7 +176,10 @@ const FORBIDDEN_CRU = "Forbidden";
 async function parseError(res: Response, fallback: string): Promise<ApiError> {
   const body: unknown = await res.json().catch(() => null);
   const message =
-    body && typeof body === "object" && "message" in body && typeof body.message === "string"
+    body &&
+    typeof body === "object" &&
+    "message" in body &&
+    typeof body.message === "string"
       ? body.message
       : fallback;
 
@@ -192,12 +188,19 @@ async function parseError(res: Response, fallback: string): Promise<ApiError> {
   // que fazer a seguir. Erro de domínio com mensagem própria passa intacto:
   // a troca só alcança o texto padrão do framework.
   const code =
-    body && typeof body === "object" && "code" in body && typeof body.code === "string"
+    body &&
+    typeof body === "object" &&
+    "code" in body &&
+    typeof body.code === "string"
       ? body.code
       : undefined;
 
   if (res.status === 403 && message === FORBIDDEN_CRU) {
-    return new ApiError(res.status, "Sua conta não tem acesso a esta área.", code);
+    return new ApiError(
+      res.status,
+      "Sua conta não tem acesso a esta área.",
+      code,
+    );
   }
 
   return new ApiError(res.status, message, code);
@@ -250,7 +253,10 @@ function encerrarSessao(): void {
   // (não roda se a pessoa já está em /login). Limpar aqui garante que a
   // logo do clube anterior não sobreviva à troca de sessão na mesma aba.
   limparCacheDaEmpresa();
-  if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+  if (
+    typeof window !== "undefined" &&
+    !window.location.pathname.startsWith("/login")
+  ) {
     // Navegação dura de propósito, em vez de `router.push`: este módulo não
     // é componente (não há hook disponível) e, mais importante, sessão
     // perdida deve descartar todo o estado em memória — cache de listas,
@@ -298,7 +304,10 @@ async function temCodigo(res: Response, codigo: string): Promise<boolean> {
   }
 }
 
-async function authFetch(path: string, init: RequestInit = {}): Promise<Response> {
+async function authFetch(
+  path: string,
+  init: RequestInit = {},
+): Promise<Response> {
   let res = await requisicaoAutenticada(path, init);
 
   // 401 aqui quase sempre é access token vencido, não credencial errada:
@@ -316,11 +325,20 @@ async function authFetch(path: string, init: RequestInit = {}): Promise<Response
   // Encerra a sessão como se fosse expiração, porque para ela é isso mesmo.
   if (res.status === 403 && (await temCodigo(res.clone(), "CONTA_INATIVA"))) {
     encerrarSessao();
-    throw await parseError(res, "Esta conta está inativa. Procure o administrador.");
+    throw await parseError(
+      res,
+      "Esta conta está inativa. Procure o administrador.",
+    );
   }
 
-  if (res.status === 403 && (await temCodigo(res.clone(), "SENHA_TEMPORARIA"))) {
-    if (typeof window !== "undefined" && window.location.pathname !== "/primeiro-acesso") {
+  if (
+    res.status === 403 &&
+    (await temCodigo(res.clone(), "SENHA_TEMPORARIA"))
+  ) {
+    if (
+      typeof window !== "undefined" &&
+      window.location.pathname !== "/primeiro-acesso"
+    ) {
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.href = "/primeiro-acesso";
     }
@@ -339,7 +357,10 @@ async function authFetch(path: string, init: RequestInit = {}): Promise<Response
   // resolve o problema dela. E a LIM-024d da spec, e este bloco e a resposta
   // a ela.
   if (res.status === 403 && (await temCodigo(res.clone(), "ACEITE_PENDENTE"))) {
-    if (typeof window !== "undefined" && window.location.pathname !== "/aceite") {
+    if (
+      typeof window !== "undefined" &&
+      window.location.pathname !== "/aceite"
+    ) {
       // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.href = "/aceite";
     }
@@ -427,7 +448,9 @@ export async function logout(): Promise<void> {
       method: "POST",
       credentials: "include",
       headers: {
-        ...(getAccessToken() ? { Authorization: `Bearer ${getAccessToken()}` } : {}),
+        ...(getAccessToken()
+          ? { Authorization: `Bearer ${getAccessToken()}` }
+          : {}),
       },
     });
   } catch {
@@ -460,8 +483,7 @@ export type StatusPresenca = NonNullable<
  * junta cancelamento, data futura e a janela retroativa de 7 dias. Recompor
  * com `data <= hoje` erraria a janela e ofereceria botão que volta 422.
  */
-export type Ocorrencia =
-  components["schemas"]["OcorrenciaDaTurmaResponseDto"];
+export type Ocorrencia = components["schemas"]["OcorrenciaDaTurmaResponseDto"];
 
 /**
  * SPEC-014/SPEC-015 — a chamada do professor.
@@ -683,7 +705,10 @@ export async function listCourts(): Promise<Paginated<Court>> {
   return (await res.json()) as Paginated<Court>;
 }
 
-export async function getAvailability(quadraId: string, data: string): Promise<Availability> {
+export async function getAvailability(
+  quadraId: string,
+  data: string,
+): Promise<Availability> {
   const res = await authFetch(`/courts/${quadraId}/availability?data=${data}`);
   return (await res.json()) as Availability;
 }
@@ -719,9 +744,19 @@ export async function createBooking(dto: {
 export async function listMyBookings(
   page = 1,
   pageSize = 20,
+  quando: "futuras" | "anteriores" = "futuras",
 ): Promise<Paginated<Booking>> {
+  // SPEC-041 — **`excluirCanceladas=true` saiu daqui, e era o defeito 2.**
+  //
+  // A SPEC-027 mudou o filtro de lugar (tela → servidor) para consertar a
+  // contagem, e no caminho manteve "esconder" onde o certo era "mostrar como
+  // cancelada". Para o aluno, uma reserva cancelada pelo clube simplesmente
+  // desaparecia — sem aviso, sem registro, sem onde procurar.
+  //
+  // O parâmetro continua existindo na rota, `deprecated`, pela janela de skew
+  // entre os deploys (ver o DTO no `back`). Quem sai é o único emissor.
   const res = await authFetch(
-    `/bookings?page=${page}&pageSize=${pageSize}&excluirCanceladas=true`,
+    `/bookings?page=${page}&pageSize=${pageSize}&quando=${quando}`,
   );
   return (await res.json()) as Paginated<Booking>;
 }
@@ -758,8 +793,7 @@ export async function trocarSenha(dto: {
  * token. Nem o `status`, que o servidor LÊ para decidir se responde, sai no
  * corpo.
  */
-export type EmpresaPublica =
-  components["schemas"]["EmpresaPublicaResponseDto"];
+export type EmpresaPublica = components["schemas"]["EmpresaPublicaResponseDto"];
 
 /** REQ-001: dados mínimos da empresa para a página pública de cadastro. */
 export async function getEmpresaPorSlug(slug: string): Promise<EmpresaPublica> {
@@ -794,8 +828,7 @@ export async function registerAluno(dto: {
  * O que **não** está aqui é o ponto: `email`, `telefone` e `nivelId` existem
  * no convite no banco e não saem nesta resposta.
  */
-export type ConvitePublico =
-  components["schemas"]["ConvitePublicoResponseDto"];
+export type ConvitePublico = components["schemas"]["ConvitePublicoResponseDto"];
 
 /** REQ-002: dados que a tela do convite pode mostrar (AC-024). */
 export async function getConvite(token: string): Promise<ConvitePublico> {

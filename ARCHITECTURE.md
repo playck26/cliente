@@ -66,7 +66,7 @@ page.tsx (server component, fino)
 | `/quadras/[id]` | `court-booking` | reservar UMA quadra. **Não** foi afetada pelo redirect do índice: é o passo seguinte do fluxo, não uma aba |
 | `/aceite` | `aceite-view` | **SPEC-024** — a tela para onde o `403 ACEITE_PENDENTE` desvia. **Sem barra de navegacao nem voltar**, mesmo desenho de `/primeiro-acesso`: oferecer uma saida que o servidor recusa e convidar a pessoa a bater numa porta trancada. Sem esta tela, ligar o portao seria apagao sem saida (LIM-024d) |
 | `/perfil` | `perfil-view` + `foto-de-perfil` | **SPEC-018/TASK-003** — a foto do aluno/professor. Alcançável pela `BottomNav` desde 2026-08-29 (antes era pelo ícone no `TopAppBar`) |
-| `/reservas` | `reservas-tabs` → `my-bookings-list` \| `courts-list` (+ `GrupoDeFiltro`) | **SPEC-022** — duas abas numa tela só: "Reservas" (padrão) e "Quadras". A aba mora em `?aba=`, não em estado de componente: é o que dá link compartilhável, "voltar" que desfaz a troca, e um alvo para o redirect de `/quadras`. Só o painel ativo é montado — montar os dois faria duas idas à rede para mostrar uma |
+| `/reservas` | `reservas-tabs` → `my-bookings-list` \| `courts-list` (+ `GrupoDeFiltro`) | **SPEC-022 + SPEC-041** — **três** abas numa tela só: "Reservas" (padrão), "Anteriores" e "Quadras". A terceira nasceu de defeito, não de pedido: a lista não tinha corte temporal, e reserva de semana passada aparecia como se ainda fosse acontecer. O corte é pelo **fim** da ocupação (D-I4) — quem está na quadra às 20h numa reserva de 19h às 21h ainda a vê na primeira aba, e por isso ela não se chama "Próximas". A lista remonta ao trocar de aba (`key`), então a paginação reinicia: declarado em LIM-041g. A aba mora em `?aba=`, não em estado de componente: é o que dá link compartilhável, "voltar" que desfaz a troca, e um alvo para o redirect de `/quadras`. Só o painel ativo é montado — montar os dois faria duas idas à rede para mostrar uma |
 
 ## 4. Estado
 
@@ -82,7 +82,15 @@ page.tsx (server component, fino)
 `useVista` de `my-classes-list.tsx` (lista × semana) seguem a mesma regra: link
 compartilhável, "voltar" que desfaz a troca, valor desconhecido cai no padrão
 em silêncio, e **o padrão sai do endereço** — endereço limpo é o que a pessoa
-copia. Quem escreve preserva o resto da query em vez de reescrevê-la.
+copia.
+
+**A frase que estava aqui — "quem escreve preserva o resto da query" — era
+falsa, e a validação cruzada da SPEC-041 mostrou.** `abas-na-url.tsx` reconstrói
+a URL **só** com `aba`, e o ramo do padrão é o pior: empurra o caminho pelado e
+apaga tudo. Já é defeito em produção em `/minhas-aulas`, onde `?vista=semana`
+some ao trocar de aba. Quem preserva é o `useVista` — um dos dois, não os dois.
+Conserto na SPEC-041/B3; até lá, **isto aqui é descrição do que deveria ser, e
+está marcado como tal**.
 
 **Data e hora saem de `lib/fuso.ts`, nunca de `new Date().toISOString()`**
 (DEF-020). `toISOString()` converte para UTC, e no Brasil isso já é o dia

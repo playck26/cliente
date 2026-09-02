@@ -2,7 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { Paginacao } from "@/components/paginacao";
-import { CalendarDays, CreditCard, MessageCircle, WalletCards } from "lucide-react";
+import {
+  CalendarDays,
+  CreditCard,
+  MessageCircle,
+  WalletCards,
+} from "lucide-react";
 import { CapaDaQuadra } from "@/components/capa-da-quadra";
 import { CourtLines } from "@/components/court-lines";
 import { Button } from "@/components/ui/button";
@@ -18,13 +23,35 @@ import {
 } from "@/lib/api-client";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 
-const DIAS_SEMANA = ["Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sábado"];
+const DIAS_SEMANA = [
+  "Domingo",
+  "Segunda-feira",
+  "Terça-feira",
+  "Quarta-feira",
+  "Quinta-feira",
+  "Sexta-feira",
+  "Sábado",
+];
 
 function formatarData(data: string): string {
   const [ano, mes, dia] = data.split("-").map(Number);
-  const diaSemana = DIAS_SEMANA[new Date(Date.UTC(ano, mes - 1, dia)).getUTCDay()];
+  const diaSemana =
+    DIAS_SEMANA[new Date(Date.UTC(ano, mes - 1, dia)).getUTCDay()];
   return `${diaSemana}, ${String(dia).padStart(2, "0")}/${String(mes).padStart(2, "0")}`;
 }
+
+/**
+ * SPEC-041/LIM-041c — **provisório por decisão, não por descuido.**
+ *
+ * O Israel: *"o nome nem vai ser clube — teremos uma definição para o nome que
+ * o dono quiser pôr, nas configurações do admin da empresa, mas isso é coisa
+ * mais pra frente."*
+ *
+ * Fica no **Cliente**, e não no `back`, porque é *copy* de interface: o
+ * servidor devolve estado, não frase em português. Numa constante só, para a
+ * spec do nome configurável trocar em um lugar.
+ */
+const TEXTO_RESERVA_CANCELADA = "Esta reserva foi cancelada.";
 
 const STATUS_LABEL: Record<Booking["statusPagamento"], string> = {
   pendente_pagamento: "Pagamento pendente",
@@ -32,15 +59,51 @@ const STATUS_LABEL: Record<Booking["statusPagamento"], string> = {
   cancelado: "Cancelada",
 };
 
+/**
+ * SPEC-041 — **o que cada aba diz de si.**
+ *
+ * Duas abas, duas perguntas, e o vazio de uma não serve à outra: "Suas
+ * próximas reservas aparecerão aqui" numa aba de histórico é a frase errada
+ * para quem só quer saber se jogou semana passada.
+ */
+const COPY_DA_ABA = {
+  reservas: {
+    titulo: "Quadras na sua agenda",
+    contagem: (n: number) => `${n} ${n === 1 ? "reserva" : "reservas"}`,
+    rotuloDaLista: "Reservas",
+    vazioTitulo: "Nenhuma reserva por vir",
+    vazioTexto: "Suas próximas reservas de quadra aparecerão aqui.",
+  },
+  anteriores: {
+    titulo: "O que já passou",
+    contagem: (n: number) =>
+      `${n} ${n === 1 ? "reserva anterior" : "reservas anteriores"}`,
+    rotuloDaLista: "Reservas anteriores",
+    vazioTitulo: "Nada no histórico ainda",
+    vazioTexto: "Suas reservas passadas aparecerão aqui.",
+  },
+} as const;
+
 // REQ-004/005 (SPEC-005): aluno vê e cancela as próprias reservas avulsas.
-export function MyBookingsList() {
+// SPEC-041: e agora com corte temporal, porque sem ele o passado se
+// apresentava como futuro.
+export function MyBookingsList({
+  aba = "reservas",
+}: {
+  aba?: "reservas" | "anteriores";
+} = {}) {
+  const copy = COPY_DA_ABA[aba];
+  const quando = aba === "anteriores" ? "anteriores" : "futuras";
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [courts, setCourts] = useState<Court[]>([]);
-  const [paymentConfig, setPaymentConfig] = useState<PublicPaymentConfig | null>(null);
+  const [paymentConfig, setPaymentConfig] =
+    useState<PublicPaymentConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [cancelingId, setCancelingId] = useState<string | null>(null);
-  const [pagamentoAbertoId, setPagamentoAbertoId] = useState<string | null>(null);
+  const [pagamentoAbertoId, setPagamentoAbertoId] = useState<string | null>(
+    null,
+  );
   const [pagina, setPagina] = useState(1);
   const [total, setTotal] = useState(0);
   const [tamanho, setTamanho] = useState(20);
@@ -49,7 +112,10 @@ export function MyBookingsList() {
     setLoading(true);
     setError(null);
     try {
-      const [bookingsResult, courtsResult] = await Promise.all([listMyBookings(pagina), listCourts()]);
+      const [bookingsResult, courtsResult] = await Promise.all([
+        listMyBookings(pagina, 20, quando),
+        listCourts(),
+      ]);
       // SPEC-027: o `.filter` de canceladas saiu daqui e foi para o servidor
       // (`excluirCanceladas=true`). Filtrar no cliente depois de paginar faria
       // uma página de 20 mostrar 12 itens com o rodapé dizendo "1–20 de 47".
@@ -82,17 +148,31 @@ export function MyBookingsList() {
         return;
       }
 
-      setBookings(
-        [...bookingsResult.data].sort((a, b) =>
-          (a.data + a.horaInicio).localeCompare(b.data + b.horaInicio),
-        ),
-      );
+      /**
+       * **SPEC-041 — o `.sort` que morava aqui saiu, e ele era um terceiro
+       * defeito.**
+       *
+       * O servidor paginava em `data desc` e a tela repintava em ordem
+       * crescente. A lista não era crescente nem decrescente: era um serrote
+       * que reiniciava a cada página — da 20ª-mais-recente até a mais
+       * recente, e a página 2 voltava para a 40ª e subia de novo.
+       *
+       * É o irmão que a SPEC-027 esqueceu quando mandou o `.filter` para o
+       * servidor. E enquanto ele existisse, **nenhuma** mudança de `orderBy`
+       * no servidor apareceria na tela: quem ordena agora é quem tem a lista
+       * inteira, que é o único que pode.
+       */
+      setBookings(bookingsResult.data);
       setTotal(bookingsResult.total);
       setTamanho(bookingsResult.pageSize);
       setCourts(courtsResult.data);
       setLoading(false);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Não foi possível carregar suas reservas.");
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "Não foi possível carregar suas reservas.",
+      );
       setLoading(false);
     }
   }
@@ -101,11 +181,13 @@ export function MyBookingsList() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagina]);
+  }, [pagina, quando]);
 
   useEffect(() => {
     // A config de pagamento não muda com a página — buscar uma vez.
-    getPublicPaymentConfig().then(setPaymentConfig).catch(() => undefined);
+    getPublicPaymentConfig()
+      .then(setPaymentConfig)
+      .catch(() => undefined);
   }, []);
 
   async function handleCancel(id: string) {
@@ -115,7 +197,11 @@ export function MyBookingsList() {
       await cancelBooking(id);
       await load();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Não foi possível cancelar a reserva.");
+      setError(
+        err instanceof ApiError
+          ? err.message
+          : "Não foi possível cancelar a reserva.",
+      );
     } finally {
       setCancelingId(null);
     }
@@ -125,8 +211,12 @@ export function MyBookingsList() {
     return courts.find((court) => court.id === quadraId);
   }
 
-  const pendentes = bookings.filter((booking) => booking.statusPagamento === "pendente_pagamento").length;
-  const temMeioDePagamento = Boolean(paymentConfig?.linkPagamentoUrl || paymentConfig?.whatsappNumero);
+  const pendentes = bookings.filter(
+    (booking) => booking.statusPagamento === "pendente_pagamento",
+  ).length;
+  const temMeioDePagamento = Boolean(
+    paymentConfig?.linkPagamentoUrl || paymentConfig?.whatsappNumero,
+  );
 
   // SPEC-022 — ver a nota gêmea em `courts-list.tsx`: a moldura passou para
   // `reservas-tabs.tsx`, porque as duas telas agora dividem uma só.
@@ -142,40 +232,76 @@ export function MyBookingsList() {
             </div>
             <div className="mt-4 flex items-end justify-between gap-4">
               <div>
-                <h1 className="text-[28px] leading-[1.04] font-extrabold">Quadras na sua agenda</h1>
+                <h1 className="text-[28px] leading-[1.04] font-extrabold">
+                  {copy.titulo}
+                </h1>
+                {/*
+                  SPEC-041/AC-008 — **`total`, não `bookings.length`.** A
+                  frase contava a PÁGINA: com 47 reservas, a página 1 dizia
+                  "20 reservas ativas". E "ativa" deixou de ser verdade no
+                  minuto em que as canceladas passaram a aparecer aqui.
+                */}
                 <p className="mt-1.5 text-[13px] font-semibold text-white/75">
-                  {loading ? "Carregando reservas..." : `${bookings.length} ${bookings.length === 1 ? "reserva ativa" : "reservas ativas"}`}
+                  {loading ? "Carregando reservas..." : copy.contagem(total)}
                 </p>
               </div>
               <div className="shrink-0 rounded-2xl bg-white/12 px-4 py-3 text-center ring-1 ring-white/20">
-                <p className="text-2xl leading-none font-extrabold">{loading ? "–" : pendentes}</p>
-                <p className="mt-1 text-[10px] font-bold text-white/70">pendentes</p>
+                <p className="text-2xl leading-none font-extrabold">
+                  {loading ? "–" : pendentes}
+                </p>
+                <p className="mt-1 text-[10px] font-bold text-white/70">
+                  pendentes
+                </p>
               </div>
             </div>
           </div>
         </section>
 
-        {error ? <p role="alert" className="rounded-2xl bg-surface p-4 text-sm font-semibold text-[var(--color-error)] shadow-[var(--shadow-low)] ring-1 ring-border">{error}</p> : null}
+        {error ? (
+          <p
+            role="alert"
+            className="rounded-2xl bg-surface p-4 text-sm font-semibold text-[var(--color-error)] shadow-[var(--shadow-low)] ring-1 ring-border"
+          >
+            {error}
+          </p>
+        ) : null}
 
         {loading ? (
           <div className="space-y-3" aria-label="Carregando reservas">
-            {[0, 1].map((item) => <div key={item} className="h-56 animate-pulse rounded-3xl bg-[var(--color-surface-container-high)]" />)}
+            {[0, 1].map((item) => (
+              <div
+                key={item}
+                className="h-56 animate-pulse rounded-3xl bg-[var(--color-surface-container-high)]"
+              />
+            ))}
           </div>
         ) : bookings.length === 0 ? (
           <section className="rounded-3xl bg-surface p-6 text-center shadow-[var(--shadow-low)] ring-1 ring-border">
-            <CalendarDays className="mx-auto size-8 text-[var(--color-primary-strong)]" aria-hidden="true" />
-            <h2 className="mt-3 text-lg font-extrabold">Nenhuma reserva ainda</h2>
-            <p className="mt-1 text-sm text-[var(--color-text-secondary)]">Suas próximas reservas de quadra aparecerão aqui.</p>
+            <CalendarDays
+              className="mx-auto size-8 text-[var(--color-primary-strong)]"
+              aria-hidden="true"
+            />
+            <h2 className="mt-3 text-lg font-extrabold">{copy.vazioTitulo}</h2>
+            <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+              {copy.vazioTexto}
+            </p>
           </section>
         ) : (
-          <section className="space-y-4" aria-label="Reservas ativas">
+          <section className="space-y-4" aria-label={copy.rotuloDaLista}>
             {bookings.map((booking, index) => {
               const quadra = quadraDaReserva(booking.quadraId);
               const pago = booking.statusPagamento === "pago";
+              // SPEC-041/AC-006 — cancelada é exibida, e **não é operável**.
+              const cancelada = booking.statusPagamento === "cancelado";
               const pagamentoAberto = pagamentoAbertoId === booking.id;
               return (
-                <article key={booking.id} className="overflow-hidden rounded-3xl bg-surface shadow-[var(--shadow-low)] ring-1 ring-border">
-                  <div className={`relative h-[118px] overflow-hidden text-white ${index % 2 === 0 ? "bg-[var(--color-court-clay)]" : "bg-[var(--color-court-blue)]"}`}>
+                <article
+                  key={booking.id}
+                  className="overflow-hidden rounded-3xl bg-surface shadow-[var(--shadow-low)] ring-1 ring-border"
+                >
+                  <div
+                    className={`relative h-[118px] overflow-hidden text-white ${index % 2 === 0 ? "bg-[var(--color-court-clay)]" : "bg-[var(--color-court-blue)]"}`}
+                  >
                     {/*
                       Revisão de 2026-08-29 — a reserva mostra a MESMA capa
                       que a lista de quadras. A pessoa escolhe pela foto e
@@ -189,34 +315,91 @@ export function MyBookingsList() {
                       `CapaDaQuadra` cai em `<CourtLines/>` sozinha quando a
                       quadra não tem foto, que é exatamente o que havia antes.
                     */}
-                    <CapaDaQuadra imagemUrl={quadra?.imagemUrl ?? null} nome={quadra?.nome ?? "Quadra"} />
-                    <span className={`absolute top-3 right-4 z-10 rounded-full px-3 py-1.5 text-[11px] font-extrabold ${pago ? "bg-white text-[var(--color-primary-strong)]" : "bg-[var(--color-court-dark)] text-white"}`}>
+                    <CapaDaQuadra
+                      imagemUrl={quadra?.imagemUrl ?? null}
+                      nome={quadra?.nome ?? "Quadra"}
+                    />
+                    {/*
+                      SPEC-041 — o ternário tinha dois ramos para o que agora
+                      são três estados. Cancelada caía no ramo de "pendente" e
+                      ficava **visualmente idêntica** a uma reserva que a
+                      pessoa ainda vai usar. O `line-through` segue o molde de
+                      `semana-do-aluno.tsx`, onde a aula não realizada já é
+                      marcada assim.
+                    */}
+                    <span
+                      className={`absolute top-3 right-4 z-10 rounded-full px-3 py-1.5 text-[11px] font-extrabold ${cancelada ? "bg-white/85 text-[var(--color-text-secondary)] line-through" : pago ? "bg-white text-[var(--color-primary-strong)]" : "bg-[var(--color-court-dark)] text-white"}`}
+                    >
                       {STATUS_LABEL[booking.statusPagamento]}
                     </span>
                     <div className="absolute inset-x-4 bottom-3 z-10 min-w-0">
-                      <p className="text-[11px] font-extrabold tracking-[0.14em] text-white/75 uppercase">{formatarData(booking.data)} • {booking.horaInicio}</p>
-                      <h2 className="mt-1 text-[21px] leading-tight font-extrabold">{quadra?.nome ?? "Quadra"}</h2>
+                      <p className="text-[11px] font-extrabold tracking-[0.14em] text-white/75 uppercase">
+                        {formatarData(booking.data)} • {booking.horaInicio}
+                      </p>
+                      <h2
+                        className={`mt-1 text-[21px] leading-tight font-extrabold ${cancelada ? "text-white/70 line-through" : ""}`}
+                      >
+                        {quadra?.nome ?? "Quadra"}
+                      </h2>
                     </div>
                   </div>
 
                   <div className="p-4">
                     <div className="grid grid-cols-2 gap-2">
                       <div className="rounded-2xl bg-[var(--color-surface-container)] p-3">
-                        <p className="text-[11px] font-bold text-[var(--color-text-secondary)]">Horário</p>
-                        <p className="mt-0.5 text-[13px] font-extrabold">{booking.horaInicio}–{booking.horaFim}</p>
+                        <p className="text-[11px] font-bold text-[var(--color-text-secondary)]">
+                          Horário
+                        </p>
+                        <p className="mt-0.5 text-[13px] font-extrabold">
+                          {booking.horaInicio}–{booking.horaFim}
+                        </p>
                       </div>
                       <div className="rounded-2xl bg-[var(--color-surface-container)] p-3">
-                        <p className="text-[11px] font-bold text-[var(--color-text-secondary)]">Esporte</p>
-                        <p className="mt-0.5 truncate text-[13px] font-extrabold">{/* DEF-012 — ver `courts-list.tsx`. */}
-                        {quadra?.esporte?.nome ?? "Quadra"}</p>
+                        <p className="text-[11px] font-bold text-[var(--color-text-secondary)]">
+                          Esporte
+                        </p>
+                        <p className="mt-0.5 truncate text-[13px] font-extrabold">
+                          {/* DEF-012 — ver `courts-list.tsx`. */}
+                          {quadra?.esporte?.nome ?? "Quadra"}
+                        </p>
                       </div>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-2 gap-2">
-                      <Button type="button" variant="outline" disabled={cancelingId === booking.id} onClick={() => void handleCancel(booking.id)} className="h-11 rounded-2xl font-extrabold">
-                        {cancelingId === booking.id ? "Cancelando..." : "Cancelar"}
-                      </Button>
-                      {/* DEF-005 — este ternário tinha dois ramos para três
+                    {/*
+                      SPEC-041/AC-006 — **o grid inteiro some numa cancelada,
+                      não só o "Cancelar".**
+                      
+                      O "Cancelar" duplicado seria só feio: o servidor ignora
+                      (`cancelBooking` é no-op em quem já está cancelada). O
+                      grave é o outro lado do grid — cancelada cai em `!pago`,
+                      e a tela ofereceria **link de pagamento e WhatsApp para
+                      cobrar** uma reserva que o clube desmarcou. Cobrar por
+                      algo que não vai acontecer é pior que qualquer botão
+                      inerte.
+                      
+                      No lugar, a razão do estado, que é o que a pessoa veio
+                      procurar. O texto é provisório por decisão do Israel: o
+                      nome do clube vira configuração numa spec futura
+                      (LIM-041c), e por isso mora numa constante só.
+                    */}
+                    {cancelada ? (
+                      <p className="mt-4 rounded-2xl bg-[var(--color-surface-container)] p-3 text-center text-[13px] font-bold text-[var(--color-text-secondary)]">
+                        {TEXTO_RESERVA_CANCELADA}
+                      </p>
+                    ) : (
+                      <div className="mt-4 grid grid-cols-2 gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          disabled={cancelingId === booking.id}
+                          onClick={() => void handleCancel(booking.id)}
+                          className="h-11 rounded-2xl font-extrabold"
+                        >
+                          {cancelingId === booking.id
+                            ? "Cancelando..."
+                            : "Cancelar"}
+                        </Button>
+                        {/* DEF-005 — este ternário tinha dois ramos para três
                           casos. A condição era `!pago && temMeioDePagamento`, e
                           o `else` dizia "Pagamento ok" — verdade para quem
                           pagou, **mentira para quem deve numa empresa que não
@@ -225,27 +408,61 @@ export function MyBookingsList() {
                           pendente" três linhas acima. Nunca diga a alguém que
                           a dívida dela está quitada porque falta configuração
                           do outro lado. */}
-                      {pago ? (
-                        <span className="flex h-11 items-center justify-center rounded-2xl bg-[var(--color-secondary-container)] text-[13px] font-extrabold text-[var(--color-primary-strong)]">Pagamento ok</span>
-                      ) : temMeioDePagamento ? (
-                        <Button type="button" onClick={() => setPagamentoAbertoId(pagamentoAberto ? null : booking.id)} className="h-11 rounded-2xl font-extrabold">
-                          <WalletCards className="size-4" aria-hidden="true" /> Pagar agora
-                        </Button>
-                      ) : (
-                        <span className="flex h-11 items-center justify-center rounded-2xl bg-[var(--color-surface-container)] px-2 text-center text-[12px] font-bold text-[var(--color-text-secondary)]">Combine o pagamento com o clube</span>
-                      )}
-                    </div>
+                        {pago ? (
+                          <span className="flex h-11 items-center justify-center rounded-2xl bg-[var(--color-secondary-container)] text-[13px] font-extrabold text-[var(--color-primary-strong)]">
+                            Pagamento ok
+                          </span>
+                        ) : temMeioDePagamento ? (
+                          <Button
+                            type="button"
+                            onClick={() =>
+                              setPagamentoAbertoId(
+                                pagamentoAberto ? null : booking.id,
+                              )
+                            }
+                            className="h-11 rounded-2xl font-extrabold"
+                          >
+                            <WalletCards
+                              className="size-4"
+                              aria-hidden="true"
+                            />{" "}
+                            Pagar agora
+                          </Button>
+                        ) : (
+                          <span className="flex h-11 items-center justify-center rounded-2xl bg-[var(--color-surface-container)] px-2 text-center text-[12px] font-bold text-[var(--color-text-secondary)]">
+                            Combine o pagamento com o clube
+                          </span>
+                        )}
+                      </div>
+                    )}
 
-                    {pagamentoAberto && paymentConfig ? (
+                    {!cancelada && pagamentoAberto && paymentConfig ? (
                       <div className="mt-3 flex flex-col gap-2 rounded-2xl bg-[var(--color-surface-container)] p-3">
                         {paymentConfig.linkPagamentoUrl ? (
-                          <a href={paymentConfig.linkPagamentoUrl} target="_blank" rel="noopener noreferrer" className="flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[var(--color-primary-strong)] px-3 py-2 text-center text-sm font-extrabold text-white">
-                            <CreditCard className="size-4" aria-hidden="true" /> Abrir link de pagamento
+                          <a
+                            href={paymentConfig.linkPagamentoUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex min-h-11 items-center justify-center gap-2 rounded-2xl bg-[var(--color-primary-strong)] px-3 py-2 text-center text-sm font-extrabold text-white"
+                          >
+                            <CreditCard className="size-4" aria-hidden="true" />{" "}
+                            Abrir link de pagamento
                           </a>
                         ) : null}
                         {paymentConfig.whatsappNumero ? (
-                          <a href={buildWhatsAppLink(paymentConfig.whatsappNumero)} target="_blank" rel="noopener noreferrer" className="flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-border bg-white px-3 py-2 text-center text-sm font-bold text-[var(--color-text-primary)]">
-                            <MessageCircle className="size-4" aria-hidden="true" /> Falar no WhatsApp
+                          <a
+                            href={buildWhatsAppLink(
+                              paymentConfig.whatsappNumero,
+                            )}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex min-h-11 items-center justify-center gap-2 rounded-2xl border border-border bg-white px-3 py-2 text-center text-sm font-bold text-[var(--color-text-primary)]"
+                          >
+                            <MessageCircle
+                              className="size-4"
+                              aria-hidden="true"
+                            />{" "}
+                            Falar no WhatsApp
                           </a>
                         ) : null}
                       </div>
