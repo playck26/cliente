@@ -188,6 +188,18 @@ export function MyBookingsList({
     null,
   );
   const [pagina, setPagina] = useState(1);
+  /**
+   * SPEC-041/AC-016 — **o instante desta travessia de lista.**
+   *
+   * `null` = começar uma nova (o servidor decide e devolve). A regra de quando
+   * zerar é curta: **só a paginação reaproveita**; trocar de aba ou de filtro
+   * muda o conjunto de propósito, e aí a fronteira nova é a certa.
+   *
+   * Trocar de aba já zera sozinho — o `key` em `reservas-tabs` remonta o
+   * componente inteiro. Trocar de filtro **não** remonta, e por isso o
+   * `filtrarPor` limpa isto à mão.
+   */
+  const [referencia, setReferencia] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
   const [tamanho, setTamanho] = useState(20);
 
@@ -196,7 +208,13 @@ export function MyBookingsList({
     setError(null);
     try {
       const [bookingsResult, courtsResult] = await Promise.all([
-        listMyBookings(pagina, 20, quando, status ?? undefined),
+        listMyBookings(
+          pagina,
+          20,
+          quando,
+          status ?? undefined,
+          referencia ?? undefined,
+        ),
         listCourts(),
       ]);
       // SPEC-027: o `.filter` de canceladas saiu daqui e foi para o servidor
@@ -245,6 +263,9 @@ export function MyBookingsList({
        * no servidor apareceria na tela: quem ordena agora é quem tem a lista
        * inteira, que é o único que pode.
        */
+      // Guarda o instante que o servidor usou, para as próximas páginas.
+      // Idempotente: reenviar o mesmo devolve o mesmo.
+      setReferencia(bookingsResult.referenciaTemporal);
       setBookings(bookingsResult.data);
       setTotal(bookingsResult.total);
       setTamanho(bookingsResult.pageSize);
@@ -308,6 +329,9 @@ export function MyBookingsList({
    */
   function filtrarPor(novo: string | null) {
     setPagina(1);
+    // Conjunto novo, fronteira nova. Reaproveitar a referência aqui
+    // congelaria um instante que já não descreve esta lista.
+    setReferencia(null);
     navegarParaStatus(novo);
   }
 

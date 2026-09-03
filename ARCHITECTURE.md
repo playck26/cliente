@@ -78,6 +78,16 @@ page.tsx (server component, fino)
 | **Aba e vista** | **na URL** (`?aba=`, `?vista=`), não em `useState` |
 | Global | **não existe** |
 
+**SPEC-041/Fase B — a URL ganhou um terceiro morador, e o filtro de reservas
+carrega o valor da API** (`?status=cancelado`), não um apelido em português. O
+rótulo do botão é que traduz. Uma camada de tradução seria um segundo
+vocabulário para o mesmo conceito, e não cobriria "Todas", que é a **ausência**
+do parâmetro — são quatro estados de tela para três valores de API.
+
+**O `GrupoDeFiltro` saiu de dentro do `courts-list`** e virou arquivo próprio
+quando as reservas precisaram dele. Mesmo caminho do `abas-na-url` na SPEC-023,
+e pelo mesmo motivo: a cópia é sempre a que fica velha.
+
 **A URL guarda o que a pessoa escolheu ver.** `abas-na-url.tsx` (aba) e o
 `useVista` de `my-classes-list.tsx` (lista × semana) seguem a mesma regra: link
 compartilhável, "voltar" que desfaz a troca, valor desconhecido cai no padrão

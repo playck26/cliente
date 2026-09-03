@@ -1918,6 +1918,11 @@ export interface components {
             pageSize: number;
             /** @example 240 */
             total: number;
+            /**
+             * Format: date-time
+             * @example 2026-09-15T23:00:00.000Z
+             */
+            referenciaTemporal: string;
         };
         AutorDoEventoDto: {
             /** Format: uuid */
@@ -3846,6 +3851,8 @@ export interface operations {
                  * @description DEPRECIADO (SPEC-041/D5) — desde a SPEC-041 o app mostra as canceladas marcadas em vez de escondê-las; use `status` para filtrar. Mantido só pela janela de skew entre os deploys do Back e do Cliente. Exclui ocupações canceladas. Pode ser combinado com `status` — os dois viram um `AND`, então `status=pago&excluirCanceladas=true` devolve só as pagas.
                  */
                 excluirCanceladas?: boolean;
+                /** @description Instante que o servidor usou na 1ª página desta travessia. Reenviado nas seguintes para a fronteira não andar entre elas. Omitido = agora. */
+                referenciaTemporal?: string;
                 data?: string;
                 page?: number;
                 pageSize?: number;

@@ -51,6 +51,17 @@ export interface Paginated<T> {
 }
 
 /**
+ * SPEC-041/AC-016 — paginação cujo conjunto depende do RELÓGIO.
+ *
+ * A lista de reservas é cortada entre passado e futuro, e essa fronteira anda
+ * sozinha. O servidor devolve o instante que usou; quem pagina reenvia, para a
+ * página 2 ver o mesmo conjunto que a página 1.
+ */
+export interface PaginadoComReferencia<T> extends Paginated<T> {
+  referenciaTemporal: string;
+}
+
+/**
  * SPEC-020/TASK-007 — **estes dois tipos deixaram de ser escritos à mão.**
  *
  * Eram uma `interface Court` local, e foi ela que causou o DEF-012: dizia
@@ -761,7 +772,10 @@ export async function listMyBookings(
   // para o mesmo conceito — e `todas` não teria par nenhum, porque "todas" é a
   // AUSÊNCIA do parâmetro, não um valor dele.
   status?: Booking["statusPagamento"],
-): Promise<Paginated<ItemDaListaDeReservas>> {
+  // SPEC-041/AC-016 — o instante da 1ª página desta travessia. Ver
+  // `useTravessia` em `my-bookings-list.tsx`.
+  referenciaTemporal?: string,
+): Promise<PaginadoComReferencia<ItemDaListaDeReservas>> {
   // SPEC-041 — **`excluirCanceladas=true` saiu daqui, e era o defeito 2.**
   //
   // A SPEC-027 mudou o filtro de lugar (tela → servidor) para consertar a
@@ -777,8 +791,9 @@ export async function listMyBookings(
     quando,
   });
   if (status) busca.set("status", status);
+  if (referenciaTemporal) busca.set("referenciaTemporal", referenciaTemporal);
   const res = await authFetch(`/bookings?${busca.toString()}`);
-  return (await res.json()) as Paginated<ItemDaListaDeReservas>;
+  return (await res.json()) as PaginadoComReferencia<ItemDaListaDeReservas>;
 }
 
 export async function cancelBooking(id: string): Promise<void> {

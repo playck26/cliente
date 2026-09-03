@@ -167,6 +167,7 @@ describe("MyBookingsList — a página que deixou de existir", () => {
         20,
         "futuras",
         undefined,
+        undefined,
       ),
     );
 
@@ -180,6 +181,7 @@ describe("MyBookingsList — a página que deixou de existir", () => {
         1,
         20,
         "futuras",
+        undefined,
         undefined,
       ),
     );
@@ -252,6 +254,7 @@ describe("MyBookingsList — passado e canceladas (SPEC-041)", () => {
       1,
       20,
       "futuras",
+      undefined,
       undefined,
     );
   });
@@ -336,6 +339,7 @@ describe("MyBookingsList — passado e canceladas (SPEC-041)", () => {
         1,
         20,
         "anteriores",
+        undefined,
         undefined,
       ),
     );
@@ -470,6 +474,7 @@ describe("MyBookingsList — autoria e filtro (SPEC-041/Fase B)", () => {
         20,
         "futuras",
         "cancelado",
+        undefined,
       ),
     );
   });
@@ -487,6 +492,7 @@ describe("MyBookingsList — autoria e filtro (SPEC-041/Fase B)", () => {
         1,
         20,
         "futuras",
+        undefined,
         undefined,
       ),
     );
@@ -516,5 +522,99 @@ describe("MyBookingsList — autoria e filtro (SPEC-041/Fase B)", () => {
     fireEvent.click(screen.getByRole("button", { name: "Todas" }));
 
     expect(push.mock.calls[0][0]).toBe("/reservas?aba=anteriores");
+  });
+});
+
+/**
+ * SPEC-041/AC-016 — **a travessia de lista, do lado da tela.**
+ *
+ * O servidor congela o instante e devolve; quem pagina reenvia. Sem isso a
+ * fronteira anda entre a página 1 e a página 2, e o primeiro item da segunda
+ * nunca aparece.
+ */
+describe("MyBookingsList — a referência temporal (SPEC-041/B5)", () => {
+  const REFERENCIA = "2026-09-15T23:59:00.000Z";
+
+  function pagina(n: number, total: number) {
+    return {
+      page: n,
+      pageSize: 20,
+      total,
+      referenciaTemporal: REFERENCIA,
+      data: Array.from({ length: Math.min(20, total) }, (_, i) => ({
+        ...reserva("pago"),
+        id: `p${n}-${i}`,
+      })),
+    };
+  }
+
+  beforeEach(() => {
+    push.mockReset();
+    params.valor = "";
+    listMyBookingsMock.mockReset();
+    getPublicPaymentConfigMock.mockReset().mockResolvedValue({});
+    listCourtsMock.mockReset().mockResolvedValue({ data: [], total: 0 });
+    cancelBookingMock.mockReset().mockResolvedValue(undefined);
+  });
+
+  it("a primeira página NÃO envia referência — quem decide é o servidor", async () => {
+    listMyBookingsMock.mockResolvedValue(pagina(1, 5));
+
+    render(<MyBookingsList />);
+
+    await waitFor(() =>
+      expect(listMyBookingsMock).toHaveBeenCalledWith(
+        1,
+        20,
+        "futuras",
+        undefined,
+        undefined,
+      ),
+    );
+  });
+
+  it("a página 2 reenvia a referência que a página 1 recebeu", async () => {
+    listMyBookingsMock.mockResolvedValue(pagina(1, 40));
+
+    render(<MyBookingsList />);
+    fireEvent.click(
+      await screen.findByLabelText("Próxima página de minhas reservas"),
+    );
+
+    await waitFor(() =>
+      expect(listMyBookingsMock).toHaveBeenCalledWith(
+        2,
+        20,
+        "futuras",
+        undefined,
+        REFERENCIA,
+      ),
+    );
+  });
+
+  it("trocar de filtro começa uma referência NOVA", async () => {
+    // Conjunto novo, fronteira nova. Reaproveitar congelaria um instante que
+    // já não descreve esta lista — e trocar de filtro não remonta o
+    // componente, então o `key` da aba não salva aqui.
+    listMyBookingsMock.mockResolvedValue(pagina(1, 40));
+
+    render(<MyBookingsList />);
+    fireEvent.click(
+      await screen.findByLabelText("Próxima página de minhas reservas"),
+    );
+    await waitFor(() => expect(listMyBookingsMock).toHaveBeenCalledTimes(2));
+
+    listMyBookingsMock.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Pagas" }));
+
+    await waitFor(() =>
+      expect(listMyBookingsMock).toHaveBeenCalledWith(
+        1,
+        20,
+        "futuras",
+        undefined,
+        undefined,
+      ),
+    );
   });
 });
