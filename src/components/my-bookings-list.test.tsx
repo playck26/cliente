@@ -2,8 +2,16 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MyBookingsList } from "./my-bookings-list";
 
+// SPEC-041/B4 — a tela passou a ler o filtro da URL, entao o mock precisa
+// servir `useSearchParams` tambem. `params.valor` e mutavel para cada teste
+// escolher o filtro que quer, no molde de `reservas-tabs.test.tsx`.
+const push = vi.hoisted(() => vi.fn());
+const params = vi.hoisted(() => ({ valor: "" }));
+
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), back: vi.fn() }),
+  useRouter: () => ({ push, back: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(params.valor),
+  usePathname: () => "/reservas",
 }));
 
 vi.mock("@/components/bottom-nav", () => ({ BottomNav: () => null }));
@@ -154,7 +162,13 @@ describe("MyBookingsList — a página que deixou de existir", () => {
       await screen.findByLabelText("Próxima página de minhas reservas"),
     );
     await waitFor(() =>
-      expect(listMyBookingsMock).toHaveBeenCalledWith(2, 20, "futuras"),
+      expect(listMyBookingsMock).toHaveBeenCalledWith(
+        2,
+        20,
+        "futuras",
+        undefined,
+        undefined,
+      ),
     );
 
     fireEvent.click(
@@ -163,7 +177,13 @@ describe("MyBookingsList — a página que deixou de existir", () => {
 
     // O que a pessoa NÃO pode ver: "não há nada" com 20 reservas vivas.
     await waitFor(() =>
-      expect(listMyBookingsMock).toHaveBeenCalledWith(1, 20, "futuras"),
+      expect(listMyBookingsMock).toHaveBeenCalledWith(
+        1,
+        20,
+        "futuras",
+        undefined,
+        undefined,
+      ),
     );
     expect(
       screen.queryByText("Nenhuma reserva por vir"),
@@ -230,7 +250,13 @@ describe("MyBookingsList — passado e canceladas (SPEC-041)", () => {
     render(<MyBookingsList />);
 
     await waitFor(() => expect(listMyBookingsMock).toHaveBeenCalled());
-    expect(listMyBookingsMock).toHaveBeenCalledWith(1, 20, "futuras");
+    expect(listMyBookingsMock).toHaveBeenCalledWith(
+      1,
+      20,
+      "futuras",
+      undefined,
+      undefined,
+    );
   });
 
   it("AC-006: cancelada aparece marcada — e o grid de ações some INTEIRO", async () => {
@@ -309,7 +335,13 @@ describe("MyBookingsList — passado e canceladas (SPEC-041)", () => {
     render(<MyBookingsList aba="anteriores" />);
 
     await waitFor(() =>
-      expect(listMyBookingsMock).toHaveBeenCalledWith(1, 20, "anteriores"),
+      expect(listMyBookingsMock).toHaveBeenCalledWith(
+        1,
+        20,
+        "anteriores",
+        undefined,
+        undefined,
+      ),
     );
     expect(await screen.findByText("O que já passou")).toBeInTheDocument();
     // O vazio de uma aba não serve à outra: "suas próximas reservas aparecerão
@@ -378,5 +410,211 @@ describe("MyBookingsList — o passado não é operável (SPEC-042)", () => {
     expect(
       await screen.findByRole("button", { name: "Cancelar" }),
     ).toBeInTheDocument();
+  });
+});
+
+/**
+ * SPEC-041 Fase B — **quem cancelou, e o filtro na URL.**
+ */
+describe("MyBookingsList — autoria e filtro (SPEC-041/Fase B)", () => {
+  function responder(over: Record<string, unknown>) {
+    listMyBookingsMock.mockResolvedValue({
+      page: 1,
+      pageSize: 20,
+      total: 1,
+      data: [{ ...reserva("cancelado"), id: "c1", ...over }],
+    });
+  }
+
+  beforeEach(() => {
+    push.mockReset();
+    params.valor = "";
+    listMyBookingsMock.mockReset();
+    getPublicPaymentConfigMock.mockReset().mockResolvedValue({});
+    listCourtsMock.mockReset().mockResolvedValue({ data: [], total: 0 });
+    cancelBookingMock.mockReset().mockResolvedValue(undefined);
+  });
+
+  // AC-012 — três estados, três frases. O nulo CALA: sem histórico é diferente
+  // de sem cancelamento, e inventar texto para ele é o erro do "criada por —".
+  it.each([
+    [true, "Você cancelou esta reserva."],
+    [false, "Cancelada pelo clube."],
+    [null, "Esta reserva foi cancelada."],
+  ])("canceladaPorMim=%s mostra a frase certa", async (valor, frase) => {
+    responder({ canceladaPorMim: valor });
+
+    render(<MyBookingsList />);
+
+    expect(await screen.findByText(frase)).toBeInTheDocument();
+  });
+
+  it("AC-013: o nome de quem cancelou não aparece em lugar nenhum", async () => {
+    // O payload nem traz o nome (INV-092, provada no servidor). Esta é a
+    // contraparte de tela: nenhuma frase o inventa a partir do booleano.
+    responder({ canceladaPorMim: false });
+
+    render(<MyBookingsList />);
+
+    await screen.findByText("Cancelada pelo clube.");
+    expect(screen.queryByText(/por [A-Z]/)).not.toBeInTheDocument();
+  });
+
+  it("AC-014: o filtro da URL vai para a API, com o valor da API", async () => {
+    // D6 — a URL carrega `cancelado`, não `canceladas`. O português vive só no
+    // rótulo do botão; uma camada de tradução seria um segundo vocabulário.
+    params.valor = "status=cancelado";
+    responder({ canceladaPorMim: null });
+
+    render(<MyBookingsList />);
+
+    await waitFor(() =>
+      expect(listMyBookingsMock).toHaveBeenCalledWith(
+        1,
+        20,
+        "futuras",
+        "cancelado",
+        undefined,
+      ),
+    );
+  });
+
+  it("valor desconhecido na URL cai em `todas`, em silêncio", async () => {
+    // Link velho ou URL editada à mão. Repassar `?status=canceladas` direto
+    // daria 400 no servidor — é exatamente o que esta normalização impede.
+    params.valor = "status=canceladas";
+    responder({ canceladaPorMim: null });
+
+    render(<MyBookingsList />);
+
+    await waitFor(() =>
+      expect(listMyBookingsMock).toHaveBeenCalledWith(
+        1,
+        20,
+        "futuras",
+        undefined,
+        undefined,
+      ),
+    );
+  });
+
+  it("escolher um filtro preserva a aba na URL", async () => {
+    params.valor = "aba=anteriores";
+    responder({ canceladaPorMim: null });
+
+    render(<MyBookingsList aba="anteriores" />);
+    await screen.findByLabelText("Reservas anteriores");
+    fireEvent.click(screen.getByRole("button", { name: "Canceladas" }));
+
+    const [url] = push.mock.calls[0] as [string];
+    const query = new URLSearchParams(url.split("?")[1]);
+    expect(query.get("status")).toBe("cancelado");
+    // Sem o conserto da TASK-B3 a aba sumiria aqui.
+    expect(query.get("aba")).toBe("anteriores");
+  });
+
+  it("voltar para `Todas` tira o status e mantém o resto", async () => {
+    params.valor = "aba=anteriores&status=cancelado";
+    responder({ canceladaPorMim: null });
+
+    render(<MyBookingsList aba="anteriores" />);
+    await screen.findByLabelText("Reservas anteriores");
+    fireEvent.click(screen.getByRole("button", { name: "Todas" }));
+
+    expect(push.mock.calls[0][0]).toBe("/reservas?aba=anteriores");
+  });
+});
+
+/**
+ * SPEC-041/AC-016 — **a travessia de lista, do lado da tela.**
+ *
+ * O servidor congela o instante e devolve; quem pagina reenvia. Sem isso a
+ * fronteira anda entre a página 1 e a página 2, e o primeiro item da segunda
+ * nunca aparece.
+ */
+describe("MyBookingsList — a referência temporal (SPEC-041/B5)", () => {
+  const REFERENCIA = "2026-09-15T23:59:00.000Z";
+
+  function pagina(n: number, total: number) {
+    return {
+      page: n,
+      pageSize: 20,
+      total,
+      referenciaTemporal: REFERENCIA,
+      data: Array.from({ length: Math.min(20, total) }, (_, i) => ({
+        ...reserva("pago"),
+        id: `p${n}-${i}`,
+      })),
+    };
+  }
+
+  beforeEach(() => {
+    push.mockReset();
+    params.valor = "";
+    listMyBookingsMock.mockReset();
+    getPublicPaymentConfigMock.mockReset().mockResolvedValue({});
+    listCourtsMock.mockReset().mockResolvedValue({ data: [], total: 0 });
+    cancelBookingMock.mockReset().mockResolvedValue(undefined);
+  });
+
+  it("a primeira página NÃO envia referência — quem decide é o servidor", async () => {
+    listMyBookingsMock.mockResolvedValue(pagina(1, 5));
+
+    render(<MyBookingsList />);
+
+    await waitFor(() =>
+      expect(listMyBookingsMock).toHaveBeenCalledWith(
+        1,
+        20,
+        "futuras",
+        undefined,
+        undefined,
+      ),
+    );
+  });
+
+  it("a página 2 reenvia a referência que a página 1 recebeu", async () => {
+    listMyBookingsMock.mockResolvedValue(pagina(1, 40));
+
+    render(<MyBookingsList />);
+    fireEvent.click(
+      await screen.findByLabelText("Próxima página de minhas reservas"),
+    );
+
+    await waitFor(() =>
+      expect(listMyBookingsMock).toHaveBeenCalledWith(
+        2,
+        20,
+        "futuras",
+        undefined,
+        REFERENCIA,
+      ),
+    );
+  });
+
+  it("trocar de filtro começa uma referência NOVA", async () => {
+    // Conjunto novo, fronteira nova. Reaproveitar congelaria um instante que
+    // já não descreve esta lista — e trocar de filtro não remonta o
+    // componente, então o `key` da aba não salva aqui.
+    listMyBookingsMock.mockResolvedValue(pagina(1, 40));
+
+    render(<MyBookingsList />);
+    fireEvent.click(
+      await screen.findByLabelText("Próxima página de minhas reservas"),
+    );
+    await waitFor(() => expect(listMyBookingsMock).toHaveBeenCalledTimes(2));
+
+    listMyBookingsMock.mockClear();
+    fireEvent.click(screen.getByRole("button", { name: "Pagas" }));
+
+    await waitFor(() =>
+      expect(listMyBookingsMock).toHaveBeenCalledWith(
+        1,
+        20,
+        "futuras",
+        undefined,
+        undefined,
+      ),
+    );
   });
 });

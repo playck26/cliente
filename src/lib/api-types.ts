@@ -1886,14 +1886,43 @@ export interface components {
         ReservasCriadasResponseDto: {
             reservas: components["schemas"]["OcupacaoResponseDto"][];
         };
+        ItemDaListaDeReservasDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            companyId: string;
+            /** Format: uuid */
+            quadraId: string;
+            /** @example 2026-09-01 */
+            data: string;
+            /** @example 18:00 */
+            horaInicio: string;
+            /** @example 19:00 */
+            horaFim: string;
+            /** @enum {string} */
+            origemTipo: "AVULSO" | "TURMA";
+            /** Format: uuid */
+            alunoId: string | null;
+            /** @enum {string} */
+            statusPagamento: "pendente_pagamento" | "pago" | "cancelado";
+            /** @example 120 */
+            valor: number | null;
+            /** @description Foi quem está pedindo que cancelou? `true` = eu, `false` = outra pessoa, `null` = não foi cancelada, não há evento registrado (anterior à SPEC-032), ou quem pede é o gestor. **Nunca traz nome, id ou objeto do autor** (INV-092). */
+            canceladaPorMim: boolean | null;
+        };
         OcupacaoPaginadaResponseDto: {
-            data: components["schemas"]["OcupacaoResponseDto"][];
+            data: components["schemas"]["ItemDaListaDeReservasDto"][];
             /** @example 1 */
             page: number;
             /** @example 20 */
             pageSize: number;
             /** @example 240 */
             total: number;
+            /**
+             * Format: date-time
+             * @example 2026-09-15T23:00:00.000Z
+             */
+            referenciaTemporal: string;
         };
         AutorDoEventoDto: {
             /** Format: uuid */
@@ -3822,6 +3851,8 @@ export interface operations {
                  * @description DEPRECIADO (SPEC-041/D5) — desde a SPEC-041 o app mostra as canceladas marcadas em vez de escondê-las; use `status` para filtrar. Mantido só pela janela de skew entre os deploys do Back e do Cliente. Exclui ocupações canceladas. Pode ser combinado com `status` — os dois viram um `AND`, então `status=pago&excluirCanceladas=true` devolve só as pagas.
                  */
                 excluirCanceladas?: boolean;
+                /** @description Instante que o servidor usou na 1ª página desta travessia. Reenviado nas seguintes para a fronteira não andar entre elas. Omitido = agora. */
+                referenciaTemporal?: string;
                 data?: string;
                 page?: number;
                 pageSize?: number;

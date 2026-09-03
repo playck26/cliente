@@ -78,19 +78,33 @@ page.tsx (server component, fino)
 | **Aba e vista** | **na URL** (`?aba=`, `?vista=`), não em `useState` |
 | Global | **não existe** |
 
+**SPEC-041/Fase B — a URL ganhou um terceiro morador, e o filtro de reservas
+carrega o valor da API** (`?status=cancelado`), não um apelido em português. O
+rótulo do botão é que traduz. Uma camada de tradução seria um segundo
+vocabulário para o mesmo conceito, e não cobriria "Todas", que é a **ausência**
+do parâmetro — são quatro estados de tela para três valores de API.
+
+**O `GrupoDeFiltro` saiu de dentro do `courts-list`** e virou arquivo próprio
+quando as reservas precisaram dele. Mesmo caminho do `abas-na-url` na SPEC-023,
+e pelo mesmo motivo: a cópia é sempre a que fica velha.
+
 **A URL guarda o que a pessoa escolheu ver.** `abas-na-url.tsx` (aba) e o
 `useVista` de `my-classes-list.tsx` (lista × semana) seguem a mesma regra: link
 compartilhável, "voltar" que desfaz a troca, valor desconhecido cai no padrão
 em silêncio, e **o padrão sai do endereço** — endereço limpo é o que a pessoa
 copia.
 
-**A frase que estava aqui — "quem escreve preserva o resto da query" — era
-falsa, e a validação cruzada da SPEC-041 mostrou.** `abas-na-url.tsx` reconstrói
-a URL **só** com `aba`, e o ramo do padrão é o pior: empurra o caminho pelado e
-apaga tudo. Já é defeito em produção em `/minhas-aulas`, onde `?vista=semana`
-some ao trocar de aba. Quem preserva é o `useVista` — um dos dois, não os dois.
-Conserto na SPEC-041/B3; até lá, **isto aqui é descrição do que deveria ser, e
-está marcado como tal**.
+**Isto passou a ser verdade em 2026-09-02, e antes disso era mentira.**
+`abas-na-url.tsx` reconstruía a URL **só** com `aba` — o ramo do padrão era o
+pior, empurrando o caminho pelado —, e o `useVista` era o único dos dois que
+preservava. Em `/minhas-aulas`, o `?vista=semana` sumia ao trocar de aba, em
+produção.
+
+Pior que o defeito: **o comentário do `useVista` creditava o cuidado à barra de
+abas**, e esta planta repetia. Achado pela validação cruzada da SPEC-041,
+consertado na TASK-B3 — helper, comentário e esta frase no mesmo ciclo, com
+`abas-na-url.test.tsx`, que **não existia** apesar de o helper governar três
+telas. A prova do ramo padrão é a que ninguém tinha.
 
 **Data e hora saem de `lib/fuso.ts`, nunca de `new Date().toISOString()`**
 (DEF-020). `toISOString()` converte para UTC, e no Brasil isso já é o dia

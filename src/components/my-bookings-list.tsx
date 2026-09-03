@@ -11,6 +11,8 @@ import {
 import { CapaDaQuadra } from "@/components/capa-da-quadra";
 import { CourtLines } from "@/components/court-lines";
 import { Button } from "@/components/ui/button";
+import { useRouter, useSearchParams } from "next/navigation";
+import { GrupoDeFiltro } from "@/components/grupo-de-filtro";
 import {
   ApiError,
   cancelBooking,
@@ -19,6 +21,7 @@ import {
   listMyBookings,
   type Booking,
   type Court,
+  type ItemDaListaDeReservas,
   type PublicPaymentConfig,
 } from "@/lib/api-client";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
@@ -51,7 +54,86 @@ function formatarData(data: string): string {
  * servidor devolve estado, não frase em português. Numa constante só, para a
  * spec do nome configurável trocar em um lugar.
  */
-const TEXTO_RESERVA_CANCELADA = "Esta reserva foi cancelada.";
+/**
+ * SPEC-041/AC-012 e LIM-041c — **as três frases do cancelamento.**
+ *
+ * O aluno não vê NOME de quem cancelou: vê qual dos dois casos. Nome de
+ * funcionário na tela do aluno é informação que ninguém pediu e que cria
+ * expectativa de contato direto (D2).
+ *
+ * **"clube" é provisório por decisão do Israel**, não por descuido: *"o nome
+ * nem vai ser clube — teremos uma definição para o nome que o dono quiser pôr,
+ * nas configurações do admin da empresa, mas isso é coisa mais pra frente."*
+ * Fica aqui, numa constante só, para a spec futura trocar em um lugar.
+ *
+ * Fica no **Cliente** e não no `back` porque é *copy* de interface: o servidor
+ * devolve classificação (`canceladaPorMim`), não frase em português.
+ *
+ * **E o caso `null` cala.** Sem histórico é diferente de sem cancelamento, e
+ * inventar texto para o nulo é o mesmo erro do "criada por —" que a SPEC-032
+ * recusou. É também o estado normal de tudo que foi cancelado antes dela
+ * (LIM-041b).
+ */
+const TEXTO_CANCELAMENTO = {
+  eu: "Você cancelou esta reserva.",
+  clube: "Cancelada pelo clube.",
+  semRegistro: "Esta reserva foi cancelada.",
+} as const;
+
+function textoDoCancelamento(canceladaPorMim: boolean | null): string {
+  if (canceladaPorMim === true) return TEXTO_CANCELAMENTO.eu;
+  if (canceladaPorMim === false) return TEXTO_CANCELAMENTO.clube;
+  return TEXTO_CANCELAMENTO.semRegistro;
+}
+
+/**
+ * SPEC-041/AC-014 e D6 — **os quatro estados do filtro, e só três têm valor.**
+ *
+ * "Todas" é a AUSÊNCIA do parâmetro, não um valor dele — por isso um mapa
+ * 1-para-1 não serviria: são quatro estados de tela para três valores de API.
+ *
+ * A URL carrega o valor da API (`?status=cancelado`), e o português vive só no
+ * rótulo. Sem camada de tradução: ela seria um segundo vocabulário para o
+ * mesmo conceito, e é ela que produziria o 400 se alguém repassasse
+ * `?status=canceladas` direto.
+ */
+const FILTROS_DE_STATUS = [
+  { id: "pendente_pagamento", nome: "Pendentes" },
+  { id: "pago", nome: "Pagas" },
+  { id: "cancelado", nome: "Canceladas" },
+] as const;
+
+type StatusDeFiltro = Booking["statusPagamento"];
+
+/**
+ * O filtro mora na URL, no molde do `useVista` de `my-classes-list`: link
+ * compartilhável, "voltar" que desfaz, e valor desconhecido caindo em "todas"
+ * **em silêncio** — URL editada à mão ou link velho não merece erro na cara.
+ *
+ * Preserva o resto da query em vez de reescrever o endereço. O `abas-na-url`
+ * fazia o contrário até a TASK-B3 de hoje, e era defeito em produção.
+ */
+function useStatusNaUrl(): {
+  status: StatusDeFiltro | null;
+  irPara: (s: string | null) => void;
+} {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const cru = searchParams.get("status");
+  const status = FILTROS_DE_STATUS.some((f) => f.id === cru)
+    ? (cru as StatusDeFiltro)
+    : null;
+
+  const irPara = (novo: string | null) => {
+    const params = new URLSearchParams(searchParams.toString());
+    if (novo) params.set("status", novo);
+    else params.delete("status");
+    const qs = params.toString();
+    router.push(qs ? `/reservas?${qs}` : "/reservas", { scroll: false });
+  };
+
+  return { status, irPara };
+}
 
 const STATUS_LABEL: Record<Booking["statusPagamento"], string> = {
   pendente_pagamento: "Pagamento pendente",
@@ -94,7 +176,8 @@ export function MyBookingsList({
 } = {}) {
   const copy = COPY_DA_ABA[aba];
   const quando = aba === "anteriores" ? "anteriores" : "futuras";
-  const [bookings, setBookings] = useState<Booking[]>([]);
+  const { status, irPara: navegarParaStatus } = useStatusNaUrl();
+  const [bookings, setBookings] = useState<ItemDaListaDeReservas[]>([]);
   const [courts, setCourts] = useState<Court[]>([]);
   const [paymentConfig, setPaymentConfig] =
     useState<PublicPaymentConfig | null>(null);
@@ -105,6 +188,18 @@ export function MyBookingsList({
     null,
   );
   const [pagina, setPagina] = useState(1);
+  /**
+   * SPEC-041/AC-016 — **o instante desta travessia de lista.**
+   *
+   * `null` = começar uma nova (o servidor decide e devolve). A regra de quando
+   * zerar é curta: **só a paginação reaproveita**; trocar de aba ou de filtro
+   * muda o conjunto de propósito, e aí a fronteira nova é a certa.
+   *
+   * Trocar de aba já zera sozinho — o `key` em `reservas-tabs` remonta o
+   * componente inteiro. Trocar de filtro **não** remonta, e por isso o
+   * `filtrarPor` limpa isto à mão.
+   */
+  const [referencia, setReferencia] = useState<string | null>(null);
   const [total, setTotal] = useState(0);
   const [tamanho, setTamanho] = useState(20);
 
@@ -113,7 +208,13 @@ export function MyBookingsList({
     setError(null);
     try {
       const [bookingsResult, courtsResult] = await Promise.all([
-        listMyBookings(pagina, 20, quando),
+        listMyBookings(
+          pagina,
+          20,
+          quando,
+          status ?? undefined,
+          referencia ?? undefined,
+        ),
         listCourts(),
       ]);
       // SPEC-027: o `.filter` de canceladas saiu daqui e foi para o servidor
@@ -162,6 +263,9 @@ export function MyBookingsList({
        * no servidor apareceria na tela: quem ordena agora é quem tem a lista
        * inteira, que é o único que pode.
        */
+      // Guarda o instante que o servidor usou, para as próximas páginas.
+      // Idempotente: reenviar o mesmo devolve o mesmo.
+      setReferencia(bookingsResult.referenciaTemporal);
       setBookings(bookingsResult.data);
       setTotal(bookingsResult.total);
       setTamanho(bookingsResult.pageSize);
@@ -180,8 +284,17 @@ export function MyBookingsList({
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void load();
+    // `status` entra na lista porque trocar o filtro muda o conjunto.
+    //
+    // `load` fica de fora, e a regra reclama disso: ela é recriada a cada
+    // render, então incluí-la faria o efeito rodar sem parar. A saída certa
+    // seria `useCallback`, mas ela arrastaria as sete dependências de `load`
+    // para cá e o efeito voltaria a disparar por motivo errado. Fica
+    // declarado em vez de silenciado — o `disable` que morava aqui ficou
+    // órfão quando a lista mudou, e comentário que não desabilita nada é
+    // pior que advertência visível.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pagina, quando]);
+  }, [pagina, quando, status]);
 
   useEffect(() => {
     // A config de pagamento não muda com a página — buscar uma vez.
@@ -205,6 +318,21 @@ export function MyBookingsList({
     } finally {
       setCancelingId(null);
     }
+  }
+
+  /**
+   * Trocar o filtro volta para a página 1, e isso não é detalhe: pedir a
+   * página 3 de um conjunto que acabou de encolher devolve lista vazia com
+   * `total` alto — a contagem mentirosa que a SPEC-027 consertou, por outro
+   * caminho. O `useState` de `pagina` não sabe que a URL mudou; quem sabe é
+   * quem muda.
+   */
+  function filtrarPor(novo: string | null) {
+    setPagina(1);
+    // Conjunto novo, fronteira nova. Reaproveitar a referência aqui
+    // congelaria um instante que já não descreve esta lista.
+    setReferencia(null);
+    navegarParaStatus(novo);
   }
 
   function quadraDaReserva(quadraId: string): Court | undefined {
@@ -254,6 +382,18 @@ export function MyBookingsList({
                 </p>
               </div>
             </div>
+
+            {/* SPEC-041/AC-014 — o filtro que o Israel pediu ("podemos colocar
+                tipo uns filtros pra mostrar as canceladas"). Começa por
+                status, que é o que os dois defeitos pediram; quadra e período
+                esperam uso real dizer se fazem falta (LIM-041a). */}
+            <GrupoDeFiltro
+              rotulo="Filtrar reservas por situação"
+              textoTodas="Todas"
+              opcoes={FILTROS_DE_STATUS}
+              escolhida={status}
+              onEscolher={filtrarPor}
+            />
           </div>
         </section>
 
@@ -398,7 +538,7 @@ export function MyBookingsList({
                     */}
                     {cancelada ? (
                       <p className="mt-4 rounded-2xl bg-[var(--color-surface-container)] p-3 text-center text-[13px] font-bold text-[var(--color-text-secondary)]">
-                        {TEXTO_RESERVA_CANCELADA}
+                        {textoDoCancelamento(booking.canceladaPorMim)}
                       </p>
                     ) : (
                       <div
