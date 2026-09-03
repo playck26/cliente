@@ -38,11 +38,31 @@ export function useAbaAtiva<Id extends string>(
   // `push` e não `replace`, para o "voltar" ter o que desfazer.
   // `scroll: false` porque trocar de aba não é ir para outra tela — a
   // pessoa perderia a posição de leitura sem motivo.
+  //
+  // **SPEC-041/B3 — este helper APAGAVA o resto da query, e isso já era
+  // defeito em produção.**
+  //
+  // Ele reconstruía o endereço só com `aba`, então tudo o mais sumia na
+  // troca. O ramo do padrão era o pior dos dois: empurrava o caminho pelado.
+  // Em `/minhas-aulas`, o `?vista=semana` que o `my-classes-list` acabara de
+  // pôr desaparecia quando a pessoa ia para "Turmas" e voltava.
+  //
+  // **E a documentação afirmava o contrário.** O comentário do `useVista`
+  // dizia que preservar a query era "assim que a barra de abas evitou de
+  // apagar o que não é dela" — creditando à barra um cuidado que só o
+  // `useVista` tinha. A planta do Cliente repetia. Os dois foram corrigidos
+  // no mesmo ciclo; ver a nota lá.
+  //
+  // Agora parte da query existente e mexe **só** na própria chave. O padrão
+  // continua saindo do endereço — endereço limpo é o que a pessoa copia —,
+  // mas agora `delete` em vez de "reescrever do zero".
   const irPara = (aba: Id) => {
     if (aba === ativa) return;
-    router.push(aba === padrao ? caminho : `${caminho}?aba=${aba}`, {
-      scroll: false,
-    });
+    const params = new URLSearchParams(searchParams.toString());
+    if (aba === padrao) params.delete("aba");
+    else params.set("aba", aba);
+    const qs = params.toString();
+    router.push(qs ? `${caminho}?${qs}` : caminho, { scroll: false });
   };
 
   return { ativa, irPara };
