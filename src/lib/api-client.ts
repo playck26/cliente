@@ -107,6 +107,16 @@ export type Availability = components["schemas"]["DisponibilidadeResponseDto"];
 
 export type Booking = components["schemas"]["OcupacaoResponseDto"];
 
+/**
+ * SPEC-041/AC-011 — **o item da LISTAGEM, que não é o mesmo que `Booking`.**
+ *
+ * Ele carrega `canceladaPorMim`, que depende de **quem está pedindo** e por
+ * isso não cabe no DTO compartilhado por `POST /bookings` e pelo `PATCH` de
+ * pagamento. Apelido do schema, nunca escrito à mão (INV-059).
+ */
+export type ItemDaListaDeReservas =
+  components["schemas"]["ItemDaListaDeReservasDto"];
+
 export type MyClass = components["schemas"]["AulaDoAlunoResponseDto"];
 
 /**
@@ -745,7 +755,13 @@ export async function listMyBookings(
   page = 1,
   pageSize = 20,
   quando: "futuras" | "anteriores" = "futuras",
-): Promise<Paginated<Booking>> {
+  // SPEC-041/D6 — **o valor da API, não um apelido.** A URL da tela carrega
+  // `?status=cancelado`, e o português vive só no rótulo do botão, como já faz
+  // o `STATUS_LABEL`. Uma camada de tradução aqui seria um segundo vocabulário
+  // para o mesmo conceito — e `todas` não teria par nenhum, porque "todas" é a
+  // AUSÊNCIA do parâmetro, não um valor dele.
+  status?: Booking["statusPagamento"],
+): Promise<Paginated<ItemDaListaDeReservas>> {
   // SPEC-041 — **`excluirCanceladas=true` saiu daqui, e era o defeito 2.**
   //
   // A SPEC-027 mudou o filtro de lugar (tela → servidor) para consertar a
@@ -755,10 +771,14 @@ export async function listMyBookings(
   //
   // O parâmetro continua existindo na rota, `deprecated`, pela janela de skew
   // entre os deploys (ver o DTO no `back`). Quem sai é o único emissor.
-  const res = await authFetch(
-    `/bookings?page=${page}&pageSize=${pageSize}&quando=${quando}`,
-  );
-  return (await res.json()) as Paginated<Booking>;
+  const busca = new URLSearchParams({
+    page: String(page),
+    pageSize: String(pageSize),
+    quando,
+  });
+  if (status) busca.set("status", status);
+  const res = await authFetch(`/bookings?${busca.toString()}`);
+  return (await res.json()) as Paginated<ItemDaListaDeReservas>;
 }
 
 export async function cancelBooking(id: string): Promise<void> {

@@ -5,6 +5,9 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { TennisCourtIcon } from "@/components/icons/tennis-court-icon";
 import { CapaDaQuadra } from "@/components/capa-da-quadra";
+// SPEC-041/B4 — extraido daqui quando as reservas precisaram do mesmo grupo
+// de filtros. Copiar teria criado a segunda copia da mesma decisao.
+import { GrupoDeFiltro } from "@/components/grupo-de-filtro";
 import { TennisBallIcon } from "@/components/icons/tennis-ball-icon";
 import { ApiError, listCourts, type Court, type OpcaoDeCatalogo } from "@/lib/api-client";
 
@@ -48,36 +51,6 @@ function opcoesDe(quadras: Court[], de: (quadra: Court) => OpcaoDeCatalogo | nul
 
   const opcoes = [...porId.values()].sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
   return { opcoes, oferece: opcoes.length + (temSemOpcao ? 1 : 0) > 1 };
-}
-
-function GrupoDeFiltro({
-  rotulo,
-  textoTodas,
-  opcoes,
-  escolhida,
-  onEscolher,
-}: {
-  rotulo: string;
-  textoTodas: string;
-  opcoes: OpcaoDeCatalogo[];
-  escolhida: string | null;
-  onEscolher: (id: string | null) => void;
-}) {
-  const classe = (ativo: boolean) =>
-    `h-10 shrink-0 rounded-full px-4 text-[13px] font-extrabold transition-colors ${ativo ? "bg-white text-[var(--color-primary-strong)]" : "bg-white/10 text-white ring-1 ring-white/20"}`;
-
-  return (
-    <div role="group" aria-label={rotulo} className="no-scrollbar mt-4 flex gap-2 overflow-x-auto">
-      <button type="button" onClick={() => onEscolher(null)} aria-pressed={escolhida === null} className={classe(escolhida === null)}>
-        {textoTodas}
-      </button>
-      {opcoes.map((opcao) => (
-        <button key={opcao.id} type="button" onClick={() => onEscolher(opcao.id)} aria-pressed={escolhida === opcao.id} className={classe(escolhida === opcao.id)}>
-          {opcao.nome}
-        </button>
-      ))}
-    </div>
-  );
 }
 
 // REQ-005 (SPEC-005): aluno navega as quadras ativas da própria empresa.
