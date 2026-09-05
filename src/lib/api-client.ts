@@ -967,6 +967,23 @@ let empresaEmCache: Promise<MinhaEmpresa> | null = null;
  * `limparCacheDaEmpresa()` existe para o logout: a próxima pessoa a entrar
  * nesta aba pode ser de outro clube.
  */
+/**
+ * SPEC-031/AC-004 — os prazos do clube, pela rota do aluno.
+ *
+ * Devolve o corpo cru (`unknown`) de propósito: quem classifica é
+ * `lerCapacidadeOperacao`, e para ela **um `200` sem o campo é informação** —
+ * é o sinal de que o back é anterior à SPEC-031. Tipar aqui como
+ * `ConfigOperacao` afirmaria a presença do campo, que é justamente o que está
+ * em questão.
+ *
+ * Sem cache, e isso é deliberado: `getMinhaEmpresa` cacheia em módulo, e foi
+ * por causa desse cache que o prazo **não** entrou no payload dela (AC-005).
+ */
+export async function getPrazosDoClube(): Promise<unknown> {
+  const res = await authFetch("/me/company/operacao");
+  return (await res.json()) as unknown;
+}
+
 export async function getMinhaEmpresa(): Promise<MinhaEmpresa> {
   empresaEmCache ??= authFetch("/me/company")
     .then(async (res) => {
