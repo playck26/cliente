@@ -225,9 +225,20 @@ export function MinhaTurmaDetalheView({ id }: { id: string }) {
                     // o que seria recusado. Oferecer e depois recusar com
                     // 422 seria pior: a pessoa tocaria, esperaria e levaria
                     // um erro por algo que dava para saber antes.
+                    //
+                    // **SPEC-031/AC-019b — a cancelada TAMBÉM vira link**, e
+                    // isso não contradiz a regra acima: a tela de destino
+                    // entra em modo histórico e não oferece nada. O que a
+                    // regra proíbe é oferecer uma ação que seria recusada,
+                    // não oferecer a leitura de um registro que existe.
+                    //
+                    // Sem este link o AC-019 era promessa sobre uma tela
+                    // inalcançável: o professor não tinha por onde ver quem
+                    // avisou que ia faltar na aula que o clube cancelou — que
+                    // é exatamente quando a pergunta aparece.
                     return (
                       <li key={o.ocupacaoId}>
-                        {o.podeLancar ? (
+                        {o.podeLancar || o.cancelada ? (
                           <Link
                             href={`/chamada/${o.ocupacaoId}`}
                             className="block"
