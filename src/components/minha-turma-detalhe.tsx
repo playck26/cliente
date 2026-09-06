@@ -238,7 +238,7 @@ export function MinhaTurmaDetalheView({ id }: { id: string }) {
                     // é exatamente quando a pergunta aparece.
                     return (
                       <li key={o.ocupacaoId}>
-                        {o.podeLancar || o.cancelada ? (
+                        {o.podeLancar ? (
                           <Link
                             href={`/chamada/${o.ocupacaoId}`}
                             className="block"
