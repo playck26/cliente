@@ -14,6 +14,8 @@ import { MyClassesList } from "./my-classes-list";
 const push = vi.hoisted(() => vi.fn());
 const params = vi.hoisted(() => ({ valor: null as string | null }));
 const listMyClasses = vi.hoisted(() => vi.fn());
+const avisarFalta = vi.hoisted(() => vi.fn());
+const retirarAvisoDeFalta = vi.hoisted(() => vi.fn());
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push, back: vi.fn() }),
@@ -26,7 +28,7 @@ vi.mock("@/lib/api-client", async () => {
     await vi.importActual<typeof import("@/lib/api-client")>(
       "@/lib/api-client",
     );
-  return { ...real, listMyClasses };
+  return { ...real, listMyClasses, avisarFalta, retirarAvisoDeFalta };
 });
 
 const aula = {
@@ -39,6 +41,7 @@ const aula = {
   horaInicio: "18:00",
   horaFim: "19:00",
   naoRealizada: false,
+  faltaAvisada: false,
 };
 
 beforeEach(() => {
@@ -51,7 +54,9 @@ describe("quando o alternador aparece", () => {
   it("com aulas, os dois botões estão na tela", async () => {
     render(<MyClassesList />);
 
-    expect(await screen.findByRole("button", { name: "Lista" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: "Lista" }),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Semana" })).toBeInTheDocument();
   });
 
@@ -61,8 +66,12 @@ describe("quando o alternador aparece", () => {
     listMyClasses.mockResolvedValue([]);
     render(<MyClassesList />);
 
-    expect(await screen.findByText("Nenhuma aula agendada")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Semana" })).not.toBeInTheDocument();
+    expect(
+      await screen.findByText("Nenhuma aula agendada"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Semana" }),
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -96,10 +105,9 @@ describe("o que o botão escreve na URL", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: "Semana" }));
 
-    expect(push).toHaveBeenCalledWith(
-      "/minhas-aulas?aba=minhas&vista=semana",
-      { scroll: false },
-    );
+    expect(push).toHaveBeenCalledWith("/minhas-aulas?aba=minhas&vista=semana", {
+      scroll: false,
+    });
   });
 
   it("tocar na vista que já está ativa não navega", async () => {
@@ -167,5 +175,156 @@ describe("SPEC-030 — a aula não realizada, na vista do aluno", () => {
 
     expect(await screen.findByText("Agendada")).toBeInTheDocument();
     expect(screen.queryByText("Não realizada")).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * SPEC-031/REQ-006 — **o aluno avisa que vai faltar.**
+ *
+ * O que este bloco guarda é o par que mais custa quando quebra: o botão diz a
+ * verdade sobre o estado, e a tela **recarrega mesmo quando dá erro**.
+ *
+ * A segunda metade é a lição do `turmas-do-clube.tsx`, e ela vale aqui pelo
+ * mesmo motivo: o prazo envelhece entre a pintura e o toque. Receber
+ * `PRAZO_DE_CANCELAMENTO` e continuar mostrando o botão como antes seria a
+ * tela insistindo numa informação que o servidor acabou de desmentir.
+ */
+describe("MyClassesList — avisar falta (REQ-006)", () => {
+  const comAulas = (...as: (typeof aula)[]) => {
+    listMyClasses.mockResolvedValue(as);
+  };
+  const botao = () => screen.getByRole("button", { name: /falta/i });
+
+  beforeEach(() => {
+    avisarFalta.mockReset().mockResolvedValue(undefined);
+    retirarAvisoDeFalta.mockReset().mockResolvedValue(undefined);
+  });
+
+  it("sem aviso: mostra Agendada e oferece Vou faltar", async () => {
+    comAulas(aula);
+    render(<MyClassesList />);
+
+    expect(await screen.findByText("Agendada")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Avisar que vou faltar" }),
+    ).toBeTruthy();
+    expect(screen.queryByText("Falta avisada")).toBeNull();
+  });
+
+  it("com aviso: mostra Falta avisada e oferece Desfazer", async () => {
+    comAulas({ ...aula, faltaAvisada: true });
+    render(<MyClassesList />);
+
+    expect(await screen.findByText("Falta avisada")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Desfazer aviso de falta" }),
+    ).toBeTruthy();
+    // "Agendada" some: dizer as duas coisas sobre o mesmo estado seria a tela
+    // se contradizendo.
+    expect(screen.queryByText("Agendada")).toBeNull();
+  });
+
+  it("tocar Vou faltar chama o POST com turma e ocorrência", async () => {
+    comAulas(aula);
+    render(<MyClassesList />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Avisar que vou faltar" }),
+    );
+
+    await vi.waitFor(() =>
+      expect(avisarFalta).toHaveBeenCalledWith("t1", "o1"),
+    );
+    expect(retirarAvisoDeFalta).not.toHaveBeenCalled();
+  });
+
+  it("tocar Desfazer chama o DELETE, não o POST", async () => {
+    comAulas({ ...aula, faltaAvisada: true });
+    render(<MyClassesList />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Desfazer aviso de falta" }),
+    );
+
+    await vi.waitFor(() =>
+      expect(retirarAvisoDeFalta).toHaveBeenCalledWith("t1", "o1"),
+    );
+    expect(avisarFalta).not.toHaveBeenCalled();
+  });
+
+  /**
+   * **A prova que justifica o bloco.** A mensagem vem do servidor porque só
+   * ele sabe quantas horas o clube exige — e a tela recarrega, para não ficar
+   * mostrando um botão que o servidor acabou de recusar.
+   */
+  it("recusa dentro do prazo: mostra a mensagem DO SERVIDOR e recarrega", async () => {
+    comAulas(aula);
+    const { ApiError } =
+      await vi.importActual<typeof import("@/lib/api-client")>(
+        "@/lib/api-client",
+      );
+    avisarFalta.mockRejectedValue(
+      new ApiError(
+        409,
+        "Avisar ou retirar o aviso exige 2h de antecedência.",
+        "PRAZO_DE_CANCELAMENTO",
+      ),
+    );
+    render(<MyClassesList />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Avisar que vou faltar" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "exige 2h de antecedência",
+    );
+    // duas: a carga inicial e a releitura depois do erro.
+    await vi.waitFor(() => expect(listMyClasses).toHaveBeenCalledTimes(2));
+  });
+
+  /**
+   * Compatibilidade de rollout: um back anterior à TASK-009a responde `200`
+   * **sem** o campo. Ausência tem de ser lida como "não avisou" — nunca como
+   * erro, nunca como avisado.
+   */
+  it("back antigo (sem o campo) é lido como não avisado, sem quebrar", async () => {
+    // O campo é **omitido**, não posto como `false`: é assim que um back
+    // anterior à TASK-009a responde.
+    const semCampo = { ...aula };
+    delete (semCampo as { faltaAvisada?: boolean }).faltaAvisada;
+    comAulas(semCampo);
+    render(<MyClassesList />);
+
+    expect(await screen.findByText("Agendada")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Avisar que vou faltar" }),
+    ).toBeTruthy();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  /**
+   * A aula que não aconteceu não oferece nada: avisar falta de aula que não
+   * houve não tem sentido, e o servidor recusaria. Mesma regra da chamada —
+   * a tela só não oferece o que seria recusado.
+   */
+  it("aula não realizada não oferece o botão", async () => {
+    comAulas({ ...aula, naoRealizada: true });
+    render(<MyClassesList />);
+
+    expect(await screen.findByText("Não realizada")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /falta/i })).toBeNull();
+  });
+
+  it("enquanto a ação está em voo o botão fica desabilitado", async () => {
+    comAulas(aula);
+    let liberar!: () => void;
+    avisarFalta.mockImplementation(
+      () => new Promise<void>((r) => (liberar = r)),
+    );
+    render(<MyClassesList />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Avisar que vou faltar" }),
+    );
+
+    await vi.waitFor(() => expect(botao()).toBeDisabled());
+    liberar();
   });
 });

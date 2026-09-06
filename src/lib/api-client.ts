@@ -622,6 +622,36 @@ export async function getMinhaTurma(id: string): Promise<MinhaTurmaDetalhe> {
   return (await res.json()) as MinhaTurmaDetalhe;
 }
 
+/**
+ * SPEC-031/REQ-006 — **o aluno avisa que vai faltar, sem sair da turma.**
+ *
+ * Os dois verbos são simétricos por decisão (D23): retirar o aviso obedece ao
+ * MESMO prazo que dá-lo. Sem isso o aluno avisaria cedo e retiraria em cima da
+ * hora, terminando exatamente no estado que o prazo existe para negar.
+ *
+ * Os dois são idempotentes no servidor — repetir devolve o mesmo `204`, e a
+ * garantia de linha única é do índice `faltas_unica`, não da aplicação. Então
+ * a tela não precisa se defender de toque duplo; precisa só não mentir sobre
+ * o estado, e por isso recarrega depois.
+ */
+export async function avisarFalta(
+  turmaId: string,
+  ocupacaoId: string,
+): Promise<void> {
+  await authFetch(`/me/classes/${turmaId}/aulas/${ocupacaoId}/falta`, {
+    method: "POST",
+  });
+}
+
+export async function retirarAvisoDeFalta(
+  turmaId: string,
+  ocupacaoId: string,
+): Promise<void> {
+  await authFetch(`/me/classes/${turmaId}/aulas/${ocupacaoId}/falta`, {
+    method: "DELETE",
+  });
+}
+
 export async function listMyClasses(): Promise<MyClass[]> {
   const res = await authFetch("/me/classes");
   return (await res.json()) as MyClass[];

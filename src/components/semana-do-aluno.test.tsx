@@ -29,6 +29,7 @@ const aula = (patch: Record<string, unknown> = {}) => ({
   // fixture, que é o comportamento desejado — contrato novo não pode entrar
   // sem que quem monta payload de teste seja obrigado a decidir o valor.
   naoRealizada: false,
+      faltaAvisada: false,
   ...patch,
 });
 
