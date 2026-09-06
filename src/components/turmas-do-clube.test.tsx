@@ -129,7 +129,9 @@ describe("entrar e sair", () => {
     listTurmasDisponiveis.mockResolvedValue([turma()]);
     render(<TurmasDoClube />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Entrar na turma" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Entrar na turma" }),
+    );
 
     await waitFor(() => expect(entrarNaTurma).toHaveBeenCalledWith("t1"));
     expect(listTurmasDisponiveis).toHaveBeenCalledTimes(2);
@@ -147,17 +149,56 @@ describe("entrar e sair", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("recusa de saída no dia da aula mostra a mensagem do servidor", async () => {
+  /**
+   * **SPEC-031/TASK-009d — o código mudou, e a tela não.**
+   *
+   * A fixture citava `AULA_HOJE`, que o back parou de emitir no passo 3 e
+   * saiu do contrato no passo 4. Trocada por `PRAZO_DE_CANCELAMENTO`, que é o
+   * que a rota devolve agora.
+   *
+   * **A tela não precisou mudar uma linha**, e é isso que o rollout de quatro
+   * passos existe para conseguir: ela mostra a mensagem do servidor, sem
+   * ramificar no código. Se ela ramificasse, este teste teria sido a primeira
+   * coisa a quebrar — e o passo 3 teria quebrado clube em produção.
+   */
+  it("recusa por prazo mostra a mensagem do servidor, sem ramificar no código", async () => {
     listTurmasDisponiveis.mockResolvedValue([turma({ jaEstouNela: true })]);
     sairDaTurma.mockRejectedValue(
-      new ApiError(409, "Esta turma tem aula hoje.", "AULA_HOJE"),
+      new ApiError(
+        409,
+        "Esta turma exige 2h de antecedência para sair.",
+        "PRAZO_DE_CANCELAMENTO",
+      ),
     );
     render(<TurmasDoClube />);
 
-    fireEvent.click(await screen.findByRole("button", { name: "Sair da turma" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Sair da turma" }),
+    );
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "Esta turma tem aula hoje.",
+      "Esta turma exige 2h de antecedência para sair.",
+    );
+  });
+
+  /**
+   * O contrapositivo do rollout: um código que a tela **nunca viu** também
+   * mostra a mensagem. É a prova de que ela não tem lista de códigos
+   * conhecidos — e portanto que o passo 3 podia trocar o código sem avisá-la.
+   */
+  it("código desconhecido também mostra a mensagem do servidor", async () => {
+    listTurmasDisponiveis.mockResolvedValue([turma({ jaEstouNela: true })]);
+    sairDaTurma.mockRejectedValue(
+      new ApiError(409, "Motivo que a tela nunca viu.", "CODIGO_INVENTADO"),
+    );
+    render(<TurmasDoClube />);
+
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Sair da turma" }),
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Motivo que a tela nunca viu.",
     );
   });
 });
@@ -173,11 +214,17 @@ describe("a contagem envelhece — e a tela não insiste nela", () => {
         turma({ matriculados: 8, podeEntrar: false, motivo: "TURMA_CHEIA" }),
       ]);
     entrarNaTurma.mockRejectedValue(
-      new ApiError(409, "Esta turma já está com todas as vagas ocupadas.", "TURMA_CHEIA"),
+      new ApiError(
+        409,
+        "Esta turma já está com todas as vagas ocupadas.",
+        "TURMA_CHEIA",
+      ),
     );
 
     render(<TurmasDoClube />);
-    fireEvent.click(await screen.findByRole("button", { name: "Entrar na turma" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Entrar na turma" }),
+    );
 
     expect(await screen.findByText("8 de 8")).toBeInTheDocument();
     expect(screen.queryByText("7 de 8")).not.toBeInTheDocument();

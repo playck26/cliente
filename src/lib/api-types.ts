@@ -2426,9 +2426,11 @@ export interface components {
              * @description O código é o contrato; a mensagem é texto para humano e pode mudar sem aviso. Tela que decide pela mensagem quebra na primeira revisão de copy.
              * @enum {string}
              */
-            code: "ALUNO_NAO_APROVADO" | "TURMA_INATIVA" | "LIMITE_DE_TURMAS" | "TURMA_CHEIA" | "AULA_HOJE";
+            code: "ALUNO_NAO_APROVADO" | "TURMA_INATIVA" | "LIMITE_DE_TURMAS" | "TURMA_CHEIA" | "PRAZO_DE_CANCELAMENTO";
             /** @example Esta turma já está com todas as vagas ocupadas. */
             message: string;
+            /** @example 2 */
+            horasExigidas?: number;
         };
         AulaAnteriorResponseDto: {
             /** Format: uuid */
