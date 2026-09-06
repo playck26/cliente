@@ -264,6 +264,22 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
   /** SPEC-030 — alguém já declarou que esta aula não aconteceu. */
   const naoHouve = chamada?.completude === "nao_houve";
   /**
+   * SPEC-031/AC-019b — **modo histórico: a aula cancelada é alcançável e é
+   * somente leitura.**
+   *
+   * Antes, o professor não chegava aqui: `minha-turma-detalhe.tsx` só fazia
+   * link quando `podeLancar`. Quem chegasse por URL antiga encontrava a tela
+   * **editável**, tocava, e levava `422 AULA_CANCELADA` do servidor — ou seja,
+   * o erro era a forma de descobrir a regra.
+   *
+   * **"Não oferece salvar" não bastava, e a 6ª rodada mostrou por quê:** a
+   * primeira versão desta decisão escondia só o botão *Salvar*, e o professor
+   * continuava podendo tocar `Veio`/`Faltou`/`Justificou`, criando rascunho
+   * numa tela declarada somente leitura. O critério é a ausência de **toda**
+   * ação mutadora.
+   */
+  const historico = chamada?.cancelada === true;
+  /**
    * **SPEC-030 / achado 3 da validação cruzada (MÉDIA).**
    *
    * A condição do botão era `marcados === 0`, e `marcados` conta as marcas
@@ -328,7 +344,7 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
         {/* DEF-002: chamada gravada antes da correção pode estar pela
             metade, e ninguém sabe quem faltou. A tela diz isso em vez de
             apresentar uma lista incompleta como se fosse o registro. */}
-        {chamada?.completude === "desconhecida" ? (
+        {chamada?.completude === "desconhecida" && !historico ? (
           <p className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-high)] p-3 text-sm">
             Esta chamada foi lançada antes de o app exigir a lista completa,
             então pode estar pela metade. Confira todos os alunos e salve de
@@ -336,10 +352,35 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
           </p>
         ) : null}
 
+        {/* SPEC-031/AC-019b — o rótulo, e ele diz o que a tela É, não só o
+            que aconteceu com a aula: "somente leitura" é a instrução.
+
+            **Os dois blocos abaixo são silenciados no modo histórico**, e isso
+            é conserto de achado (auditoria de 2026-09-05). Os dois terminam
+            mandando *"marque os alunos abaixo e salve"* — instrução impossível
+            numa tela onde os botões estão `disabled` e a barra de Salvar não
+            existe. O professor tocaria, nada aconteceria, e não haveria nada
+            explicando por quê.
+
+            Eles são pré-existentes, mas só ficaram alcançáveis por navegação
+            normal porque este mesmo PR criou o link para a aula cancelada — o
+            link expôs uma contradição que já morava aqui. */}
+        {historico ? (
+          <p
+            role="status"
+            className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-high)] p-3 text-sm"
+          >
+            <strong>Aula cancelada — histórico somente leitura.</strong> O
+            registro fica aqui, inclusive quem avisou que ia faltar
+            {naoHouve ? " e o registro de que ela não aconteceu" : ""}. Nada
+            mais pode ser alterado.
+          </p>
+        ) : null}
+
         {/* SPEC-030 — o estado, e o caminho de volta junto com ele. Dizer
             "não aconteceu" sem dizer como desfazer transformaria um engano
             de toque em um dia perdido. */}
-        {naoHouve ? (
+        {naoHouve && !historico ? (
           <p className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-high)] p-3 text-sm">
             <strong>Esta aula está registrada como não realizada.</strong> Ela
             não aparece mais como chamada pendente e não conta na frequência
@@ -398,6 +439,7 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
                           key={valor}
                           type="button"
                           aria-pressed={ativo}
+                          disabled={historico}
                           onClick={() => marcar(aluno.alunoId, valor)}
                           className={`flex min-h-12 items-center justify-center gap-1.5 rounded-lg border text-xs font-bold transition-colors ${
                             ativo && valor === "presente"
@@ -424,7 +466,10 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
 
       {/* Barra fixa: em quadra a pessoa rola a lista, e o botão de salvar não
           pode exigir que ela role de volta até o fim. */}
-      {chamada ? (
+      {/* AC-019b: a barra inteira sai — Salvar, "Todos vieram" e "A aula não
+          aconteceu" são as três ações mutadoras daqui. Deixar qualquer uma
+          `disabled` mas visível ainda ofereceria o que seria recusado. */}
+      {chamada && !historico ? (
         <div className="fixed bottom-0 left-1/2 z-20 flex w-full max-w-[430px] -translate-x-1/2 flex-col gap-2 border-t border-border bg-surface/95 p-4 shadow-[0_-8px_24px_rgba(18,20,15,0.08)] backdrop-blur">
           <div className="flex items-center gap-3">
             {/* O contador dizia o estado ("2/10 marcados"); agora diz a
