@@ -128,6 +128,69 @@ describe("ChamadaView — modo histórico da aula cancelada (AC-019b)", () => {
   });
 
   /**
+   * **Achado de auditoria adversarial, 2026-09-05.** A tela dizia "somente
+   * leitura — nada mais pode ser alterado" e, logo abaixo, mandava *"marque os
+   * alunos abaixo e salve"*. A segunda instrução é impossível: os botões estão
+   * `disabled` e a barra de Salvar não existe.
+   *
+   * Os dois blocos são pré-existentes, mas só ficaram alcançáveis por
+   * navegação normal porque este PR criou o link para a aula cancelada — o
+   * link expôs uma contradição que já morava no arquivo.
+   */
+  describe("nenhuma instrução impossível sobra na tela", () => {
+    it("aula cancelada E não realizada: não manda marcar e salvar", async () => {
+      getChamadaMock.mockResolvedValue({
+        ...chamadaCancelada(["Ana"]),
+        completude: "nao_houve",
+      });
+      render(<ChamadaView ocupacaoId="oc1" />);
+      await screen.findByText("Ana");
+
+      expect(screen.queryByText(/marque os alunos abaixo e salve/)).toBeNull();
+      // E o rótulo do histórico ainda diz o que aconteceu com a aula.
+      expect(
+        screen.getByText(/não aconteceu/, { exact: false }),
+      ).toBeInTheDocument();
+      await waitFor(semNenhumaMutacao);
+    });
+
+    it("aula cancelada com chamada legada: não manda salvar de novo", async () => {
+      getChamadaMock.mockResolvedValue({
+        ...chamadaCancelada(["Ana"]),
+        completude: "desconhecida",
+      });
+      render(<ChamadaView ocupacaoId="oc1" />);
+      await screen.findByText("Ana");
+
+      expect(screen.queryByText(/salve de novo/)).toBeNull();
+      await waitFor(semNenhumaMutacao);
+    });
+
+    /**
+     * Os contrapositivos: **fora** do modo histórico as duas instruções
+     * continuam lá, porque fora dele elas são possíveis e úteis.
+     */
+    it("na aula NÃO cancelada, as duas instruções continuam", async () => {
+      getChamadaMock.mockResolvedValue({
+        ...chamadaCancelada(["Ana"]),
+        cancelada: false,
+        completude: "nao_houve",
+      });
+      const naoHouve = render(<ChamadaView ocupacaoId="oc1" />);
+      await screen.findByText(/marque os alunos abaixo e salve/);
+      naoHouve.unmount();
+
+      getChamadaMock.mockResolvedValue({
+        ...chamadaCancelada(["Ana"]),
+        cancelada: false,
+        completude: "desconhecida",
+      });
+      render(<ChamadaView ocupacaoId="oc1" />);
+      await screen.findByText(/salve de novo/);
+    });
+  });
+
+  /**
    * O contrapositivo, e ele é obrigatório: sem ele os testes acima passariam
    * numa tela que não oferece nada **nunca** — inclusive nas aulas normais.
    * "Ausente quando cancelada" só é informação se estiver "presente quando

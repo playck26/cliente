@@ -344,7 +344,7 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
         {/* DEF-002: chamada gravada antes da correção pode estar pela
             metade, e ninguém sabe quem faltou. A tela diz isso em vez de
             apresentar uma lista incompleta como se fosse o registro. */}
-        {chamada?.completude === "desconhecida" ? (
+        {chamada?.completude === "desconhecida" && !historico ? (
           <p className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-high)] p-3 text-sm">
             Esta chamada foi lançada antes de o app exigir a lista completa,
             então pode estar pela metade. Confira todos os alunos e salve de
@@ -353,22 +353,34 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
         ) : null}
 
         {/* SPEC-031/AC-019b — o rótulo, e ele diz o que a tela É, não só o
-            que aconteceu com a aula: "somente leitura" é a instrução. */}
+            que aconteceu com a aula: "somente leitura" é a instrução.
+
+            **Os dois blocos abaixo são silenciados no modo histórico**, e isso
+            é conserto de achado (auditoria de 2026-09-05). Os dois terminam
+            mandando *"marque os alunos abaixo e salve"* — instrução impossível
+            numa tela onde os botões estão `disabled` e a barra de Salvar não
+            existe. O professor tocaria, nada aconteceria, e não haveria nada
+            explicando por quê.
+
+            Eles são pré-existentes, mas só ficaram alcançáveis por navegação
+            normal porque este mesmo PR criou o link para a aula cancelada — o
+            link expôs uma contradição que já morava aqui. */}
         {historico ? (
           <p
             role="status"
             className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-high)] p-3 text-sm"
           >
             <strong>Aula cancelada — histórico somente leitura.</strong> O
-            registro fica aqui, inclusive quem avisou que ia faltar. Nada mais
-            pode ser alterado.
+            registro fica aqui, inclusive quem avisou que ia faltar
+            {naoHouve ? " e o registro de que ela não aconteceu" : ""}. Nada
+            mais pode ser alterado.
           </p>
         ) : null}
 
         {/* SPEC-030 — o estado, e o caminho de volta junto com ele. Dizer
             "não aconteceu" sem dizer como desfazer transformaria um engano
             de toque em um dia perdido. */}
-        {naoHouve ? (
+        {naoHouve && !historico ? (
           <p className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-high)] p-3 text-sm">
             <strong>Esta aula está registrada como não realizada.</strong> Ela
             não aparece mais como chamada pendente e não conta na frequência
