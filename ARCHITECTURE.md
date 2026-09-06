@@ -274,6 +274,56 @@ de copy e leva a regra junto.
 chaveado por código, e código desconhecido cai num texto genérico em vez de
 quebrar.
 
+> **E foi essa tolerância que permitiu o rollout do `AULA_HOJE` (SPEC-031).**
+> Nos passos 3 e 4 o código que a rota devolve TROCOU — `AULA_HOJE` saiu,
+> `PRAZO_DE_CANCELAMENTO` entrou — e **esta tela não mudou uma linha**. Há
+> teste do contrapositivo: um código que ela nunca viu também mostra a
+> mensagem. Se ela tivesse lista de códigos conhecidos, o passo 3 teria
+> quebrado clube em produção.
+
+### A SPEC-031 no Cliente: capability, prazo, falta e modo histórico
+
+Quatro coisas entraram em 2026-09-06, todas em produção.
+
+**1. A classificação em QUATRO** (`src/lib/capacidade-operacao.ts`). Cinco
+repositórios, cinco deploys independentes, e **nenhum CI sobe o outro lado** —
+então a resposta de `GET /me/company/operacao` é classificada em:
+
+| O que veio | Estado | A tela |
+|---|---|---|
+| `200` **com** o campo | `disponivel` | mostra a feature |
+| `404`, ou `200` **sem** o campo | `ausente` | esconde, em silêncio |
+| `401`/`403` | `negado` | **mostra erro** |
+| `500`, `429`, timeout, rede, corpo ilegível | `falhou` | falha **recuperável**, com retry |
+
+As duas últimas linhas existem porque alguém erraria. **`403` não é "back
+antigo"**: engolir faria a feature sumir em produção sem sinal nenhum. **`500`
+também não**, e essa é a mais fácil de errar — `catch { return ausente }`
+disfarça indisponibilidade de "versão antiga". **Ausência é uma conclusão**, e
+só o `404` e o corpo sem o campo a autorizam.
+
+Medido: com o atalho `catch { return ausente }`, **8 dos 16** casos caem.
+
+**2. O aviso de prazo** (`aviso-de-prazo.tsx`), na lista de turmas. Sem ele a
+regra só apareceria como `409` **depois** do toque — o app ensinaria a regra
+por erro.
+
+**3. O botão de avisar falta**, no card de cada aula em "Próximas". Fica ali e
+não em tela nova porque `GET /me/classes` já devolve a lista de **ocorrências**
+do aluno, não de turmas. `avisou()` compara `=== true`, não o valor cru: um
+back anterior responde `200` **sem** o campo, e ausência é lida como "não
+avisou" — o estado seguro.
+
+**4. O modo histórico da chamada** (AC-019b). A aula cancelada virou
+alcançável, e a tela entra em somente-leitura. O critério **não** é "não
+oferece salvar": é a ausência de **toda** ação mutadora, incluindo os textos
+que mandavam *"marque os alunos abaixo e salve"* — instrução impossível numa
+tela com os botões desabilitados.
+
+A prova mede **rede**, não aparência: a suíte interage com cada controle e
+afere zero requisição, com espião nos mutadores do `api-client` **e** no
+`fetch` global.
+
 ### A barra de baixo conhece o papel (DEF-011, 2026-08-26)
 
 `bottom-nav.tsx` desenha **duas** barras: a do aluno e a do professor
