@@ -1108,6 +1108,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/classes/{turmaId}/aulas/{ocupacaoId}/falta": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["MeClassesController_avisarFalta"];
+        delete: operations["MeClassesController_retirarFalta"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me/teacher/classes": {
         parameters: {
             query?: never;
@@ -2353,6 +2369,8 @@ export interface components {
             horaFim: string;
             /** @example false */
             naoRealizada: boolean;
+            /** @example false */
+            faltaAvisada: boolean;
         };
         EncontroDaTurmaDisponivelDto: {
             /**
@@ -2542,6 +2560,7 @@ export interface components {
             /** @enum {string|null} */
             status: "presente" | "ausente" | "justificado" | null;
             naTurmaHoje: boolean;
+            faltaAvisada: boolean;
         };
         ChamadaResponseDto: {
             /** Format: uuid */
@@ -4947,6 +4966,74 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ErroDeAvaliacaoResponseDto"];
                 };
+            };
+        };
+    };
+    MeClassesController_avisarFalta: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                turmaId: string;
+                ocupacaoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Aluno não matriculado na turma, ou a ocorrência não é desta turma. Os dois respondem igual: a URL da turma A não pode revelar a ocorrência da B. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Ocorrência cancelada (`OCUPACAO_CANCELADA`) ou dentro do prazo de antecedência (`PRAZO_DE_CANCELAMENTO`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MeClassesController_retirarFalta: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                turmaId: string;
+                ocupacaoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Aluno não matriculado na turma, ou a ocorrência não é desta turma. Os dois respondem igual: a URL da turma A não pode revelar a ocorrência da B. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Ocorrência cancelada (`OCUPACAO_CANCELADA`) ou dentro do prazo (`PRAZO_DE_CANCELAMENTO`) — simétrico ao `POST`, por decisão (D23). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

@@ -1,13 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CalendarDays, CalendarRange, Clock, List } from "lucide-react";
 import { TennisCourtIcon } from "@/components/icons/tennis-court-icon";
 import { CourtLines } from "@/components/court-lines";
 import { TennisBallIcon } from "@/components/icons/tennis-ball-icon";
 import { SemanaDoAluno } from "@/components/semana-do-aluno";
-import { ApiError, listMyClasses, type MyClass } from "@/lib/api-client";
+import {
+  ApiError,
+  avisarFalta,
+  listMyClasses,
+  retirarAvisoDeFalta,
+  type MyClass,
+} from "@/lib/api-client";
 
 const DIAS_SEMANA = [
   "Domingo",
@@ -66,25 +72,75 @@ function useVista(): { vista: Vista; irPara: (v: Vista) => void } {
   return { vista, irPara };
 }
 
-// REQ-002 (SPEC-005): aluno lista as próprias próximas aulas. View-only.
+/**
+ * **`=== true`, e não o valor cru.** O campo `faltaAvisada` é novo; um back
+ * anterior à TASK-009a responde `200` sem ele, e aí o valor é `undefined`
+ * mesmo o tipo gerado dizendo `boolean`.
+ *
+ * Cinco repositórios, cinco deploys independentes — este cliente pode estar
+ * publicado contra um back que não tem o campo. Ausência é lida como "não
+ * avisou", que é o estado seguro: a tela oferece avisar, e o servidor decide.
+ */
+const avisou = (aula: MyClass) => aula.faltaAvisada === true;
+
+// REQ-002 (SPEC-005): aluno lista as próprias próximas aulas.
 export function MyClassesList() {
   const [aulas, setAulas] = useState<MyClass[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** SPEC-031: qual ocorrência está com ação em voo. Um por vez basta. */
+  const [agindoEm, setAgindoEm] = useState<string | null>(null);
   const { vista, irPara } = useVista();
 
+  const carregar = useCallback(
+    () =>
+      listMyClasses()
+        .then(setAulas)
+        .catch((err: unknown) => {
+          setError(
+            err instanceof ApiError
+              ? err.message
+              : "Não foi possível carregar suas aulas.",
+          );
+        }),
+    [],
+  );
+
   useEffect(() => {
-    listMyClasses()
-      .then(setAulas)
-      .catch((err: unknown) => {
-        setError(
-          err instanceof ApiError
-            ? err.message
-            : "Não foi possível carregar suas aulas.",
-        );
-      })
-      .finally(() => setLoading(false));
-  }, []);
+    void carregar().finally(() => setLoading(false));
+  }, [carregar]);
+
+  /**
+   * SPEC-031/REQ-006 — avisar que vai faltar, e desfazer.
+   *
+   * **Recarrega sempre, inclusive no erro** — mesmo idioma de
+   * `turmas-do-clube.tsx`, e pela mesma razão: o prazo envelhece entre a
+   * pintura e o toque. Receber `PRAZO_DE_CANCELAMENTO` e continuar mostrando
+   * o botão como se nada tivesse mudado seria a tela insistindo numa
+   * informação que o servidor acabou de desmentir.
+   *
+   * O servidor é idempotente nos dois verbos, então toque duplo não é
+   * problema — o que seria problema é a tela mentir sobre o estado.
+   */
+  const alternarFalta = async (aula: MyClass) => {
+    if (!aula.turmaId) return;
+    setAgindoEm(aula.ocupacaoId);
+    setError(null);
+    try {
+      await (avisou(aula)
+        ? retirarAvisoDeFalta(aula.turmaId, aula.ocupacaoId)
+        : avisarFalta(aula.turmaId, aula.ocupacaoId));
+    } catch (e: unknown) {
+      // A mensagem vem do servidor: ela diz quantas horas o clube exige, e
+      // essa informação não existe aqui.
+      setError(
+        e instanceof ApiError ? e.message : "Não foi possível concluir.",
+      );
+    } finally {
+      await carregar();
+      setAgindoEm(null);
+    }
+  };
 
   const totalQuadras = new Set(aulas.map((aula) => aula.quadraId)).size;
 
@@ -259,9 +315,50 @@ export function MyClassesList() {
                       Não realizada
                     </span>
                   ) : (
-                    <span className="rounded-full bg-white px-3 py-1 text-[11px] font-extrabold text-[var(--color-primary-strong)] ring-1 ring-border">
-                      Agendada
-                    </span>
+                    /* SPEC-031/REQ-006 — avisar que vai faltar.
+                       O selo "Agendada" some quando há aviso: dizer "Agendada"
+                       ao lado de "vou faltar" seria a tela afirmando duas
+                       coisas sobre o mesmo estado.
+
+                       Nada aqui quando a aula NÃO aconteceu: avisar falta de
+                       aula que não houve não tem sentido, e o servidor
+                       recusaria — a tela só não oferece o que seria recusado,
+                       mesma regra da chamada. */
+                    <div className="flex items-center gap-2">
+                      {avisou(aula) ? (
+                        <span className="rounded-full bg-[var(--color-warning)]/15 px-3 py-1 text-[11px] font-extrabold text-[var(--color-text-primary)] ring-1 ring-border">
+                          Falta avisada
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-white px-3 py-1 text-[11px] font-extrabold text-[var(--color-primary-strong)] ring-1 ring-border">
+                          Agendada
+                        </span>
+                      )}
+                      {aula.turmaId ? (
+                        <button
+                          type="button"
+                          disabled={agindoEm === aula.ocupacaoId}
+                          // O rótulo visível vira "..." durante a ação, e um
+                          // nome acessível que muda no meio da operação deixa
+                          // quem usa leitor de tela sem referência. O
+                          // `aria-label` descreve a AÇÃO e não muda enquanto
+                          // ela acontece.
+                          aria-label={
+                            avisou(aula)
+                              ? "Desfazer aviso de falta"
+                              : "Avisar que vou faltar"
+                          }
+                          onClick={() => void alternarFalta(aula)}
+                          className="min-h-11 rounded-full px-3 text-[11px] font-extrabold text-[var(--color-primary-strong)] underline underline-offset-2 disabled:opacity-60"
+                        >
+                          {agindoEm === aula.ocupacaoId
+                            ? "..."
+                            : avisou(aula)
+                              ? "Desfazer"
+                              : "Vou faltar"}
+                        </button>
+                      ) : null}
+                    </div>
                   )}
                 </div>
               </article>

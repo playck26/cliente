@@ -80,6 +80,7 @@ const AULA: MyClass = {
   quadraNome: "Quadra 1",
   turmaNome: "Turma A",
   naoRealizada: false,
+      faltaAvisada: false,
 };
 
 describe("HomeView", () => {
