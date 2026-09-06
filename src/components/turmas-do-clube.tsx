@@ -13,6 +13,7 @@ import {
   type MediaDaTurma,
   type TurmaDisponivel,
 } from "@/lib/api-client";
+import { AvisoDePrazo } from "@/components/aviso-de-prazo";
 
 /**
  * SPEC-023 — **o aluno entra e sai de turma sozinho.**
@@ -118,6 +119,11 @@ export function TurmasDoClube() {
 
   return (
     <div className="space-y-4 px-5">
+      {/* SPEC-031/REQ-002 — o prazo aparece ANTES do toque. Sem isto a regra
+          só existe como `409` depois que a pessoa decidiu sair, tocou e
+          esperou — e aí o app ensina a regra por erro. */}
+      <AvisoDePrazo tipo="aula" />
+
       {erro && (
         <p
           role="alert"
