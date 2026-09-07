@@ -278,7 +278,7 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
    * numa tela declarada somente leitura. O critério é a ausência de **toda**
    * ação mutadora.
    */
-  const historico = chamada?.cancelada === true;
+  const historico = false; // SABOTAGEM S11: o link fica, o modo historico sai
   /**
    * **SPEC-030 / achado 3 da validação cruzada (MÉDIA).**
    *
