@@ -165,6 +165,12 @@ export type TextoParaAceite = components["schemas"]["TextoParaAceiteDto"];
 export type PublicPaymentConfig =
   components["schemas"]["PagamentoPublicoResponseDto"];
 
+// SPEC-033 — a carteira, na visao do aluno. Sem `motivo`: e nota interna do
+// clube (AC-013), e o tipo gerado do contrato e o que garante que ela nao
+// aparece aqui nem por engano.
+export type ExtratoDoAluno = components["schemas"]["ExtratoDoAlunoResponseDto"];
+export type MovimentoDoAluno = components["schemas"]["MovimentoDoAlunoResponseDto"];
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -479,6 +485,20 @@ export async function logout(): Promise<void> {
   } finally {
     clearAccessToken();
   }
+}
+
+/**
+ * SPEC-033/TASK-006 — a carteira do aluno.
+ *
+ * **`404` aqui não é erro de rede: é "você não tem carteira".** Usuário
+ * autenticado sem linha de aluno recebe `404` de propósito (AC-012b) — `200`
+ * com zero mentiria, porque não é que ela esteja vazia, é que não existe.
+ * Quem chama distingue os dois pelo `status`.
+ */
+export async function getMinhaCarteira(): Promise<ExtratoDoAluno> {
+  const res = await authFetch("/me/creditos");
+  if (!res.ok) throw await parseError(res, "Não foi possível carregar sua carteira.");
+  return (await res.json()) as ExtratoDoAluno;
 }
 
 export async function getMe(): Promise<Usuario> {
