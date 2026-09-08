@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
 import { FotoDePerfil } from "@/components/foto-de-perfil";
+import { MinhaCarteira } from "@/components/minha-carteira";
 import { TopAppBar } from "@/components/top-app-bar";
 import { getMe, logout, type Usuario } from "@/lib/api-client";
 
@@ -60,6 +61,20 @@ export function PerfilView() {
         </header>
 
         <FotoDePerfil nome={usuario?.nome} />
+
+        {/*
+          SPEC-033/TASK-006 — a carteira mora aqui, e não numa aba própria.
+
+          Acrescentar um quinto item na barra de baixo para uma tela que
+          mostra dois números seria pagar navegação por conteúdo — e a barra
+          é o recurso mais escasso desta interface. O perfil já é "sua
+          conta", que é onde saldo pertence.
+
+          **Ela some sozinha para quem não tem carteira** (professor e gestor
+          logados aqui): o componente devolve `null` no `404`, em vez de
+          pintar erro para quem não deveria ver nada.
+        */}
+        <MinhaCarteira />
 
         {/*
           O "Sair" fica no fim, separado, e é a única ação destrutiva desta

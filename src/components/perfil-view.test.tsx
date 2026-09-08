@@ -26,6 +26,16 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/components/foto-de-perfil", () => ({
   FotoDePerfil: () => null,
 }));
+/**
+ * SPEC-033 — a carteira entra no perfil, e este arquivo é sobre o **logout**.
+ *
+ * Dublê e não mock da API: substituir `MinhaCarteira` por `null` mantém o
+ * assunto deste arquivo intacto, e é o mesmo tratamento que a foto e a barra
+ * já recebem aqui. Trocar o mock de `api-client` para incluir mais um export
+ * acoplaria estes cinco testes a toda função nova do cliente — e a carteira
+ * tem provas próprias em `minha-carteira.test.tsx`.
+ */
+vi.mock("@/components/minha-carteira", () => ({ MinhaCarteira: () => null }));
 vi.mock("@/components/top-app-bar", () => ({ TopAppBar: () => null }));
 vi.mock("@/components/bottom-nav", () => ({ BottomNav: () => null }));
 
