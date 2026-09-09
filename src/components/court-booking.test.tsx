@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ApiError } from "@/lib/api-client";
 import { CourtBooking } from "./court-booking";
 
 /**
@@ -147,6 +148,31 @@ describe("CourtBooking — a confirmação", () => {
     await reservarNaTela();
 
     expect(screen.queryByText("Pago com seu saldo")).not.toBeInTheDocument();
+  });
+
+  it("o erro de reserva NAO sobrevive a troca de data", async () => {
+    // Achado da revisao adversarial: `bookingError` so era limpo ao tentar
+    // reservar de novo. Trocar de dia mantinha na tela um erro sobre um dia
+    // em que nada foi tentado.
+    reservar.mockRejectedValue(new ApiError(409, "Horario ja ocupado."));
+    render(<CourtBooking id={QUADRA} />);
+    fireEvent.click(await screen.findByRole("button", { name: /10:00/ }));
+    fireEvent.click(await screen.findByText("Confirmar reserva"));
+    expect(await screen.findByText("Horario ja ocupado.")).toBeInTheDocument();
+
+    // A data e uma FILA DE BOTOES de dia, nao um `input[type=date]` -- a
+    // primeira versao deste caso supos o input e morreu procurando. Os botoes
+    // de dia e os de horario compartilham `aria-pressed`, entao o que separa
+    // os dois e o texto: horario casa /\d{2}:\d{2}/, dia nao.
+    const botoes = Array.from(
+      document.querySelectorAll("button[aria-pressed]"),
+    ).filter((b) => !/\d{2}:\d{2}/.test(b.textContent || ""));
+    if (botoes.length < 2) throw new Error("fila de dias nao encontrada");
+    fireEvent.click(botoes[1]);
+
+    await waitFor(() =>
+      expect(screen.queryByText("Horario ja ocupado.")).not.toBeInTheDocument(),
+    );
   });
 
   it("clube sem link nem WhatsApp: nenhum bloco, e nada quebra", async () => {

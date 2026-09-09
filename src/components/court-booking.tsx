@@ -110,6 +110,12 @@ export function CourtBooking({ id }: { id: string }) {
     setAvailLoading(true);
     setAvailError(null);
     setSlotsSelecionados([]);
+    // **O erro da reserva morre junto com a troca de dia ou de quadra.**
+    // Sem esta linha ele sobrevivia: "nao foi possivel reservar; tente outro
+    // horario" de terca continuava em cima do resumo de quarta, acusando um
+    // dia em que nada tinha sido tentado. Achado pela revisao adversarial
+    // desta PR, que reproduziu o caso antes de eu acreditar nele.
+    setBookingError(null);
     if (!manterConfirmacao) setBookingOk(false);
     try {
       const result = await getAvailability(id, targetData);
