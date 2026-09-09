@@ -71,10 +71,20 @@ export function PerfilView() {
           conta", que é onde saldo pertence.
 
           **Ela some sozinha para quem não tem carteira** (professor e gestor
-          logados aqui): o componente devolve `null` no `404`, em vez de
-          pintar erro para quem não deveria ver nada.
+          logados aqui): o componente devolve `null` no `404` e no `403`, em
+          vez de pintar erro para quem não deveria ver nada.
+
+          **E aqui ela nem é montada para quem não é aluno.** O componente
+          sozinho não bastou, e o defeito foi visto em produção: a rota tem
+          `@Roles('aluno')`, então o professor recebia `403` — não `404` — e
+          caía no ramo de erro, com "não foi possível carregar sua carteira"
+          em vermelho no perfil dele.
+
+          As duas defesas são de propósito. Esta evita a requisição inteira:
+          não se faz uma pergunta cuja resposta já se sabe. A do componente é
+          a rede de baixo, para quando alguém montá-lo em outro lugar.
         */}
-        <MinhaCarteira />
+        {usuario?.role === "aluno" ? <MinhaCarteira /> : null}
 
         {/*
           O "Sair" fica no fim, separado, e é a única ação destrutiva desta

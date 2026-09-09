@@ -1,7 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ApiError, getMinhaCarteira, type ExtratoDoAluno } from "@/lib/api-client";
+import {
+  ApiError,
+  getMinhaCarteira,
+  type ExtratoDoAluno,
+} from "@/lib/api-client";
 
 /**
  * SPEC-033/TASK-006 — o saldo e o extrato do aluno.
@@ -9,10 +13,15 @@ import { ApiError, getMinhaCarteira, type ExtratoDoAluno } from "@/lib/api-clien
  * ## Os três estados são TRÊS, e um deles é "você não tem carteira"
  *
  * O servidor responde `404` quando o usuário não tem linha de aluno
- * (AC-012b), e isso **não é falha**: professor e gestor logados no app caem
- * aqui legitimamente. Tratar `404` como erro pintaria "não foi possível
- * carregar" para quem simplesmente não tem carteira — e a pessoa tentaria
- * recarregar para sempre.
+ * (AC-012b), e **`403` quando ele não é aluno** — a rota tem `@Roles('aluno')`.
+ * Nenhum dos dois é falha: professor e gestor logados no app caem aqui
+ * legitimamente. Tratá-los como erro pinta "não foi possível carregar" para
+ * quem simplesmente não tem carteira — e a pessoa tenta recarregar para
+ * sempre.
+ *
+ * **O `403` faltava, e o defeito foi visto em produção** no perfil de um
+ * professor. A primeira versão previu o `404` (usuário sem linha de aluno) e
+ * esqueceu o caso mais comum: quem não é aluno nem chega ao serviço.
  *
  * Os outros dois são: carteira vazia (saldo zero, sem movimento), que **é**
  * uma carteira; e falha de verdade, que precisa dizer que falhou.
@@ -33,11 +42,17 @@ export function MinhaCarteira() {
       .catch((erro: unknown) => {
         if (!vivo) return;
         // `404` é ausência de carteira, não falha de carga.
-        setEstado(
-          erro instanceof ApiError && erro.status === 404
-            ? { tipo: "sem-carteira" }
-            : { tipo: "erro" },
-        );
+        //
+        // **`403` também, e isso foi defeito em produção.** A rota tem
+        // `@Roles('aluno')`, então o professor logado no app recebia `403` —
+        // não o `404` que este componente esperava — e via "não foi possível
+        // carregar sua carteira" em vermelho no próprio perfil. Do ponto de
+        // vista da tela, os dois dizem a mesma coisa: **não há carteira sua
+        // para mostrar aqui.**
+        const semCarteira =
+          erro instanceof ApiError &&
+          (erro.status === 404 || erro.status === 403);
+        setEstado(semCarteira ? { tipo: "sem-carteira" } : { tipo: "erro" });
       });
     return () => {
       vivo = false;
