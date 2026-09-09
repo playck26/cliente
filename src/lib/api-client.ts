@@ -846,8 +846,18 @@ export async function listMyBookings(
   return (await res.json()) as PaginadoComReferencia<ItemDaListaDeReservas>;
 }
 
-export async function cancelBooking(id: string): Promise<void> {
-  await authFetch(`/bookings/${id}/cancel`, { method: "POST" });
+/**
+ * SPEC-039 — a rota deixou de responder `204` e passa a dizer **quanto voltou**.
+ *
+ * `null` distingue "não havia o que devolver" de "devolveu zero", e a tela usa
+ * essa diferença para ficar calada em vez de prometer um crédito que não
+ * existe: reserva de turma e reserva sem aluno não devolvem nada.
+ */
+export async function cancelBooking(
+  id: string,
+): Promise<{ creditoDevolvidoCentavos: number | null }> {
+  const res = await authFetch(`/bookings/${id}/cancel`, { method: "POST" });
+  return (await res.json()) as { creditoDevolvidoCentavos: number | null };
 }
 
 export async function getPublicPaymentConfig(): Promise<PublicPaymentConfig> {

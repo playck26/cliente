@@ -132,7 +132,10 @@ describe("MyBookingsList — a página que deixou de existir", () => {
     listMyBookingsMock.mockReset();
     getPublicPaymentConfigMock.mockReset().mockResolvedValue({});
     listCourtsMock.mockReset().mockResolvedValue({ data: [], total: 0 });
-    cancelBookingMock.mockReset().mockResolvedValue(undefined);
+    cancelBookingMock
+      .mockReset()
+      // SPEC-039: a rota devolve corpo desde que deixou de ser `204`.
+      .mockResolvedValue({ creditoDevolvidoCentavos: null });
   });
 
   it("volta para a última página válida em vez de dizer que não há nada", async () => {
@@ -232,7 +235,10 @@ describe("MyBookingsList — passado e canceladas (SPEC-041)", () => {
       whatsappNumero: "5511999999999",
     });
     listCourtsMock.mockReset().mockResolvedValue({ data: [], total: 0 });
-    cancelBookingMock.mockReset().mockResolvedValue(undefined);
+    cancelBookingMock
+      .mockReset()
+      // SPEC-039: a rota devolve corpo desde que deixou de ser `204`.
+      .mockResolvedValue({ creditoDevolvidoCentavos: null });
   });
 
   function responder(data: unknown[], total = data.length) {
@@ -382,7 +388,10 @@ describe("MyBookingsList — o passado não é operável (SPEC-042)", () => {
       whatsappNumero: "5511999999999",
     });
     listCourtsMock.mockReset().mockResolvedValue({ data: [], total: 0 });
-    cancelBookingMock.mockReset().mockResolvedValue(undefined);
+    cancelBookingMock
+      .mockReset()
+      // SPEC-039: a rota devolve corpo desde que deixou de ser `204`.
+      .mockResolvedValue({ creditoDevolvidoCentavos: null });
   });
 
   it("em Anteriores, não oferece Cancelar", async () => {
@@ -432,7 +441,10 @@ describe("MyBookingsList — autoria e filtro (SPEC-041/Fase B)", () => {
     listMyBookingsMock.mockReset();
     getPublicPaymentConfigMock.mockReset().mockResolvedValue({});
     listCourtsMock.mockReset().mockResolvedValue({ data: [], total: 0 });
-    cancelBookingMock.mockReset().mockResolvedValue(undefined);
+    cancelBookingMock
+      .mockReset()
+      // SPEC-039: a rota devolve corpo desde que deixou de ser `204`.
+      .mockResolvedValue({ creditoDevolvidoCentavos: null });
   });
 
   // AC-012 — três estados, três frases. O nulo CALA: sem histórico é diferente
@@ -554,7 +566,10 @@ describe("MyBookingsList — a referência temporal (SPEC-041/B5)", () => {
     listMyBookingsMock.mockReset();
     getPublicPaymentConfigMock.mockReset().mockResolvedValue({});
     listCourtsMock.mockReset().mockResolvedValue({ data: [], total: 0 });
-    cancelBookingMock.mockReset().mockResolvedValue(undefined);
+    cancelBookingMock
+      .mockReset()
+      // SPEC-039: a rota devolve corpo desde que deixou de ser `204`.
+      .mockResolvedValue({ creditoDevolvidoCentavos: null });
   });
 
   it("a primeira página NÃO envia referência — quem decide é o servidor", async () => {
@@ -616,5 +631,61 @@ describe("MyBookingsList — a referência temporal (SPEC-041/B5)", () => {
         undefined,
       ),
     );
+  });
+
+  /**
+   * SPEC-039 — o aviso da devolução, e o silêncio quando não houve.
+   *
+   * O pedido do Israel foi "depois de cancelar, sinalizar que o saldo volta".
+   * O que a tela **não** pode fazer é prometer isso sempre: reserva de turma e
+   * reserva sem aluno não devolvem nada, e quem lesse "seu crédito voltou"
+   * iria conferir o saldo e não encontrar.
+   */
+  it("SPEC-039: cancelar reserva PAGA COM CREDITO avisa quanto voltou", async () => {
+    listMyBookingsMock.mockResolvedValue({
+      page: 1,
+      pageSize: 20,
+      total: 1,
+      data: [reserva("pago")],
+    });
+    cancelBookingMock
+      .mockReset()
+      .mockResolvedValue({ creditoDevolvidoCentavos: 15000 });
+
+    render(<MyBookingsList />);
+    fireEvent.click(
+      (await screen.findAllByRole("button", { name: "Cancelar" }))[0],
+    );
+
+    expect(
+      await screen.findByText(/voltaram para a sua carteira/),
+    ).toBeInTheDocument();
+    // O VALOR, e nao so a frase: um aviso com o numero errado e pior que
+    // nenhum aviso, porque parece confirmacao.
+    expect(screen.getByText(/R\$\s?150,00/)).toBeInTheDocument();
+  });
+
+  it("SPEC-039: quando NAO houve devolucao, a tela fica calada", async () => {
+    listMyBookingsMock.mockResolvedValue({
+      page: 1,
+      pageSize: 20,
+      total: 1,
+      data: [reserva("pendente_pagamento")],
+    });
+    // `null` = nao havia consumo ativo. Reserva de turma e reserva sem aluno
+    // caem aqui.
+    cancelBookingMock
+      .mockReset()
+      .mockResolvedValue({ creditoDevolvidoCentavos: null });
+
+    render(<MyBookingsList />);
+    fireEvent.click(
+      (await screen.findAllByRole("button", { name: "Cancelar" }))[0],
+    );
+
+    await waitFor(() => expect(cancelBookingMock).toHaveBeenCalled());
+    expect(
+      screen.queryByText(/voltaram para a sua carteira/),
+    ).not.toBeInTheDocument();
   });
 });

@@ -71,10 +71,29 @@ export function PerfilView() {
           conta", que é onde saldo pertence.
 
           **Ela some sozinha para quem não tem carteira** (professor e gestor
-          logados aqui): o componente devolve `null` no `404`, em vez de
-          pintar erro para quem não deveria ver nada.
+          logados aqui): o componente devolve `null` no `404` e no `403`, em
+          vez de pintar erro para quem não deveria ver nada.
+
+          **E aqui ela nem é montada para quem não é aluno.** O componente
+          sozinho não bastou, e o defeito foi visto em produção: a rota tem
+          `@Roles('aluno')`, então o professor recebia `403` — não `404` — e
+          caía no ramo de erro, com "não foi possível carregar sua carteira"
+          em vermelho no perfil dele.
+
+          **A guarda esconde só quando SABE que não é aluno.** A primeira
+          versão era `usuario?.role === "aluno" ? <MinhaCarteira /> : null`, e
+          isso era uma regressão achada na revisão desta PR: `getMe()` falha em
+          silêncio de propósito (o nome é enfeite), e amarrar a carteira ao
+          sucesso dele faria um ALUNO real perder a carteira numa falha
+          transitória — sem erro, sem nada.
+
+          Invertida, a guarda vira o que devia ser: uma **otimização** que
+          poupa a requisição de quem sabidamente não tem carteira. A garantia
+          continua no componente, que trata `403` e `404`. Enquanto `usuario`
+          é `null` — carregando, ou getMe falhou — a carteira é montada, que é
+          exatamente o comportamento de antes desta PR.
         */}
-        <MinhaCarteira />
+        {usuario && usuario.role !== "aluno" ? null : <MinhaCarteira />}
 
         {/*
           O "Sair" fica no fim, separado, e é a única ação destrutiva desta

@@ -43,6 +43,19 @@ describe("MinhaCarteira", () => {
     await vi.waitFor(() => expect(container).toBeEmptyDOMElement());
   });
 
+  it("403 tambem e ausencia de carteira -- o defeito visto em producao", async () => {
+    // **O caso que faltava.** A rota tem `@Roles('aluno')`, entao o professor
+    // logado no app recebia `403`, nao `404`, e caia no ramo de erro: o perfil
+    // dele mostrava "nao foi possivel carregar sua carteira" em vermelho.
+    //
+    // A primeira versao deste componente previu o usuario SEM linha de aluno
+    // e esqueceu o caso mais comum: quem nao e aluno nem chega ao servico.
+    pegarCarteira.mockRejectedValue(new ApiError(403, "Forbidden"));
+    const { container } = render(<MinhaCarteira />);
+
+    await vi.waitFor(() => expect(container).toBeEmptyDOMElement());
+  });
+
   it("falha de verdade DIZ que falhou", async () => {
     pegarCarteira.mockRejectedValue(new ApiError(500, "boom"));
     render(<MinhaCarteira />);
