@@ -80,11 +80,20 @@ export function PerfilView() {
           caía no ramo de erro, com "não foi possível carregar sua carteira"
           em vermelho no perfil dele.
 
-          As duas defesas são de propósito. Esta evita a requisição inteira:
-          não se faz uma pergunta cuja resposta já se sabe. A do componente é
-          a rede de baixo, para quando alguém montá-lo em outro lugar.
+          **A guarda esconde só quando SABE que não é aluno.** A primeira
+          versão era `usuario?.role === "aluno" ? <MinhaCarteira /> : null`, e
+          isso era uma regressão achada na revisão desta PR: `getMe()` falha em
+          silêncio de propósito (o nome é enfeite), e amarrar a carteira ao
+          sucesso dele faria um ALUNO real perder a carteira numa falha
+          transitória — sem erro, sem nada.
+
+          Invertida, a guarda vira o que devia ser: uma **otimização** que
+          poupa a requisição de quem sabidamente não tem carteira. A garantia
+          continua no componente, que trata `403` e `404`. Enquanto `usuario`
+          é `null` — carregando, ou getMe falhou — a carteira é montada, que é
+          exatamente o comportamento de antes desta PR.
         */}
-        {usuario?.role === "aluno" ? <MinhaCarteira /> : null}
+        {usuario && usuario.role !== "aluno" ? null : <MinhaCarteira />}
 
         {/*
           O "Sair" fica no fim, separado, e é a única ação destrutiva desta

@@ -35,7 +35,14 @@ vi.mock("@/components/foto-de-perfil", () => ({
  * acoplaria estes cinco testes a toda função nova do cliente — e a carteira
  * tem provas próprias em `minha-carteira.test.tsx`.
  */
-vi.mock("@/components/minha-carteira", () => ({ MinhaCarteira: () => null }));
+vi.mock("@/components/minha-carteira", () => ({
+  // **Marcador, e nao `null`.** Com `null` o dublê tornava o gate do
+  // perfil INOBSERVÁVEL: a revisão desta PR mostrou que a suíte ficava
+  // verde com a guarda removida. Um `data-testid` custa nada e devolve
+  // a pergunta "a carteira foi montada?" para dentro deste arquivo,
+  // sem acoplar os cinco testes de logout ao cliente de API.
+  MinhaCarteira: () => <div data-testid="carteira" />,
+}));
 vi.mock("@/components/top-app-bar", () => ({ TopAppBar: () => null }));
 vi.mock("@/components/bottom-nav", () => ({ BottomNav: () => null }));
 
@@ -54,15 +61,58 @@ beforeEach(() => {
 
 const botaoSair = () => screen.getByRole("button", { name: /Sair da conta/ });
 
+const PROFESSOR = {
+  id: "u2",
+  nome: "Joao",
+  email: "prof@teste.com",
+  role: "professor" as const,
+};
+
+/**
+ * SPEC-033 + a correcao de 2026-09-09 — quem VE a carteira no perfil.
+ *
+ * O defeito de producao: o professor recebia `403` da rota (ela tem
+ * `@Roles('aluno')`), nao o `404` que o componente previa, e via "nao foi
+ * possivel carregar sua carteira" em vermelho.
+ *
+ * A guarda daqui e a metade de CIMA da correcao — e a que a revisao mostrou
+ * nao ter prova nenhuma.
+ */
+describe("quem ve a carteira no perfil", () => {
+  it("aluno: a carteira e montada", async () => {
+    render(<PerfilView />);
+    expect(await screen.findByTestId("carteira")).toBeInTheDocument();
+  });
+
+  it("professor: a carteira NAO e montada -- nem a requisicao acontece", async () => {
+    getMe.mockResolvedValue(PROFESSOR);
+    render(<PerfilView />);
+    await screen.findByText(/prof@teste.com/);
+    expect(screen.queryByTestId("carteira")).not.toBeInTheDocument();
+  });
+
+  it("getMe FALHOU: a carteira e montada assim mesmo", async () => {
+    // **A regressao que a revisao achou.** A primeira versao da guarda era
+    // `usuario?.role === "aluno" ? <MinhaCarteira /> : null`, e `getMe()`
+    // falha em SILENCIO de proposito (o nome e enfeite). Amarrar a carteira
+    // ao sucesso dele faria um ALUNO real perder a carteira numa falha
+    // transitoria, sem erro e sem aviso.
+    //
+    // A guarda esconde so quando SABE que nao e aluno. O resto e do
+    // componente, que trata `403` e `404`.
+    getMe.mockRejectedValue(new Error("rede caiu"));
+    render(<PerfilView />);
+    expect(await screen.findByTestId("carteira")).toBeInTheDocument();
+  });
+});
+
 describe("sair da conta", () => {
   it("o botão existe, e diz o que vai acontecer", async () => {
     render(<PerfilView />);
     await screen.findByText(/ana@teste.com/);
 
     expect(botaoSair()).toBeInTheDocument();
-    expect(
-      screen.getByText(/precisará entrar de novo/),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/precisará entrar de novo/)).toBeInTheDocument();
   });
 
   it("avisa o servidor e leva para o login", async () => {

@@ -6,6 +6,7 @@ import {
   getMinhaCarteira,
   type ExtratoDoAluno,
 } from "@/lib/api-client";
+import { emReais } from "@/lib/dinheiro";
 
 /**
  * SPEC-033/TASK-006 — o saldo e o extrato do aluno.
@@ -133,13 +134,6 @@ type Estado =
   | { tipo: "ok"; dados: ExtratoDoAluno }
   | { tipo: "sem-carteira" }
   | { tipo: "erro" };
-
-function emReais(centavos: number): string {
-  return (centavos / 100).toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  });
-}
 
 const ROTULO: Record<string, string> = {
   entrada: "Crédito adicionado",

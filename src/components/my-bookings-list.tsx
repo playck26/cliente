@@ -24,6 +24,7 @@ import {
   type ItemDaListaDeReservas,
   type PublicPaymentConfig,
 } from "@/lib/api-client";
+import { emReais } from "@/lib/dinheiro";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 
 const DIAS_SEMANA = [
@@ -183,6 +184,16 @@ export function MyBookingsList({
     useState<PublicPaymentConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * SPEC-039 — quanto voltou para a carteira no último cancelamento.
+   *
+   * `null` significa **não mostrar nada**, e é o estado certo em dois casos
+   * diferentes: ninguém cancelou ainda, e cancelou mas não havia crédito a
+   * devolver. Prometer "seu crédito voltou" numa reserva que nunca consumiu
+   * crédito é pior que ficar calado — a pessoa vai conferir o saldo e não
+   * encontrar nada.
+   */
+  const [creditoDevolvido, setCreditoDevolvido] = useState<number | null>(null);
   const [cancelingId, setCancelingId] = useState<string | null>(null);
   const [pagamentoAbertoId, setPagamentoAbertoId] = useState<string | null>(
     null,
@@ -306,9 +317,15 @@ export function MyBookingsList({
   async function handleCancel(id: string) {
     setCancelingId(id);
     setError(null);
+    setCreditoDevolvido(null);
     try {
-      await cancelBooking(id);
+      // **O corpo, e não só o status.** A rota devolve
+      // `{ creditoDevolvidoCentavos }` desde a SPEC-039 justamente para a tela
+      // poder dizer o que aconteceu com o dinheiro — antes ela respondia `204`
+      // e não havia o que mostrar.
+      const { creditoDevolvidoCentavos } = await cancelBooking(id);
       await load();
+      setCreditoDevolvido(creditoDevolvidoCentavos);
     } catch (err) {
       setError(
         err instanceof ApiError
@@ -403,6 +420,29 @@ export function MyBookingsList({
             className="rounded-2xl bg-surface p-4 text-sm font-semibold text-[var(--color-error)] shadow-[var(--shadow-low)] ring-1 ring-border"
           >
             {error}
+          </p>
+        ) : null}
+
+        {/*
+          SPEC-039 — o aviso da devolução.
+
+          **`> 0` e não `!== null`.** O servidor manda `null` quando não havia
+          consumo, e é aí que a tela fica calada: reserva de turma e reserva
+          sem aluno não devolvem nada, e prometer crédito que não voltou faz a
+          pessoa conferir o saldo e não encontrar. O `> 0` cobre também o zero,
+          que hoje não acontece e seria uma devolução de valor nenhum.
+
+          O texto diz que **já voltou**, e não "voltará": a devolução acontece
+          na MESMA transação do cancelamento (SPEC-033), então quando esta tela
+          renderiza o saldo já subiu.
+        */}
+        {creditoDevolvido !== null && creditoDevolvido > 0 ? (
+          <p
+            role="status"
+            className="rounded-2xl bg-[var(--color-secondary-container)] p-4 text-sm font-semibold text-[var(--color-primary-strong)]"
+          >
+            Reserva cancelada. {emReais(creditoDevolvido)} voltaram para a sua
+            carteira.
           </p>
         ) : null}
 
