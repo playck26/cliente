@@ -404,6 +404,22 @@ export interface paths {
         patch: operations["MeCadastroController_atualizarMeuCadastro"];
         trace?: never;
     };
+    "/api/v1/students/importar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ImportacaoController_importar"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/planos": {
         parameters: {
             query?: never;
@@ -1878,6 +1894,56 @@ export interface components {
             /** @enum {string|null} */
             uf?: "AC" | "AL" | "AP" | "AM" | "BA" | "CE" | "DF" | "ES" | "GO" | "MA" | "MT" | "MS" | "MG" | "PA" | "PB" | "PR" | "PE" | "PI" | "RJ" | "RN" | "RS" | "RO" | "RR" | "SC" | "SP" | "SE" | "TO" | null;
             observacoesSaude?: string | null;
+        };
+        ErroDeImportacaoDto: {
+            /** @example 47 */
+            linha: number;
+            /** @example email */
+            coluna: string;
+            /** @example Ja existe uma conta com este e-mail. */
+            mensagem: string;
+        };
+        LinhaValidaDto: {
+            /** @example 2 */
+            linha: number;
+            /** @example Ana Souza */
+            nome: string;
+            /** @example ana@clube.local */
+            email: string;
+            telefone: string | null;
+            /** Format: date-time */
+            dataNascimento: string | null;
+            emergenciaNome: string | null;
+            emergenciaTelefone: string | null;
+            /** Format: uuid */
+            nivelId: string | null;
+        };
+        RelatorioDeImportacaoDto: {
+            /**
+             * @description Linhas de aluno, sem o cabecalho.
+             * @example 300
+             */
+            total: number;
+            /** @example 298 */
+            validas: number;
+            erros: components["schemas"]["ErroDeImportacaoDto"][];
+            linhas: components["schemas"]["LinhaValidaDto"][];
+        };
+        AlunoImportadoDto: {
+            /** @example 2 */
+            linha: number;
+            /** Format: uuid */
+            alunoId: string;
+            /** @example ana@clube.local */
+            email: string;
+            /**
+             * @description Sai UMA VEZ. Nenhuma outra rota a devolve -- se o gestor perder, o caminho e regenerar.
+             * @example Kx7-mQ2p
+             */
+            senhaTemporaria: string;
+        };
+        ImportacaoConcluidaDto: {
+            criados: components["schemas"]["AlunoImportadoDto"][];
         };
         PlanoResponseDto: {
             /** Format: uuid */
@@ -3886,6 +3952,34 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AlunoResponseDto"];
+                };
+            };
+        };
+    };
+    ImportacaoController_importar: {
+        parameters: {
+            query: {
+                conferir: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    arquivo?: string;
+                };
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RelatorioDeImportacaoDto"] | components["schemas"]["ImportacaoConcluidaDto"];
                 };
             };
         };
