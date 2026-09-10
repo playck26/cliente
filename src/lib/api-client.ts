@@ -369,6 +369,22 @@ async function authFetch(
     );
   }
 
+  // DEF-028 — o clube inteiro suspenso. Mesmo desvio da conta inativa, e
+  // **precisa vir antes do bloco de 403 genérico logo abaixo**: aquele tenta
+  // renovar a sessão, e a renovação de uma empresa suspensa responde `401` e
+  // derruba as demais sessões. Sem este desvio a pessoa cairia no login sem
+  // uma palavra sobre o motivo — um logout mudo no meio do trabalho.
+  //
+  // Mensagem separada de propósito: a conta dela está em ordem, e "procure o
+  // administrador" mandaria o gestor procurar a si mesmo.
+  if (res.status === 403 && (await temCodigo(res.clone(), "EMPRESA_INATIVA"))) {
+    encerrarSessao();
+    throw await parseError(
+      res,
+      "O acesso deste clube está suspenso. Fale com o suporte da plataforma.",
+    );
+  }
+
   if (
     res.status === 403 &&
     (await temCodigo(res.clone(), "SENHA_TEMPORARIA"))
