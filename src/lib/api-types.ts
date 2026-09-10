@@ -388,6 +388,22 @@ export interface paths {
         patch: operations["LevelsController_update"];
         trace?: never;
     };
+    "/api/v1/me/cadastro": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MeCadastroController_meuCadastro"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch: operations["MeCadastroController_atualizarMeuCadastro"];
+        trace?: never;
+    };
     "/api/v1/_smoke/tenant-check/{companyId}": {
         parameters: {
             query?: never;
@@ -1028,6 +1044,22 @@ export interface paths {
         patch: operations["ClassesController_update"];
         trace?: never;
     };
+    "/api/v1/classes/{id}/ocorrencias-canceladas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ClassesController_ocorrenciasCanceladas"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/classes/{turmaId}/ocorrencias/{ocupacaoId}/cancel": {
         parameters: {
             query?: never;
@@ -1038,6 +1070,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["ClassesController_cancelarOcorrencia"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/classes/{turmaId}/ocorrencias/{ocupacaoId}/reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["ClassesController_reativarOcorrencia"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1548,6 +1596,21 @@ export interface components {
             porTurma: components["schemas"]["FrequenciaPorTurmaResponseDto"][];
             ocorrencias: components["schemas"]["OcorrenciaDoAlunoResponseDto"][];
         };
+        CompletudeDoCadastroDto: {
+            /**
+             * @description Fracao dos SETE campos contaveis, arredondada. O piso real e 29% -- `nome` e `email` sao NOT NULL em `usuarios`, entao todo aluno nasce com dois. Barra em zero mentiria sobre o trabalho ja feito.
+             * @example 71
+             */
+            percentual: number;
+            /**
+             * @description Os que faltam, NA ORDEM EM QUE A TELA DEVE PEDI-LOS. Vazio quando `percentual` e 100.
+             * @example [
+             *       "dataNascimento",
+             *       "emergenciaTelefone"
+             *     ]
+             */
+            faltam: string[];
+        };
         AlunoResponseDto: {
             /** Format: uuid */
             id: string;
@@ -1561,6 +1624,19 @@ export interface components {
             nivelId: string | null;
             /** @enum {string} */
             status: "ativo" | "inativo";
+            /** @example 1990-05-10 */
+            dataNascimento: string | null;
+            /** @example Beto Souza */
+            emergenciaNome: string | null;
+            /** @example +5511988887777 */
+            emergenciaTelefone: string | null;
+            endereco: string | null;
+            /** @example Sao Paulo */
+            cidade: string | null;
+            /** @example SP */
+            uf: string | null;
+            observacoesSaude: string | null;
+            cadastro: components["schemas"]["CompletudeDoCadastroDto"];
         };
         AlunoPaginadoResponseDto: {
             data: components["schemas"]["AlunoResponseDto"][];
@@ -1584,6 +1660,19 @@ export interface components {
             nivelId: string | null;
             /** @enum {string} */
             status: "ativo" | "inativo";
+            /** @example 1990-05-10 */
+            dataNascimento: string | null;
+            /** @example Beto Souza */
+            emergenciaNome: string | null;
+            /** @example +5511988887777 */
+            emergenciaTelefone: string | null;
+            endereco: string | null;
+            /** @example Sao Paulo */
+            cidade: string | null;
+            /** @example SP */
+            uf: string | null;
+            observacoesSaude: string | null;
+            cadastro: components["schemas"]["CompletudeDoCadastroDto"];
             /** @example Xk4p-9Qm2 */
             senhaTemporaria: string;
         };
@@ -1596,6 +1685,15 @@ export interface components {
         UpdateStudentDto: {
             nome?: string;
             telefone?: string;
+            /** @example 1990-05-10 */
+            dataNascimento?: string | null;
+            emergenciaNome?: string | null;
+            emergenciaTelefone?: string | null;
+            endereco?: string | null;
+            cidade?: string | null;
+            /** @enum {string|null} */
+            uf?: "AC" | "AL" | "AP" | "AM" | "BA" | "CE" | "DF" | "ES" | "GO" | "MA" | "MT" | "MS" | "MG" | "PA" | "PB" | "PR" | "PE" | "PI" | "RJ" | "RN" | "RS" | "RO" | "RR" | "SC" | "SP" | "SE" | "TO" | null;
+            observacoesSaude?: string | null;
             nivelId?: string;
             /** @enum {string} */
             status?: "ativo" | "inativo";
@@ -1701,6 +1799,19 @@ export interface components {
         UpdateLevelDto: {
             nome?: string;
             ordem?: number;
+        };
+        CamposDoCadastroDto: {
+            nome?: string;
+            telefone?: string;
+            /** @example 1990-05-10 */
+            dataNascimento?: string | null;
+            emergenciaNome?: string | null;
+            emergenciaTelefone?: string | null;
+            endereco?: string | null;
+            cidade?: string | null;
+            /** @enum {string|null} */
+            uf?: "AC" | "AL" | "AP" | "AM" | "BA" | "CE" | "DF" | "ES" | "GO" | "MA" | "MT" | "MS" | "MG" | "PA" | "PB" | "PR" | "PE" | "PI" | "RJ" | "RN" | "RS" | "RO" | "RR" | "SC" | "SP" | "SE" | "TO" | null;
+            observacoesSaude?: string | null;
         };
         SmokeDeTenantResponseDto: {
             /** @example true */
@@ -2135,7 +2246,7 @@ export interface components {
              * @description O GESTO humano que provocou o evento.
              * @enum {string}
              */
-            acao: "reserva_criada" | "reserva_cancelada" | "reserva_movida" | "aula_cancelada" | "pagamento_confirmado" | "turma_criada" | "turma_horario_editado" | "credito_lancado" | "credito_retirado" | "turma_aluno_removido";
+            acao: "reserva_criada" | "reserva_cancelada" | "reserva_movida" | "aula_cancelada" | "pagamento_confirmado" | "turma_criada" | "turma_horario_editado" | "credito_lancado" | "credito_retirado" | "turma_aluno_removido" | "turma_inativada" | "turma_reativada" | "aula_reativada";
             /** @description Nota interna, e só existe em ação administrativa que a exige. Consumo e devolução não têm motivo — o motivo deles é a própria reserva. */
             motivo: Record<string, never> | null;
             autor: components["schemas"]["AutorDoEventoDto"];
@@ -2450,6 +2561,23 @@ export interface components {
             alunosAlocados: number;
             alunos: components["schemas"]["AlunoDaTurmaResponseDto"][];
         };
+        AulaCanceladaResponseDto: {
+            /**
+             * Format: uuid
+             * @description O MESMO id que `POST /classes/:turmaId/ocorrencias/:ocupacaoId/reactivate` aceita — se divergirem, o caminho quebra no último passo (mesma razão da INV-026b).
+             */
+            ocupacaoId: string;
+            /** @example 2026-09-22 */
+            data: string;
+            /** @example 18:00 */
+            horaInicio: string;
+            /** @example 19:00 */
+            horaFim: string;
+            /** @example Quadra 1 */
+            quadraNome: string;
+            /** @description `false` quando outra ocupação já tomou o horário. A tela avisa antes; quem decide é o servidor. */
+            horarioLivre: boolean;
+        };
         CancelarOcorrenciaDto: {
             /** @example Quadra interditada para manutenção */
             motivo: string;
@@ -2734,7 +2862,7 @@ export interface components {
              */
             aulas: number;
             /**
-             * @description Quantas ainda sem chamada registrada. É esta contagem que faz o calendário valer: a grade ele já conhece de cabeça; o que falta registrar, não.
+             * @description Quantas ainda sem chamada registrada. É esta contagem que faz o calendário valer: a grade ele já conhece de cabeça; o que falta registrar, não. **Aula particular nunca entra aqui** (SPEC-039/LIM-039a), mas conta em `aulas`.
              * @example 1
              */
             pendentes: number;
@@ -2745,6 +2873,8 @@ export interface components {
              * @description O MESMO id que `PUT /me/teacher/attendance/:ocupacaoId` aceita (INV-026b). Se divergirem, o caminho quebra no último passo.
              */
             ocupacaoId: string;
+            /** @enum {string} */
+            tipo: "turma" | "particular";
             /** Format: uuid */
             turmaId: string | null;
             turmaNome: string | null;
@@ -2755,10 +2885,10 @@ export interface components {
             /** @example 19:00 */
             horaFim: string;
             /**
-             * @description `futura` = ainda não começou; a chamada **não** pode ser lançada. `em_andamento` = começou e não terminou; pode lançar, e não é pendência. `pendente` = já terminou e não há linha em `chamadas`. `legada` = chamada de antes da SPEC-015, com `completude: desconhecida`. `nao_houve` = alguém declarou que a aula não aconteceu (SPEC-030); **não** é pendência e não pinta o ponto vermelho. `cancelada` não aparece aqui: o filtro do calendário a exclui antes.
-             * @enum {string}
+             * @description `futura` = ainda não começou; a chamada **não** pode ser lançada. `em_andamento` = começou e não terminou; pode lançar, e não é pendência. `pendente` = já terminou e não há linha em `chamadas`. `legada` = chamada de antes da SPEC-015, com `completude: desconhecida`. `nao_houve` = alguém declarou que a aula não aconteceu (SPEC-030); **não** é pendência e não pinta o ponto vermelho. `cancelada` não aparece aqui: o filtro do calendário a exclui antes. **`null` na aula PARTICULAR** (SPEC-039/LIM-039a): ela não tem chamada, e resolver um estado ali pintaria `pendente` numa aula que nunca poderá receber uma — ponto vermelho que o professor não limpa.
+             * @enum {string|null}
              */
-            chamada: "futura" | "em_andamento" | "pendente" | "feita" | "legada" | "nao_houve";
+            chamada: "futura" | "em_andamento" | "pendente" | "feita" | "legada" | "nao_houve" | null;
         };
         AlunoEmEvasaoResponseDto: {
             /** Format: uuid */
@@ -3565,6 +3695,48 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["NivelResponseDto"];
+                };
+            };
+        };
+    };
+    MeCadastroController_meuCadastro: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlunoResponseDto"];
+                };
+            };
+        };
+    };
+    MeCadastroController_atualizarMeuCadastro: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CamposDoCadastroDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AlunoResponseDto"];
                 };
             };
         };
@@ -4928,7 +5100,52 @@ export interface operations {
             };
         };
     };
+    ClassesController_ocorrenciasCanceladas: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AulaCanceladaResponseDto"][];
+                };
+            };
+        };
+    };
     ClassesController_cancelarOcorrencia: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                turmaId: string;
+                ocupacaoId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelarOcorrenciaDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ClassesController_reativarOcorrencia: {
         parameters: {
             query?: never;
             header?: never;

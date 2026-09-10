@@ -20,6 +20,14 @@ export type LoginDto = components["schemas"]["LoginDto"];
 export type Papel = components["schemas"]["UsuarioPublicoResponseDto"]["role"];
 
 export type Usuario = components["schemas"]["UsuarioPublicoResponseDto"];
+/**
+ * SPEC-036 — a ficha do aluno com o bloco `cadastro` calculado.
+ *
+ * Vem do `openapi.json` como todo o resto: tipo escrito a mao aqui e o
+ * DEF-012, que deixa o typecheck verde e a tela quebrada em runtime.
+ */
+export type MeuCadastro = components["schemas"]["AlunoResponseDto"];
+export type CamposDoCadastro = components["schemas"]["CamposDoCadastroDto"];
 
 /**
  * SPEC-013 — o que o professor vê. Note o que **não** está aqui: telefone e
@@ -169,7 +177,8 @@ export type PublicPaymentConfig =
 // clube (AC-013), e o tipo gerado do contrato e o que garante que ela nao
 // aparece aqui nem por engano.
 export type ExtratoDoAluno = components["schemas"]["ExtratoDoAlunoResponseDto"];
-export type MovimentoDoAluno = components["schemas"]["MovimentoDoAlunoResponseDto"];
+export type MovimentoDoAluno =
+  components["schemas"]["MovimentoDoAlunoResponseDto"];
 
 export class ApiError extends Error {
   constructor(
@@ -497,8 +506,46 @@ export async function logout(): Promise<void> {
  */
 export async function getMinhaCarteira(): Promise<ExtratoDoAluno> {
   const res = await authFetch("/me/creditos");
-  if (!res.ok) throw await parseError(res, "Não foi possível carregar sua carteira.");
+  if (!res.ok)
+    throw await parseError(res, "Não foi possível carregar sua carteira.");
   return (await res.json()) as ExtratoDoAluno;
+}
+
+/**
+ * SPEC-036 — o cadastro do aluno logado.
+ *
+ * `403` para quem nao e aluno (professor e gestor nao tem ficha), e o chamador
+ * distingue pelo `status` — o mesmo arranjo da carteira, e pelo mesmo motivo:
+ * devolver `{}` faria a tela pintar uma barra de 0% para quem nao tem cadastro
+ * de aluno nenhum.
+ */
+export async function getMeuCadastro(): Promise<MeuCadastro> {
+  const res = await authFetch("/me/cadastro");
+  if (!res.ok)
+    throw await parseError(res, "Nao foi possivel carregar seu cadastro.");
+  return (await res.json()) as MeuCadastro;
+}
+
+/**
+ * SPEC-036/AC-006 — o aluno escreve os SETE campos, e so eles.
+ *
+ * `nivelId` e `status` nao existem neste corpo: o DTO do servidor e outro
+ * (`CamposDoCadastroDto`), e mandar um deles derruba a requisicao inteira com
+ * `400`. A garantia e de TIPO, nao de vigilancia.
+ *
+ * **`null` apaga; `""` o servidor recusa com `400`** (INV-108): ausencia e
+ * `NULL`, e so. Quem chama converte campo vazio em `null` antes de mandar.
+ */
+export async function salvarMeuCadastro(
+  dto: CamposDoCadastro,
+): Promise<MeuCadastro> {
+  const res = await authFetch("/me/cadastro", {
+    method: "PATCH",
+    body: JSON.stringify(dto),
+  });
+  if (!res.ok)
+    throw await parseError(res, "Nao foi possivel salvar seu cadastro.");
+  return (await res.json()) as MeuCadastro;
 }
 
 export async function getMe(): Promise<Usuario> {

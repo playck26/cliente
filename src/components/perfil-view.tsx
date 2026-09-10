@@ -6,6 +6,7 @@ import { LogOut } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
 import { FotoDePerfil } from "@/components/foto-de-perfil";
 import { MinhaCarteira } from "@/components/minha-carteira";
+import { CompleteSeuCadastro } from "@/components/complete-seu-cadastro";
 import { TopAppBar } from "@/components/top-app-bar";
 import { getMe, logout, type Usuario } from "@/lib/api-client";
 
@@ -94,6 +95,26 @@ export function PerfilView() {
           exatamente o comportamento de antes desta PR.
         */}
         {usuario && usuario.role !== "aluno" ? null : <MinhaCarteira />}
+
+        {/*
+          SPEC-036/TASK-005 — "complete seu cadastro".
+
+          **Vem DEPOIS da carteira, e a ordem é a decisão.** Saldo é o que o
+          aluno abre o perfil para ver; cadastro é o que o clube quer que ele
+          preencha. Pôr o pedido antes do que ele veio buscar seria cobrar na
+          porta.
+
+          **Não bloqueia nada** (SPEC-036/D4): o item 14 do backlog diz
+          "faixa de incentivo NÃO BLOQUEANTE", e é literal. O aluno com 29%
+          reserva quadra igual, e há um gate no `back` que fica vermelho se
+          alguém transformar este número em requisito.
+
+          Mesma guarda da carteira, pelo mesmo motivo: a rota tem
+          `@Roles('aluno')` e responde `403` a professor e gestor. O
+          componente já some sozinho no erro, e esta linha só poupa a
+          requisição de quem sabidamente não tem cadastro de aluno.
+        */}
+        {usuario && usuario.role !== "aluno" ? null : <CompleteSeuCadastro />}
 
         {/*
           O "Sair" fica no fim, separado, e é a única ação destrutiva desta

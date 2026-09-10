@@ -1,4 +1,10 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgendaDoProfessor } from "./agenda-do-professor";
 
@@ -425,10 +431,7 @@ describe("SPEC-027 — aula futura não cobra chamada", () => {
     // ficaria sem lançar chamada nenhuma.
     await abrirODia("pendente");
 
-    expect(screen.getByRole("link")).toHaveAttribute(
-      "href",
-      "/chamada/ocup-1",
-    );
+    expect(screen.getByRole("link")).toHaveAttribute("href", "/chamada/ocup-1");
     expect(screen.getByText("Chamada pendente")).toBeInTheDocument();
   });
 
@@ -498,5 +501,48 @@ describe("SPEC-030 — aula nao realizada no calendario", () => {
     // uma aula do mes passado apareceria como "Ainda não começou".
     expect(screen.queryByText("Ainda não começou")).not.toBeInTheDocument();
     expect(screen.queryByText("Chamada pendente")).not.toBeInTheDocument();
+  });
+
+  /**
+   * SPEC-039/LIM-039a — **a aula particular, e o defeito que ela deixou em
+   * produção.**
+   *
+   * A 039 tornou `chamada` anulável no contrato e o `api-types.ts` deste
+   * repositório **não foi regenerado no mesmo ciclo**. O `tsc` ficou verde
+   * contra um contrato velho, e o defeito só apareceu quando a SPEC-036
+   * regenerou os tipos por outro motivo.
+   *
+   * O que o professor via: o selo caía no fallback e dizia "Ainda não
+   * começou" — numa aula particular do mês passado —, e o cartão levava a
+   * `/chamada/:id`, tela que não pode funcionar porque aula particular não
+   * tem chamada.
+   */
+  it("aula PARTICULAR: selo próprio, e o cartão NÃO vira link", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-09-15T12:00:00.000Z"));
+    getAgendaDoProfessor.mockResolvedValue([
+      { data: "2026-09-01", aulas: 1, pendentes: 0 },
+    ]);
+    getAulasDoDia.mockResolvedValue([
+      {
+        ocupacaoId: "o-particular",
+        tipo: "particular",
+        turmaId: null,
+        turmaNome: null,
+        quadraNome: "Quadra 1",
+        horaInicio: "10:00",
+        horaFim: "11:00",
+        chamada: null,
+      },
+    ]);
+    render(<AgendaDoProfessor />);
+    fireEvent.click(await screen.findByLabelText("1: 1 aula"));
+
+    expect(await screen.findByText("Aula particular")).toBeInTheDocument();
+    // O fallback dizia isto, e era mentira numa aula do mês passado.
+    expect(screen.queryByText("Ainda não começou")).not.toBeInTheDocument();
+    // Sem chamada não há para onde clicar: o link levaria a uma tela que o
+    // servidor recusa.
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
 });

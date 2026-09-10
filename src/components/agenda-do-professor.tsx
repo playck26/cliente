@@ -30,8 +30,18 @@ import { hojeNoClube } from "@/lib/fuso";
 
 const DIAS_DA_SEMANA = ["D", "S", "T", "Q", "Q", "S", "S"];
 const MESES = [
-  "janeiro", "fevereiro", "março", "abril", "maio", "junho",
-  "julho", "agosto", "setembro", "outubro", "novembro", "dezembro",
+  "janeiro",
+  "fevereiro",
+  "março",
+  "abril",
+  "maio",
+  "junho",
+  "julho",
+  "agosto",
+  "setembro",
+  "outubro",
+  "novembro",
+  "dezembro",
 ];
 
 /**
@@ -264,7 +274,9 @@ export function AgendaDoProfessor() {
       </section>
 
       {carregando ? (
-        <p className="text-[13px] font-bold text-[var(--color-text-secondary)]">Carregando…</p>
+        <p className="text-[13px] font-bold text-[var(--color-text-secondary)]">
+          Carregando…
+        </p>
       ) : dias.length === 0 ? (
         <p className="text-[13px] font-bold text-[var(--color-text-secondary)]">
           Nenhuma aula sua neste mês.
@@ -274,7 +286,9 @@ export function AgendaDoProfessor() {
       {diaAberto && (
         <section className="space-y-3" aria-label={`Aulas de ${diaAberto}`}>
           {aulasCarregando ? (
-            <p className="text-[13px] font-bold text-[var(--color-text-secondary)]">Carregando aulas…</p>
+            <p className="text-[13px] font-bold text-[var(--color-text-secondary)]">
+              Carregando aulas…
+            </p>
           ) : erroDoDia ? (
             <p
               role="alert"
@@ -321,7 +335,23 @@ export function AgendaDoProfessor() {
               const moldura =
                 "block rounded-3xl bg-surface p-4 shadow-[var(--shadow-low)] ring-1 ring-border";
 
-              if (aula.chamada === "futura") {
+              /**
+               * **`chamada: null` é a aula PARTICULAR** (SPEC-039/LIM-039a), e
+               * ela não vira link.
+               *
+               * *Este era um defeito em produção, e ele chegou aqui por um
+               * caminho que vale registrar:* a SPEC-039 tornou `chamada`
+               * anulável no contrato, mas o `api-types.ts` deste repositório
+               * **não foi regenerado no mesmo ciclo**. O `tsc` continuou
+               * verde contra um contrato velho, e o defeito ficou invisível
+               * até a SPEC-036 regenerar os tipos por outro motivo.
+               *
+               * O que o professor via: o selo caía no fallback e dizia
+               * **"Ainda não começou"** — numa aula particular do mês
+               * passado —, e o cartão levava a `/chamada/:id`, uma tela que
+               * não pode funcionar porque aula particular não tem chamada.
+               */
+              if (aula.chamada === null || aula.chamada === "futura") {
                 return (
                   <div key={aula.ocupacaoId} className={moldura}>
                     {cartao}
@@ -355,7 +385,7 @@ export function AgendaDoProfessor() {
  * interpreta `completude` nem conta presenças — se interpretasse, viraria uma
  * segunda cópia da regra da SPEC-014.
  */
-function EstadoDaChamada({ estado }: { estado: string }) {
+function EstadoDaChamada({ estado }: { estado: string | null }) {
   const estilo: Record<string, { texto: string; classe: string }> = {
     /*
       SPEC-027 — os dois estados novos, e o pedido do Israel foi literal:
@@ -369,7 +399,8 @@ function EstadoDaChamada({ estado }: { estado: string }) {
     },
     em_andamento: {
       texto: "Aula em andamento",
-      classe: "bg-[var(--color-secondary)]/25 text-[var(--color-primary-strong)]",
+      classe:
+        "bg-[var(--color-secondary)]/25 text-[var(--color-primary-strong)]",
     },
     pendente: {
       texto: "Chamada pendente",
@@ -382,7 +413,8 @@ function EstadoDaChamada({ estado }: { estado: string }) {
     },
     legada: {
       texto: "Chamada antiga",
-      classe: "bg-[var(--color-court-dark)]/10 text-[var(--color-text-secondary)]",
+      classe:
+        "bg-[var(--color-court-dark)]/10 text-[var(--color-text-secondary)]",
     },
     /*
       SPEC-030 — a aula que não aconteceu. **Neutro, nunca vermelho:** o
@@ -400,6 +432,22 @@ function EstadoDaChamada({ estado }: { estado: string }) {
         "bg-[var(--color-surface-container-high)] text-[var(--color-text-secondary)]",
     },
   };
+  /**
+   * **`null` é a aula particular** (SPEC-039/LIM-039a), e ela precisa de
+   * rótulo próprio — não do fallback.
+   *
+   * Sem esta linha o selo dizia "Ainda não começou" numa aula do mês passado.
+   * Dizer o que a aula **é** responde a pergunta que o professor faz ao ver
+   * uma linha sem chamada; o fallback respondia outra, e errado.
+   */
+  if (estado === null) {
+    return (
+      <span className="shrink-0 rounded-full bg-[var(--color-surface-container-high)] px-2.5 py-1 text-[11px] font-extrabold text-[var(--color-text-secondary)]">
+        Aula particular
+      </span>
+    );
+  }
+
   /*
     Fallback NEUTRO, não `pendente`. Se o servidor um dia mandar um estado
     que esta versão do app não conhece, pintar de vermelho seria acusar o
