@@ -27,6 +27,8 @@ export type Usuario = components["schemas"]["UsuarioPublicoResponseDto"];
  * DEF-012, que deixa o typecheck verde e a tela quebrada em runtime.
  */
 export type MeuCadastro = components["schemas"]["AlunoResponseDto"];
+/** SPEC-037 — o plano contratado, com valor e prazo congelados. */
+export type Matricula = components["schemas"]["MatriculaResponseDto"];
 export type CamposDoCadastro = components["schemas"]["CamposDoCadastroDto"];
 
 /**
@@ -546,6 +548,26 @@ export async function salvarMeuCadastro(
   if (!res.ok)
     throw await parseError(res, "Nao foi possivel salvar seu cadastro.");
   return (await res.json()) as MeuCadastro;
+}
+
+/**
+ * SPEC-037/AC-011 — a matricula VIGENTE do aluno logado.
+ *
+ * **Devolve `null` quando nao ha, e nao `404`.** Nao ter plano e um estado
+ * normal -- a tabela nasceu vazia. `404` faria a tela tratar o normal como
+ * erro, que e o defeito que a carteira levou para producao na SPEC-033.
+ *
+ * `403` para professor e gestor: quem chama distingue pelo `status`, como na
+ * carteira.
+ */
+export async function getMinhaMatricula(): Promise<Matricula | null> {
+  const res = await authFetch("/me/matricula");
+  if (!res.ok)
+    throw await parseError(res, "Nao foi possivel carregar seu plano.");
+  const texto = await res.text();
+  // Corpo vazio e o `null` do servidor: `res.json()` estouraria com
+  // `Unexpected end of JSON input`, e o erro nao diria isso.
+  return texto.trim() === "" ? null : (JSON.parse(texto) as Matricula);
 }
 
 export async function getMe(): Promise<Usuario> {

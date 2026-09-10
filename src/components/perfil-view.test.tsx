@@ -56,6 +56,10 @@ vi.mock("@/components/minha-carteira", () => ({
 vi.mock("@/components/complete-seu-cadastro", () => ({
   CompleteSeuCadastro: () => <div data-testid="complete-cadastro" />,
 }));
+/** SPEC-037 — mesmo tratamento, mesma razao. */
+vi.mock("@/components/meu-plano", () => ({
+  MeuPlano: () => <div data-testid="meu-plano" />,
+}));
 vi.mock("@/components/top-app-bar", () => ({ TopAppBar: () => null }));
 vi.mock("@/components/bottom-nav", () => ({ BottomNav: () => null }));
 
@@ -106,6 +110,10 @@ describe("quem ve a carteira no perfil", () => {
     // a rota responde `403` a professor e gestor. Sem esta linha, a guarda
     // nova ficaria sem prova enquanto a da carteira parecia cobrir as duas.
     expect(screen.queryByTestId("complete-cadastro")).not.toBeInTheDocument();
+    // SPEC-037 — a terceira secao com a MESMA guarda. Sem esta linha, a
+    // proxima a entrar ficaria sem prova enquanto as duas de cima pareciam
+    // cobrir a tela inteira.
+    expect(screen.queryByTestId("meu-plano")).not.toBeInTheDocument();
   });
 
   it("getMe FALHOU: a carteira e montada assim mesmo", async () => {

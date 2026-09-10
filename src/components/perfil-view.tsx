@@ -7,6 +7,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import { FotoDePerfil } from "@/components/foto-de-perfil";
 import { MinhaCarteira } from "@/components/minha-carteira";
 import { CompleteSeuCadastro } from "@/components/complete-seu-cadastro";
+import { MeuPlano } from "@/components/meu-plano";
 import { TopAppBar } from "@/components/top-app-bar";
 import { getMe, logout, type Usuario } from "@/lib/api-client";
 
@@ -115,6 +116,19 @@ export function PerfilView() {
           requisição de quem sabidamente não tem cadastro de aluno.
         */}
         {usuario && usuario.role !== "aluno" ? null : <CompleteSeuCadastro />}
+
+        {/*
+          SPEC-037/TASK-006 — o plano contratado, e o link para pagar.
+
+          **Depois do cadastro e antes do "Sair".** A ordem desta tela é:
+          quem sou (foto), quanto tenho (carteira), o que falta (cadastro), o
+          que contratei (plano). Do imediato ao contratual.
+
+          Some sozinho quando não há matrícula — a tabela nasceu vazia, e a
+          maioria dos alunos está assim. Mostrar "você não tem plano" seria
+          cobrar de quem talvez nem deva ter: quem matricula é o clube.
+        */}
+        {usuario && usuario.role !== "aluno" ? null : <MeuPlano />}
 
         {/*
           O "Sair" fica no fim, separado, e é a única ação destrutiva desta
