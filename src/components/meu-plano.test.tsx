@@ -38,6 +38,10 @@ function matricula(extra: Record<string, unknown> = {}) {
     inicio: "2026-09-10",
     fim: "2026-10-10",
     contratoVersao: 3,
+    // SPEC-045 — 20 dias: **fora da janela de aviso**, para que os casos
+    // antigos deste arquivo continuem medindo o que mediam. Um padrão dentro
+    // da janela poria o aviso em todos eles.
+    diasRestantes: 20,
     linkPagamentoUrl: "https://clube.example/pagar",
     ...extra,
   };
@@ -57,6 +61,56 @@ describe("MeuPlano", () => {
     // ter reajustado o plano, e a matrícula dele não muda (D1).
     expect(screen.getByText(/R\$\s*250,00/)).toBeInTheDocument();
     expect(screen.getByText(/Mensal · até 10\/10\/2026/)).toBeInTheDocument();
+  });
+
+  // =====================================================================
+  // SPEC-045/AC-010 — o aviso de vencimento
+  // =====================================================================
+
+  it("**a 7 dias, avisa**", async () => {
+    getMinhaMatricula.mockResolvedValue(matricula({ diasRestantes: 7 }));
+    render(<MeuPlano />);
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Seu plano vence em 7 dias.",
+    );
+  });
+
+  it("**a 8 dias, NÃO avisa** — aviso permanente vira paisagem", async () => {
+    getMinhaMatricula.mockResolvedValue(matricula({ diasRestantes: 8 }));
+    render(<MeuPlano />);
+
+    // Sem este caso, um aviso que aparecesse o mês inteiro passaria: o de 7
+    // dias sozinho fica verde com a condição `diasRestantes <= 999`.
+    await screen.findByText(/Mensal/);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+  });
+
+  it("no dia, diz HOJE — e não 'em 0 dias'", async () => {
+    getMinhaMatricula.mockResolvedValue(matricula({ diasRestantes: 0 }));
+    render(<MeuPlano />);
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Seu plano vence hoje.",
+    );
+  });
+
+  it("já vencido, diz 'venceu há' — e não 'vence em -3'", async () => {
+    getMinhaMatricula.mockResolvedValue(matricula({ diasRestantes: -3 }));
+    render(<MeuPlano />);
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Seu plano venceu há 3 dias.",
+    );
+  });
+
+  it("singular no dia único", async () => {
+    getMinhaMatricula.mockResolvedValue(matricula({ diasRestantes: 1 }));
+    render(<MeuPlano />);
+
+    expect(await screen.findByRole("status")).toHaveTextContent(
+      "Seu plano vence em 1 dia.",
+    );
   });
 
   it("sem matrícula, SOME — não diz 'você não tem plano'", async () => {

@@ -77,6 +77,32 @@ export function MeuPlano() {
         {matricula.planoNome ?? "Plano"} · até {porExtenso(matricula.fim)}
       </p>
 
+      {/*
+        SPEC-045/AC-010 — **a data sozinha não cria urgência.**
+
+        "até 12 de outubro" e "vence em 5 dias" são a mesma informação, e só a
+        segunda faz alguém agir. Mesma lição do `70%` da SPEC-036 e da contagem
+        de conflitos da SPEC-035: número bruto não diz o que fazer.
+
+        **Sete dias, e nada fora disso.** Um aviso que aparece o mês inteiro
+        vira paisagem, e aí não avisa mais nada quando importa.
+
+        `diasRestantes` vem do SERVIDOR: "hoje" da tela é o relógio do
+        navegador, que está no fuso de quem viaja e não no do clube.
+      */}
+      {matricula.diasRestantes <= 7 ? (
+        <p
+          role="status"
+          className="mt-2 rounded-2xl bg-[var(--color-primary-strong)]/10 px-3 py-2 text-[13px] font-extrabold text-[var(--color-primary-strong)]"
+        >
+          {matricula.diasRestantes < 0
+            ? `Seu plano venceu há ${Math.abs(matricula.diasRestantes)} ${Math.abs(matricula.diasRestantes) === 1 ? "dia" : "dias"}.`
+            : matricula.diasRestantes === 0
+              ? "Seu plano vence hoje."
+              : `Seu plano vence em ${matricula.diasRestantes} ${matricula.diasRestantes === 1 ? "dia" : "dias"}.`}
+        </p>
+      ) : null}
+
       {matricula.linkPagamentoUrl ? (
         <a
           href={matricula.linkPagamentoUrl}
