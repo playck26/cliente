@@ -29,6 +29,7 @@ const listar = vi.hoisted(() => vi.fn());
 const disponibilidade = vi.hoisted(() => vi.fn());
 const reservar = vi.hoisted(() => vi.fn());
 const configDePagamento = vi.hoisted(() => vi.fn());
+const carteira = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/api-client", async () => {
   const real =
@@ -41,6 +42,7 @@ vi.mock("@/lib/api-client", async () => {
     getAvailability: disponibilidade,
     createBooking: reservar,
     getPublicPaymentConfig: configDePagamento,
+    getMinhaCarteira: carteira,
   };
 });
 
@@ -84,6 +86,9 @@ beforeEach(() => {
     whatsappNumero: "5511999999999",
   });
   reservar.mockResolvedValue(reservaComStatus("pago"));
+  // R$ 500,00. A quadra custa R$ 120/h, entao um horario cabe com folga --
+  // quem testa o caso sem saldo sobrescreve.
+  carteira.mockResolvedValue({ saldoCentavos: 50_000, movimentos: [] });
 });
 
 /** Seleciona o horário e confirma — o caminho que todo caso percorre. */
@@ -187,5 +192,58 @@ describe("CourtBooking — a confirmação", () => {
       expect(screen.queryByText("Para pagar")).not.toBeInTheDocument(),
     );
     expect(screen.queryByText("Pago com seu saldo")).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * SPEC-048/REQ-001 — **o saldo, porque reservar GASTA ele.**
+ *
+ * Esta tela dizia *"Pago com seu saldo"* **depois** de confirmar e nada antes.
+ * Aviso depois do fato é recibo, não clareza — e este é o fluxo mais usado do
+ * app. O que estes casos guardam é o "antes".
+ */
+describe("SPEC-048 — o saldo aparece ANTES", () => {
+  it("AC-001: mostra o saldo assim que a tela abre", async () => {
+    render(<CourtBooking id={QUADRA} />);
+    expect(await screen.findByText(/Seu saldo: R\$\s*500,00/)).toBeInTheDocument();
+  });
+
+  it("AC-002: escolhido o horário, diz quanto SAI da carteira", async () => {
+    render(<CourtBooking id={QUADRA} />);
+    fireEvent.click(await screen.findByRole("button", { name: /10:00/ }));
+    expect(screen.getByText("Sai do seu saldo")).toBeInTheDocument();
+    // R$ 120/h x 1 horário. A tela não recalcula preço: usa o da quadra.
+    expect(screen.getByText("R$ 120,00")).toBeInTheDocument();
+    expect(screen.getByText(/Ficam R\$\s*380,00/)).toBeInTheDocument();
+  });
+
+  it("**AC-003: sem saldo, diz quanto falta — e NÃO trava o botão**", async () => {
+    carteira.mockResolvedValue({ saldoCentavos: 4_000, movimentos: [] });
+    render(<CourtBooking id={QUADRA} />);
+    fireEvent.click(await screen.findByRole("button", { name: /10:00/ }));
+
+    expect(await screen.findByText(/faltam/i)).toHaveTextContent("R$ 80,00");
+    // Travar prenderia quem acabou de receber crédito: o saldo foi lido na
+    // montagem, e quem julga é o servidor. É a D2, e a LIM-047f antes dela.
+    expect(screen.getByText("Confirmar reserva").closest("button")).toBeEnabled();
+  });
+
+  it("AC-004: carteira indisponível NÃO derruba a tela", async () => {
+    carteira.mockRejectedValue(new Error("rede"));
+    render(<CourtBooking id={QUADRA} />);
+    fireEvent.click(await screen.findByRole("button", { name: /10:00/ }));
+    // Sem o saldo a pessoa perde o AVISO, não a possibilidade de reservar.
+    expect(screen.queryByText(/Seu saldo/)).not.toBeInTheDocument();
+    expect(screen.getByText("Confirmar reserva")).toBeInTheDocument();
+  });
+
+  it("AC-005: depois de confirmar, o saldo mostrado é o NOVO", async () => {
+    carteira
+      .mockResolvedValueOnce({ saldoCentavos: 50_000, movimentos: [] })
+      .mockResolvedValueOnce({ saldoCentavos: 38_000, movimentos: [] });
+    await reservarNaTela();
+    // Repetir o saldo antigo aqui seria a tela afirmar um número que ela mesma
+    // acabou de tornar falso.
+    expect(screen.getByText(/Seu saldo agora é R\$\s*380,00/)).toBeInTheDocument();
   });
 });
