@@ -1,6 +1,7 @@
 "use client";
 
 import { BottomNav } from "@/components/bottom-nav";
+import { AulaParticular } from "@/components/aula-particular";
 import { CourtsList } from "@/components/courts-list";
 import { MyBookingsList } from "@/components/my-bookings-list";
 import { TopAppBar } from "@/components/top-app-bar";
@@ -44,12 +45,27 @@ import {
  * 19h às 21h ainda a vê aqui. Chamar de "próxima" o que é atual seria trocar
  * um rótulo impreciso por outro — e "Reservas" já está em produção.
  */
+/**
+ * **SPEC-047 acrescentou "Aula particular", e ela é irmã de "Quadras".**
+ *
+ * As duas são a mesma pergunta — *"o que eu quero marcar?"* — e a resposta
+ * muda só no que o aluno escolhe: lá a quadra, aqui o professor. Pela LIM-047e
+ * ele **não escolhe a quadra** numa aula particular, então a tela nova não é
+ * um passo dentro de "Quadras": é uma porta ao lado.
+ *
+ * Não virou item da `BottomNav` porque a barra tem quatro destinos e um quinto
+ * custaria a legibilidade de todos — e porque "marcar aula" é reserva, que já
+ * tem casa. `/minhas-aulas` é outra coisa: são as aulas de TURMA, e juntar as
+ * duas repetiria a confusão que a SPEC-022 desfez entre `/quadras` e
+ * `/reservas`.
+ */
 const ABAS = [
   { id: "reservas", rotulo: "Reservas" },
   { id: "anteriores", rotulo: "Anteriores" },
   { id: "quadras", rotulo: "Quadras" },
+  { id: "aula", rotulo: "Aula particular" },
 ] as const satisfies readonly AbaDaTela<
-  "reservas" | "anteriores" | "quadras"
+  "reservas" | "anteriores" | "quadras" | "aula"
 >[];
 
 type AbaId = (typeof ABAS)[number]["id"];
@@ -90,7 +106,9 @@ export function ReservasTabs() {
         aria-labelledby={`aba-${ativa}`}
         className="mt-5"
       >
-        {ativa === "quadras" ? (
+        {ativa === "aula" ? (
+          <AulaParticular />
+        ) : ativa === "quadras" ? (
           <CourtsList />
         ) : (
           // A `key` força remontar ao trocar de aba, e isso é de propósito:
