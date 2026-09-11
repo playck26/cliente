@@ -757,6 +757,51 @@ export async function retirarAvisoDeFalta(
   });
 }
 
+/**
+ * SPEC-046 — **reposição de aula.**
+ *
+ * O crédito é derivado no servidor (`faltas válidas − reposições`): a tela não
+ * refaz essa conta, e nem poderia — ela não conhece as faltas dos outros
+ * alunos, que é o que determina a vaga de cada ocorrência.
+ */
+export type CreditoDeReposicao =
+  components["schemas"]["CreditoDeReposicaoResponseDto"];
+export type FaltaParaRepor =
+  components["schemas"]["FaltaParaReporResponseDto"];
+export type OportunidadeDeReposicao =
+  components["schemas"]["OportunidadeDeReposicaoResponseDto"];
+
+export async function getMeuCreditoDeReposicao(): Promise<CreditoDeReposicao> {
+  const res = await authFetch("/me/reposicoes");
+  return (await res.json()) as CreditoDeReposicao;
+}
+
+export async function listarOportunidadesDeReposicao(): Promise<
+  OportunidadeDeReposicao[]
+> {
+  const res = await authFetch("/me/reposicoes/oportunidades");
+  return (await res.json()) as OportunidadeDeReposicao[];
+}
+
+export async function marcarReposicao(
+  faltaId: string,
+  ocupacaoId: string,
+): Promise<void> {
+  await authFetch("/me/reposicoes", {
+    method: "POST",
+    body: JSON.stringify({ faltaId, ocupacaoId }),
+  });
+}
+
+/**
+ * Desmarcar obedece ao MESMO prazo de marcar (SPEC-031/D23, herdado pela
+ * SPEC-046/AC-014). Sem isso o aluno desmarcaria cinco minutos antes e a vaga
+ * voltaria tarde demais para qualquer um usar.
+ */
+export async function desmarcarReposicao(id: string): Promise<void> {
+  await authFetch(`/me/reposicoes/${id}`, { method: "DELETE" });
+}
+
 export async function listMyClasses(): Promise<MyClass[]> {
   const res = await authFetch("/me/classes");
   return (await res.json()) as MyClass[];

@@ -60,6 +60,15 @@ vi.mock("@/components/complete-seu-cadastro", () => ({
 vi.mock("@/components/meu-plano", () => ({
   MeuPlano: () => <div data-testid="meu-plano" />,
 }));
+/**
+ * SPEC-046 — idem. **Dublar o COMPONENTE, e nao o cliente de API**: a licao
+ * que este arquivo ja documenta para os outros filhos. Sem este dublê, dez
+ * casos deste arquivo quebram por causa de uma requisicao que nao e o assunto
+ * de nenhum deles.
+ */
+vi.mock("@/components/minhas-reposicoes", () => ({
+  MinhasReposicoes: () => <div data-testid="minhas-reposicoes" />,
+}));
 vi.mock("@/components/top-app-bar", () => ({ TopAppBar: () => null }));
 vi.mock("@/components/bottom-nav", () => ({ BottomNav: () => null }));
 

@@ -7,6 +7,7 @@ import { BottomNav } from "@/components/bottom-nav";
 import { FotoDePerfil } from "@/components/foto-de-perfil";
 import { MinhaCarteira } from "@/components/minha-carteira";
 import { CompleteSeuCadastro } from "@/components/complete-seu-cadastro";
+import { MinhasReposicoes } from "@/components/minhas-reposicoes";
 import { MeuPlano } from "@/components/meu-plano";
 import { TopAppBar } from "@/components/top-app-bar";
 import { getMe, logout, type Usuario } from "@/lib/api-client";
@@ -129,6 +130,15 @@ export function PerfilView() {
           cobrar de quem talvez nem deva ter: quem matricula é o clube.
         */}
         {usuario && usuario.role !== "aluno" ? null : <MeuPlano />}
+
+        {/*
+          SPEC-046 — as aulas para repor, DEPOIS do plano.
+
+          A ordem é de compromisso: o plano é o contrato, a reposição é o que
+          ele faz com uma aula específica. E some sozinha quando não há falta
+          nenhuma — quem está em dia não precisa ver "0 créditos" todo dia.
+        */}
+        {usuario && usuario.role !== "aluno" ? null : <MinhasReposicoes />}
 
         {/*
           O "Sair" fica no fim, separado, e é a única ação destrutiva desta
