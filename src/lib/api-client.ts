@@ -1194,3 +1194,76 @@ export async function getMinhaEmpresa(): Promise<MinhaEmpresa> {
 export function limparCacheDaEmpresa(): void {
   empresaEmCache = null;
 }
+
+// =====================================================================
+// SPEC-047 — aula particular marcada pelo ALUNO
+// =====================================================================
+
+export type ProfessorParaAula =
+  components["schemas"]["ProfessorParaAlunoResponseDto"];
+export type HorariosDeAula =
+  components["schemas"]["HorariosDeAulaResponseDto"];
+export type HorarioDeAula = components["schemas"]["HorarioDeAulaDto"];
+
+/**
+ * SPEC-047/REQ-002 — quem dá aula particular, e por quanto.
+ *
+ * **Não é `/teachers`**: aquela é `CompanyAdminGuard` e devolve telefone,
+ * e-mail e `usuarioId`. Esta traz só o que o aluno precisa para escolher.
+ *
+ * Professor sem preço resolvido **não vem** — o servidor já filtrou, e a tela
+ * não precisa (nem deve) repetir a regra.
+ */
+export async function listarProfessoresParaAula(): Promise<
+  ProfessorParaAula[]
+> {
+  const res = await authFetch("/me/professores");
+  return (await res.json()) as ProfessorParaAula[];
+}
+
+/**
+ * SPEC-047/REQ-005 — os horários que a criação **vai aceitar**.
+ *
+ * A tela não cruza nada: ela desenha o que vem. Cruzar aqui exigiria a janela
+ * do professor e os compromissos dele, que o aluno não enxerga — e foi por
+ * isso que esta rota existe (ver o serviço no `back`).
+ *
+ * `atende: false` é diferente de `slots: []`: um manda trocar de dia, o outro
+ * manda esperar.
+ */
+export async function horariosDeAula(
+  professorId: string,
+  data: string,
+): Promise<HorariosDeAula> {
+  const res = await authFetch(
+    `/me/professores/${professorId}/horarios?data=${data}`,
+  );
+  return (await res.json()) as HorariosDeAula;
+}
+
+/**
+ * SPEC-047/D3 — **a tela NUNCA manda `valor`.**
+ *
+ * O preço vem da tabela do clube; mandar o valor daqui é o DEF-029, que já
+ * esteve em produção e permitia ao aluno marcar a própria aula por R$ 0,01.
+ * O servidor recusa com `VALOR_NAO_E_DO_ALUNO`, e esta função não tem por
+ * onde enviar — é a trava no formato, não só na intenção.
+ */
+export async function marcarAulaParticular(dto: {
+  quadraId: string;
+  data: string;
+  horaInicio: string;
+  horaFim: string;
+  professorId: string;
+}): Promise<{ reservas: Booking[] }> {
+  const res = await authFetch("/bookings", {
+    method: "POST",
+    body: JSON.stringify({
+      quadraId: dto.quadraId,
+      data: dto.data,
+      slots: [{ horaInicio: dto.horaInicio, horaFim: dto.horaFim }],
+      professorId: dto.professorId,
+    }),
+  });
+  return (await res.json()) as { reservas: Booking[] };
+}
