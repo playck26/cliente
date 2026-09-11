@@ -115,6 +115,67 @@ describe("parseError (pelo authFetch)", () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
+  /**
+   * DEF-028 — o clube suspenso.
+   *
+   * Precisa vir ANTES do ramo de `403` genérico: aquele tenta renovar a
+   * sessão, e a renovação de uma empresa suspensa responde `401` e derruba as
+   * demais sessões. Sem o desvio, a pessoa cai no login sem uma palavra.
+   */
+  it("**403 EMPRESA_INATIVA encerra a sessão, numa chamada só**", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      respostaDe(403, {
+        statusCode: 403,
+        code: "EMPRESA_INATIVA",
+        message: "O acesso deste clube está suspenso. Fale com o suporte da plataforma.",
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const erro = await listMyClasses().catch((e: unknown) => e);
+
+    expect((erro as ApiError).message).toMatch(/suporte da plataforma/i);
+    // UMA chamada. Pelo ramo genérico seriam três — e a do meio derrubaria as
+    // outras sessões da pessoa.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(
+      window.localStorage.getItem("playck_cliente_access_token"),
+    ).toBeNull();
+  });
+
+  it("DEF-028: os dois códigos de inatividade não se confundem", async () => {
+    // **Sem `message` no corpo, de propósito.** Com ela presente a frase do
+    // servidor atravessa qualquer ramo, e o caso passaria com o desvio
+    // removido. Sem ela, o que aparece é o texto PADRÃO de cada ramo.
+    // O tipo do `catch` e explicito: `listMyClasses()` resolve com a lista, e
+    // `Promise<Lista | ApiError>` nao tem `.message`. **O runner passou e o
+    // `tsc` reprovou** -- terceira vez neste ciclo que o teste verde nao
+    // significa que compila.
+    const responder = async (code: string): Promise<ApiError> => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue(respostaDe(403, { statusCode: 403, code })),
+      );
+      try {
+        await listMyClasses();
+        throw new Error(`esperava ApiError para ${code}`);
+      } catch (e) {
+        return e as ApiError;
+      }
+    };
+
+    const daConta = await responder("CONTA_INATIVA");
+    window.localStorage.setItem(
+      "playck_cliente_access_token",
+      "token-de-teste",
+    );
+    const daEmpresa = await responder("EMPRESA_INATIVA");
+
+    expect(daConta.message).toMatch(/procure o administrador/i);
+    expect(daEmpresa.message).toMatch(/suporte da plataforma/i);
+    expect(daEmpresa.message).not.toMatch(/procure o administrador/i);
+  });
+
   it("403 COM mensagem própria passa intacto", async () => {
     // A troca alcança só o texto padrão do framework. Erro de domínio que se
     // deu ao trabalho de explicar é mais útil que qualquer frase genérica.

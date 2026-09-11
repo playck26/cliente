@@ -6,6 +6,9 @@ import { LogOut } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
 import { FotoDePerfil } from "@/components/foto-de-perfil";
 import { MinhaCarteira } from "@/components/minha-carteira";
+import { CompleteSeuCadastro } from "@/components/complete-seu-cadastro";
+import { MinhasReposicoes } from "@/components/minhas-reposicoes";
+import { MeuPlano } from "@/components/meu-plano";
 import { TopAppBar } from "@/components/top-app-bar";
 import { getMe, logout, type Usuario } from "@/lib/api-client";
 
@@ -94,6 +97,48 @@ export function PerfilView() {
           exatamente o comportamento de antes desta PR.
         */}
         {usuario && usuario.role !== "aluno" ? null : <MinhaCarteira />}
+
+        {/*
+          SPEC-036/TASK-005 — "complete seu cadastro".
+
+          **Vem DEPOIS da carteira, e a ordem é a decisão.** Saldo é o que o
+          aluno abre o perfil para ver; cadastro é o que o clube quer que ele
+          preencha. Pôr o pedido antes do que ele veio buscar seria cobrar na
+          porta.
+
+          **Não bloqueia nada** (SPEC-036/D4): o item 14 do backlog diz
+          "faixa de incentivo NÃO BLOQUEANTE", e é literal. O aluno com 29%
+          reserva quadra igual, e há um gate no `back` que fica vermelho se
+          alguém transformar este número em requisito.
+
+          Mesma guarda da carteira, pelo mesmo motivo: a rota tem
+          `@Roles('aluno')` e responde `403` a professor e gestor. O
+          componente já some sozinho no erro, e esta linha só poupa a
+          requisição de quem sabidamente não tem cadastro de aluno.
+        */}
+        {usuario && usuario.role !== "aluno" ? null : <CompleteSeuCadastro />}
+
+        {/*
+          SPEC-037/TASK-006 — o plano contratado, e o link para pagar.
+
+          **Depois do cadastro e antes do "Sair".** A ordem desta tela é:
+          quem sou (foto), quanto tenho (carteira), o que falta (cadastro), o
+          que contratei (plano). Do imediato ao contratual.
+
+          Some sozinho quando não há matrícula — a tabela nasceu vazia, e a
+          maioria dos alunos está assim. Mostrar "você não tem plano" seria
+          cobrar de quem talvez nem deva ter: quem matricula é o clube.
+        */}
+        {usuario && usuario.role !== "aluno" ? null : <MeuPlano />}
+
+        {/*
+          SPEC-046 — as aulas para repor, DEPOIS do plano.
+
+          A ordem é de compromisso: o plano é o contrato, a reposição é o que
+          ele faz com uma aula específica. E some sozinha quando não há falta
+          nenhuma — quem está em dia não precisa ver "0 créditos" todo dia.
+        */}
+        {usuario && usuario.role !== "aluno" ? null : <MinhasReposicoes />}
 
         {/*
           O "Sair" fica no fim, separado, e é a única ação destrutiva desta

@@ -43,6 +43,32 @@ vi.mock("@/components/minha-carteira", () => ({
   // sem acoplar os cinco testes de logout ao cliente de API.
   MinhaCarteira: () => <div data-testid="carteira" />,
 }));
+/**
+ * SPEC-036 — mesmo tratamento, e pelo motivo que o bloco acima ja explica:
+ * dublar o COMPONENTE mantem estes cinco testes de logout desacoplados de
+ * toda funcao nova do cliente de API. A faixa tem provas proprias em
+ * `complete-seu-cadastro.test.tsx`.
+ *
+ * **Marcador, e nao `null`**, pela licao que a revisao da SPEC-033 deixou:
+ * com `null`, a guarda do perfil ficava INOBSERVAVEL — a suite passava verde
+ * com ela removida.
+ */
+vi.mock("@/components/complete-seu-cadastro", () => ({
+  CompleteSeuCadastro: () => <div data-testid="complete-cadastro" />,
+}));
+/** SPEC-037 — mesmo tratamento, mesma razao. */
+vi.mock("@/components/meu-plano", () => ({
+  MeuPlano: () => <div data-testid="meu-plano" />,
+}));
+/**
+ * SPEC-046 — idem. **Dublar o COMPONENTE, e nao o cliente de API**: a licao
+ * que este arquivo ja documenta para os outros filhos. Sem este dublê, dez
+ * casos deste arquivo quebram por causa de uma requisicao que nao e o assunto
+ * de nenhum deles.
+ */
+vi.mock("@/components/minhas-reposicoes", () => ({
+  MinhasReposicoes: () => <div data-testid="minhas-reposicoes" />,
+}));
 vi.mock("@/components/top-app-bar", () => ({ TopAppBar: () => null }));
 vi.mock("@/components/bottom-nav", () => ({ BottomNav: () => null }));
 
@@ -89,6 +115,14 @@ describe("quem ve a carteira no perfil", () => {
     render(<PerfilView />);
     await screen.findByText(/prof@teste.com/);
     expect(screen.queryByTestId("carteira")).not.toBeInTheDocument();
+    // SPEC-036 — a faixa de cadastro tem a MESMA guarda, e pelo mesmo motivo:
+    // a rota responde `403` a professor e gestor. Sem esta linha, a guarda
+    // nova ficaria sem prova enquanto a da carteira parecia cobrir as duas.
+    expect(screen.queryByTestId("complete-cadastro")).not.toBeInTheDocument();
+    // SPEC-037 — a terceira secao com a MESMA guarda. Sem esta linha, a
+    // proxima a entrar ficaria sem prova enquanto as duas de cima pareciam
+    // cobrir a tela inteira.
+    expect(screen.queryByTestId("meu-plano")).not.toBeInTheDocument();
   });
 
   it("getMe FALHOU: a carteira e montada assim mesmo", async () => {

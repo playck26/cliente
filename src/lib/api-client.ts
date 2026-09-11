@@ -20,6 +20,16 @@ export type LoginDto = components["schemas"]["LoginDto"];
 export type Papel = components["schemas"]["UsuarioPublicoResponseDto"]["role"];
 
 export type Usuario = components["schemas"]["UsuarioPublicoResponseDto"];
+/**
+ * SPEC-036 — a ficha do aluno com o bloco `cadastro` calculado.
+ *
+ * Vem do `openapi.json` como todo o resto: tipo escrito a mao aqui e o
+ * DEF-012, que deixa o typecheck verde e a tela quebrada em runtime.
+ */
+export type MeuCadastro = components["schemas"]["AlunoResponseDto"];
+/** SPEC-037 — o plano contratado, com valor e prazo congelados. */
+export type Matricula = components["schemas"]["MatriculaResponseDto"];
+export type CamposDoCadastro = components["schemas"]["CamposDoCadastroDto"];
 
 /**
  * SPEC-013 — o que o professor vê. Note o que **não** está aqui: telefone e
@@ -169,7 +179,8 @@ export type PublicPaymentConfig =
 // clube (AC-013), e o tipo gerado do contrato e o que garante que ela nao
 // aparece aqui nem por engano.
 export type ExtratoDoAluno = components["schemas"]["ExtratoDoAlunoResponseDto"];
-export type MovimentoDoAluno = components["schemas"]["MovimentoDoAlunoResponseDto"];
+export type MovimentoDoAluno =
+  components["schemas"]["MovimentoDoAlunoResponseDto"];
 
 export class ApiError extends Error {
   constructor(
@@ -358,6 +369,22 @@ async function authFetch(
     );
   }
 
+  // DEF-028 — o clube inteiro suspenso. Mesmo desvio da conta inativa, e
+  // **precisa vir antes do bloco de 403 genérico logo abaixo**: aquele tenta
+  // renovar a sessão, e a renovação de uma empresa suspensa responde `401` e
+  // derruba as demais sessões. Sem este desvio a pessoa cairia no login sem
+  // uma palavra sobre o motivo — um logout mudo no meio do trabalho.
+  //
+  // Mensagem separada de propósito: a conta dela está em ordem, e "procure o
+  // administrador" mandaria o gestor procurar a si mesmo.
+  if (res.status === 403 && (await temCodigo(res.clone(), "EMPRESA_INATIVA"))) {
+    encerrarSessao();
+    throw await parseError(
+      res,
+      "O acesso deste clube está suspenso. Fale com o suporte da plataforma.",
+    );
+  }
+
   if (
     res.status === 403 &&
     (await temCodigo(res.clone(), "SENHA_TEMPORARIA"))
@@ -497,8 +524,66 @@ export async function logout(): Promise<void> {
  */
 export async function getMinhaCarteira(): Promise<ExtratoDoAluno> {
   const res = await authFetch("/me/creditos");
-  if (!res.ok) throw await parseError(res, "Não foi possível carregar sua carteira.");
+  if (!res.ok)
+    throw await parseError(res, "Não foi possível carregar sua carteira.");
   return (await res.json()) as ExtratoDoAluno;
+}
+
+/**
+ * SPEC-036 — o cadastro do aluno logado.
+ *
+ * `403` para quem nao e aluno (professor e gestor nao tem ficha), e o chamador
+ * distingue pelo `status` — o mesmo arranjo da carteira, e pelo mesmo motivo:
+ * devolver `{}` faria a tela pintar uma barra de 0% para quem nao tem cadastro
+ * de aluno nenhum.
+ */
+export async function getMeuCadastro(): Promise<MeuCadastro> {
+  const res = await authFetch("/me/cadastro");
+  if (!res.ok)
+    throw await parseError(res, "Nao foi possivel carregar seu cadastro.");
+  return (await res.json()) as MeuCadastro;
+}
+
+/**
+ * SPEC-036/AC-006 — o aluno escreve os SETE campos, e so eles.
+ *
+ * `nivelId` e `status` nao existem neste corpo: o DTO do servidor e outro
+ * (`CamposDoCadastroDto`), e mandar um deles derruba a requisicao inteira com
+ * `400`. A garantia e de TIPO, nao de vigilancia.
+ *
+ * **`null` apaga; `""` o servidor recusa com `400`** (INV-108): ausencia e
+ * `NULL`, e so. Quem chama converte campo vazio em `null` antes de mandar.
+ */
+export async function salvarMeuCadastro(
+  dto: CamposDoCadastro,
+): Promise<MeuCadastro> {
+  const res = await authFetch("/me/cadastro", {
+    method: "PATCH",
+    body: JSON.stringify(dto),
+  });
+  if (!res.ok)
+    throw await parseError(res, "Nao foi possivel salvar seu cadastro.");
+  return (await res.json()) as MeuCadastro;
+}
+
+/**
+ * SPEC-037/AC-011 — a matricula VIGENTE do aluno logado.
+ *
+ * **Devolve `null` quando nao ha, e nao `404`.** Nao ter plano e um estado
+ * normal -- a tabela nasceu vazia. `404` faria a tela tratar o normal como
+ * erro, que e o defeito que a carteira levou para producao na SPEC-033.
+ *
+ * `403` para professor e gestor: quem chama distingue pelo `status`, como na
+ * carteira.
+ */
+export async function getMinhaMatricula(): Promise<Matricula | null> {
+  const res = await authFetch("/me/matricula");
+  if (!res.ok)
+    throw await parseError(res, "Nao foi possivel carregar seu plano.");
+  const texto = await res.text();
+  // Corpo vazio e o `null` do servidor: `res.json()` estouraria com
+  // `Unexpected end of JSON input`, e o erro nao diria isso.
+  return texto.trim() === "" ? null : (JSON.parse(texto) as Matricula);
 }
 
 export async function getMe(): Promise<Usuario> {
@@ -670,6 +755,51 @@ export async function retirarAvisoDeFalta(
   await authFetch(`/me/classes/${turmaId}/aulas/${ocupacaoId}/falta`, {
     method: "DELETE",
   });
+}
+
+/**
+ * SPEC-046 — **reposição de aula.**
+ *
+ * O crédito é derivado no servidor (`faltas válidas − reposições`): a tela não
+ * refaz essa conta, e nem poderia — ela não conhece as faltas dos outros
+ * alunos, que é o que determina a vaga de cada ocorrência.
+ */
+export type CreditoDeReposicao =
+  components["schemas"]["CreditoDeReposicaoResponseDto"];
+export type FaltaParaRepor =
+  components["schemas"]["FaltaParaReporResponseDto"];
+export type OportunidadeDeReposicao =
+  components["schemas"]["OportunidadeDeReposicaoResponseDto"];
+
+export async function getMeuCreditoDeReposicao(): Promise<CreditoDeReposicao> {
+  const res = await authFetch("/me/reposicoes");
+  return (await res.json()) as CreditoDeReposicao;
+}
+
+export async function listarOportunidadesDeReposicao(): Promise<
+  OportunidadeDeReposicao[]
+> {
+  const res = await authFetch("/me/reposicoes/oportunidades");
+  return (await res.json()) as OportunidadeDeReposicao[];
+}
+
+export async function marcarReposicao(
+  faltaId: string,
+  ocupacaoId: string,
+): Promise<void> {
+  await authFetch("/me/reposicoes", {
+    method: "POST",
+    body: JSON.stringify({ faltaId, ocupacaoId }),
+  });
+}
+
+/**
+ * Desmarcar obedece ao MESMO prazo de marcar (SPEC-031/D23, herdado pela
+ * SPEC-046/AC-014). Sem isso o aluno desmarcaria cinco minutos antes e a vaga
+ * voltaria tarde demais para qualquer um usar.
+ */
+export async function desmarcarReposicao(id: string): Promise<void> {
+  await authFetch(`/me/reposicoes/${id}`, { method: "DELETE" });
 }
 
 export async function listMyClasses(): Promise<MyClass[]> {
