@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -18,6 +19,7 @@ import {
   ApiError,
   createBooking,
   getAvailability,
+  getMinhaCarteira,
   getPublicPaymentConfig,
   listCourts,
   type Availability,
@@ -80,6 +82,17 @@ export function CourtBooking({ id }: { id: string }) {
   const [bookingOk, setBookingOk] = useState(false);
   const [paymentConfig, setPaymentConfig] =
     useState<PublicPaymentConfig | null>(null);
+  /**
+   * SPEC-048/REQ-001 — **o saldo, porque reservar GASTA ele.**
+   *
+   * Esta tela dizia *"Pago com seu saldo"* **depois** de confirmar, e nada
+   * antes. Aviso depois do fato não é clareza, é recibo — e este é o fluxo
+   * mais usado do app.
+   *
+   * `null` é "não sei", não "zero": a carteira pode não ter carregado, e a
+   * diferença decide se a tela fala ou fica calada.
+   */
+  const [saldoCentavos, setSaldoCentavos] = useState<number | null>(null);
 
   useEffect(() => {
     listCourts()
@@ -101,7 +114,18 @@ export function CourtBooking({ id }: { id: string }) {
     getPublicPaymentConfig()
       .then(setPaymentConfig)
       .catch(() => undefined);
+    // AC-004 — **falha aqui não derruba a tela.** Sem o saldo a pessoa perde o
+    // aviso, não a possibilidade de reservar; e quem decide de verdade é o
+    // servidor, na criação. Professor e gestor logados caem no `404` da
+    // carteira legitimamente (SPEC-033), e para eles o silêncio é o certo.
+    void recarregarSaldo();
   }, [id]);
+
+  function recarregarSaldo() {
+    return getMinhaCarteira()
+      .then((extrato) => setSaldoCentavos(extrato.saldoCentavos))
+      .catch(() => undefined);
+  }
 
   async function loadAvailability(
     targetData: string,
@@ -177,6 +201,10 @@ export function CourtBooking({ id }: { id: string }) {
           reservas.every((r) => r.statusPagamento === "pago"),
       );
       setBookingOk(true);
+      // AC-005 — a carteira mudou: a reserva foi debitada. **Reler evita a
+      // tela afirmar um saldo que já não é o dela** — e é o número que a
+      // pessoa vai conferir logo depois.
+      void recarregarSaldo();
     } catch (err) {
       setBookingError(
         err instanceof ApiError
@@ -211,6 +239,25 @@ export function CourtBooking({ id }: { id: string }) {
   }
 
   const total = slotsSelecionados.length * (quadra?.precoHora ?? 0);
+
+  /**
+   * SPEC-048/D6 — **a conversão acontece AQUI, uma vez.**
+   *
+   * `precoHora` é `Decimal` em REAIS; a carteira é em CENTAVOS. Comparar os
+   * dois é exatamente onde nasce erro de fator 100, e por isso a tela tem um
+   * único lugar que atravessa a fronteira. `Math.round` porque `1.1 * 100` é
+   * `110.00000000000001` em ponto flutuante — e centavo quebrado viraria
+   * "faltam R$ 0,00".
+   */
+  const totalCentavos = Math.round(total * 100);
+  const faltamCentavos =
+    saldoCentavos === null ? 0 : Math.max(0, totalCentavos - saldoCentavos);
+  const saldoNaoCobre = saldoCentavos !== null && faltamCentavos > 0;
+  const emReais = (centavos: number) =>
+    (centavos / 100).toLocaleString("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    });
 
   return (
     <main className="app-screen min-h-screen overflow-hidden bg-background pb-36">
@@ -279,6 +326,26 @@ export function CourtBooking({ id }: { id: string }) {
 
         {!bookingOk ? (
           <>
+            {/*
+              AC-001 — **o saldo aparece antes de qualquer escolha.**
+              Fica acima da data de propósito: quem abre a tela precisa saber
+              com o que conta ANTES de montar um pedido que a carteira pode não
+              cobrir. Some quando não carregou (`null`), porque afirmar "R$ 0,00"
+              para quem não tem carteira seria inventar um fato.
+            */}
+            {saldoCentavos !== null ? (
+              <p className="flex items-center gap-2 rounded-2xl bg-surface px-4 py-3 text-sm font-semibold text-[var(--color-text-secondary)] shadow-[var(--shadow-low)] ring-1 ring-border">
+                <Wallet className="size-4 shrink-0" aria-hidden="true" />
+                Seu saldo: {emReais(saldoCentavos)}
+                <Link
+                  href="/perfil"
+                  className="ml-auto shrink-0 text-[13px] font-bold text-[var(--color-primary-strong)] underline"
+                >
+                  carteira
+                </Link>
+              </p>
+            ) : null}
+
             <section>
               <div className="mb-3">
                 <p className="text-[11px] font-extrabold tracking-[0.12em] text-[var(--color-primary-strong)] uppercase">
@@ -415,6 +482,51 @@ export function CourtBooking({ id }: { id: string }) {
                     })}
                   </p>
                 </div>
+                {/*
+                  AC-002/AC-003 — **o que vai sair da carteira, e o que falta.**
+
+                  Para o ALUNO reservar é tudo-ou-nada: ou o saldo cobre o
+                  pedido inteiro e a reserva nasce `pago`, ou o servidor recusa
+                  com `SALDO_INSUFICIENTE`. Não existe reserva de aluno pendente
+                  por falta de saldo — e era isso que a tela nunca disse.
+                */}
+                {saldoCentavos !== null ? (
+                  <div className="mt-3 rounded-2xl bg-white/10 p-3">
+                    <p className="flex items-center justify-between gap-3 text-[13px] font-semibold text-white/80">
+                      <span className="flex items-center gap-2">
+                        <Wallet className="size-4 shrink-0" aria-hidden="true" />
+                        Sai do seu saldo
+                      </span>
+                      <span className="font-extrabold text-white">
+                        {emReais(totalCentavos)}
+                      </span>
+                    </p>
+                    {saldoNaoCobre ? (
+                      <p className="mt-2 text-[13px] font-semibold text-white">
+                        Seu saldo é {emReais(saldoCentavos)} — faltam{" "}
+                        <span className="font-extrabold">
+                          {emReais(faltamCentavos)}
+                        </span>
+                        .{" "}
+                        <Link href="/perfil" className="underline">
+                          Ver carteira
+                        </Link>
+                        {/*
+                          **O botão continua habilitado** (D2/LIM-047f): o saldo
+                          foi lido na montagem, e travar prenderia quem acabou
+                          de receber crédito. A tela informa; quem julga é o
+                          servidor.
+                        */}
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-[13px] font-medium text-white/60">
+                        Ficam {emReais(saldoCentavos - totalCentavos)} depois
+                        desta reserva.
+                      </p>
+                    )}
+                  </div>
+                ) : null}
+
                 {bookingError ? (
                   <p
                     role="alert"
@@ -464,6 +576,14 @@ export function CourtBooking({ id }: { id: string }) {
                 </p>
                 <p className="mt-1 text-[13px] font-medium text-[var(--color-text-secondary)]">
                   O valor foi debitado da sua carteira. Não há nada a pagar.
+                  {/*
+                    AC-005 — o saldo NOVO, relido do servidor depois da
+                    reserva. Repetir o antigo aqui seria a tela afirmar um
+                    número que ela mesma acabou de tornar falso.
+                  */}
+                  {saldoCentavos !== null
+                    ? ` Seu saldo agora é ${emReais(saldoCentavos)}.`
+                    : ""}
                 </p>
               </div>
             ) : paymentConfig?.linkPagamentoUrl ||
