@@ -118,9 +118,46 @@ daquele arquivo.
 `localStorage` (`auth-storage.ts`); o refresh token é cookie `httpOnly` que
 o JS nunca lê.
 
-**PWA:** `register-service-worker.tsx` + manifest. A marca oficial vive em
-`public/playck-logo.png` e deriva os ícones do navegador, Apple Touch Icon
-e PWA (`192x192`/`512x512`).
+**PWA (SPEC-050):** `register-service-worker.tsx` + `app/manifest.ts` +
+**`convite-de-instalacao.tsx`**, com a decisão em `lib/instalacao-pwa.ts`
+(mesma separação de `capacidade-operacao.ts` × `aviso-de-prazo.tsx`: decisão se
+testa sem DOM).
+
+Até a SPEC-050 existiam só os dois primeiros, e **o app era instalável sem
+nunca convidar ninguém** — não havia `beforeinstallprompt` em nenhum
+repositório, então a instalação dependia do banner automático do navegador, que
+é de uma vez só por design e **inexistente no iOS**.
+
+Três coisas aqui não são óbvias e cada uma tem teste:
+
+1. **O evento é capturado antes da hidratação.** Um `<Script
+   strategy="beforeInteractive">` no `layout.tsx` guarda o
+   `beforeinstallprompt` em `window.__playckEventoDeInstalacao`, porque o
+   Chrome o dispara logo após o `load` — normalmente **antes** de um
+   `useEffect` assinar. Um componente que só assinasse no efeito não apareceria
+   numa carga fria, reproduzindo o defeito original com o código novo no lugar.
+2. **Dois modos.** `botao` no Chromium (diálogo nativo); `instrucao` no iOS,
+   onde o evento não existe e a única saída é ensinar Compartilhar →
+   "Adicionar à Tela de Início". A detecção de iOS testa `Macintosh` +
+   `maxTouchPoints > 1`, porque o iPad se anuncia como Mac desde o iPadOS 13.
+3. **Dispensar vale 15 dias** (`playck_instalacao_dispensada_em`), e a chave
+   **não** leva o prefixo `playck_cliente_` de propósito: aquelas saem no
+   `clearAccessToken()`, e dispensa que morre no logout faz o convite voltar a
+   cada sessão. Há teste travando isso.
+
+**Os ícones são gerados, não editados.** `harness/pwa/gerar-icones.mjs` (raiz
+da governança) refaz os 15 arquivos dos 3 apps a partir de
+`public/playck-logo.png`, achatando o alfa sobre `--color-court-dark` e
+gerando o par `maskable` a 76% (a *safe zone* é o círculo de 80% de diâmetro; o
+logo é circular, então não vale a conta do quadrado inscrito). Antes da
+SPEC-050 os ícones eram o logo **com canal alfa** — fundo preto no iOS, fundo
+a critério do launcher no Android, e nenhum `maskable`.
+
+**Ressalva conhecida (não é defeito desta camada):** `start_url` é `/`, que
+redireciona para `/login`, e o login **não reconhece quem já tem token** (não
+há `middleware.ts`; `app/login/page.tsx` renderiza o formulário sem condição).
+O app instalado abre no formulário de login para quem já está logado. Fora do
+escopo da SPEC-050 de propósito — mexe em fluxo de autenticação.
 
 ## 5. Camada de API — a regra que mais importa
 
