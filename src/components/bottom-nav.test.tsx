@@ -75,6 +75,15 @@ describe("DEF-011 — a barra do professor", () => {
     expect(hrefs()).toContain("/minhas-turmas");
   });
 
+  it("SPEC-052/AC-008: o item da tela dele se chama Agenda, e o endereço não muda", () => {
+    render(<BottomNav papel="professor" />);
+    expect(screen.getByRole("link", { name: /Agenda/ })).toHaveAttribute(
+      "href",
+      "/minhas-turmas",
+    );
+    expect(screen.queryByRole("link", { name: /Turmas/ })).not.toBeInTheDocument();
+  });
+
   it("oferece o perfil, que é a outra coisa que ele alcança", () => {
     render(<BottomNav papel="professor" />);
     expect(hrefs()).toContain("/perfil");

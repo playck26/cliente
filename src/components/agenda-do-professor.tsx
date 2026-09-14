@@ -63,6 +63,83 @@ function chaveDoDia(ano: number, mes: number, dia: number): string {
   return `${chaveDoMes(ano, mes)}-${String(dia).padStart(2, "0")}`;
 }
 
+/**
+ * SPEC-052/D1 — a partição do dia por tipo, **ou `null` se o `back` ainda não
+ * a manda**.
+ *
+ * O tipo gerado declara `turmas` e `particulares` obrigatórios, mas durante o
+ * rollout o Cliente novo pode conversar com o `back` antigo (SPEC-052,
+ * "Rollout"): aí os dois chegam `undefined`, e a grade degrada para a de hoje
+ * — sem marcador de tipo — em vez de pintar `undefined > 0`.
+ */
+function tiposDoDia(
+  d: DiaDaAgendaDoProfessor,
+): { turmas: number; particulares: number } | null {
+  const { turmas, particulares } = d as Partial<
+    Pick<DiaDaAgendaDoProfessor, "turmas" | "particulares">
+  >;
+  if (turmas === undefined || particulares === undefined) return null;
+  return { turmas, particulares };
+}
+
+/**
+ * O que o leitor de tela ouve do dia. SPEC-052/D3: **a cor e a forma nunca
+ * carregam a informação sozinhas** — o marcador que se vê precisa ser dito.
+ */
+function rotuloDoDia(dia: number, d: DiaDaAgendaDoProfessor | undefined): string {
+  if (!d) return `${dia}, sem aula`;
+  const pendencia = d.pendentes > 0 ? `, ${d.pendentes} sem chamada` : "";
+  const tipos = tiposDoDia(d);
+  if (tipos === null) {
+    return `${dia}: ${d.aulas} ${d.aulas === 1 ? "aula" : "aulas"}${pendencia}`;
+  }
+  const partes: string[] = [];
+  if (tipos.turmas > 0) {
+    partes.push(
+      `${tipos.turmas} ${tipos.turmas === 1 ? "aula" : "aulas"} de turma`,
+    );
+  }
+  if (tipos.particulares > 0) {
+    partes.push(
+      `${tipos.particulares} ${tipos.particulares === 1 ? "aula particular" : "aulas particulares"}`,
+    );
+  }
+  return `${dia}: ${partes.join(", ")}${pendencia}`;
+}
+
+/**
+ * SPEC-052/D3 — **o marcador de tipo: forma E cor.**
+ *
+ * | tipo       | forma    | token (contraste medido)                          |
+ * |------------|----------|---------------------------------------------------|
+ * | turma      | círculo  | `primary-strong` — 4,97:1 no dia, 5,75:1 no branco |
+ * | particular | quadrado | `court-blue` — 5,39:1 no dia, 6,23:1 no branco     |
+ *
+ * **Não são os tokens da agenda do gestor** (`*-container`): aqueles medem
+ * 1,04:1 entre si e servem de fundo de bloco, não de ponto. Tamanho (`size-2`)
+ * e posição (topo) diferentes do ponto de pendência (`size-1.5`, embaixo) —
+ * é isso, e não a cor, que separa os dois (azul × vermelho mede 1,39:1).
+ *
+ * `data-forma` existe para a prova afirmar a FORMA, e não só a classe de cor.
+ */
+function Marcador({ tipo }: { tipo: "turma" | "particular" }) {
+  return tipo === "turma" ? (
+    <span
+      data-marcador="turma"
+      data-forma="circulo"
+      aria-hidden="true"
+      className="block size-2 rounded-full bg-[var(--color-primary-strong)]"
+    />
+  ) : (
+    <span
+      data-marcador="particular"
+      data-forma="quadrado"
+      aria-hidden="true"
+      className="block size-2 rounded-[1px] bg-[var(--color-court-blue)]"
+    />
+  );
+}
+
 export function AgendaDoProfessor() {
   const inicio = hojeNoClube();
   const [ano, setAno] = useState(inicio.ano);
@@ -226,6 +303,7 @@ export function AgendaDoProfessor() {
             const dia = i + 1;
             const data = chaveDoDia(ano, mes, dia);
             const doDia = porData.get(data);
+            const tipos = doDia ? tiposDoDia(doDia) : null;
             const ehHoje =
               hoje.ano === ano && hoje.mes === mes && hoje.dia === dia;
             const selecionado = diaAberto === data;
@@ -236,11 +314,7 @@ export function AgendaDoProfessor() {
                 type="button"
                 disabled={!doDia}
                 onClick={() => abrirDia(data)}
-                aria-label={
-                  doDia
-                    ? `${dia}: ${doDia.aulas} ${doDia.aulas === 1 ? "aula" : "aulas"}${doDia.pendentes > 0 ? `, ${doDia.pendentes} sem chamada` : ""}`
-                    : `${dia}, sem aula`
-                }
+                aria-label={rotuloDoDia(dia, doDia)}
                 aria-pressed={selecionado}
                 className={`relative flex aspect-square flex-col items-center justify-center rounded-2xl text-[13px] font-extrabold transition-colors ${
                   selecionado
@@ -257,12 +331,31 @@ export function AgendaDoProfessor() {
               >
                 {dia}
                 {/*
+                  SPEC-052/D3 — um marcador por tipo presente, no TOPO.
+
+                  **No dia selecionado eles ficam sobre uma pastilha branca.**
+                  O fundo do selecionado é `primary-strong`, a mesma cor do
+                  círculo: sem a pastilha, o marcador estaria no DOM e sumiria
+                  na tela (1,00:1). O ponto de pendência fica FORA dela, branco
+                  sobre o fundo, como já era.
+                */}
+                {tipos && (tipos.turmas > 0 || tipos.particulares > 0) && (
+                  <span
+                    data-pastilha={selecionado ? "" : undefined}
+                    className={`absolute top-1 flex items-center gap-0.5 ${selecionado ? "rounded-full bg-white px-1 py-0.5" : ""}`}
+                  >
+                    {tipos.turmas > 0 && <Marcador tipo="turma" />}
+                    {tipos.particulares > 0 && <Marcador tipo="particular" />}
+                  </span>
+                )}
+                {/*
                   A bolinha é o ponto inteiro da tela: dia com chamada
                   pendente. Sem ela, o calendário só repetiria a grade que o
                   professor já conhece.
                 */}
                 {doDia && doDia.pendentes > 0 && (
                   <Circle
+                    data-pendencia=""
                     className={`absolute bottom-1.5 size-1.5 fill-current ${selecionado ? "text-white" : "text-[var(--color-error)]"}`}
                     aria-hidden="true"
                   />
@@ -272,6 +365,27 @@ export function AgendaDoProfessor() {
           })}
         </div>
       </section>
+
+      {/*
+        SPEC-052/D3 — a legenda em TEXTO. A agenda do gestor pinta por tipo sem
+        legenda (LIM-052c); esta não copia a lacuna. Só aparece quando o mês
+        traz os tipos: sem eles (rollout), não há marcador a explicar.
+      */}
+      {dias.some((d) => tiposDoDia(d) !== null) && (
+        <ul
+          aria-label="Legenda"
+          className="flex flex-wrap items-center gap-x-5 gap-y-2 px-1 text-[12px] font-bold text-[var(--color-text-secondary)]"
+        >
+          <li className="flex items-center gap-1.5">
+            <Marcador tipo="turma" />
+            Turma
+          </li>
+          <li className="flex items-center gap-1.5">
+            <Marcador tipo="particular" />
+            Aula particular
+          </li>
+        </ul>
+      )}
 
       {carregando ? (
         <p className="text-[13px] font-bold text-[var(--color-text-secondary)]">
@@ -332,8 +446,27 @@ export function AgendaDoProfessor() {
                 </div>
               );
 
-              const moldura =
-                "block rounded-3xl bg-surface p-4 shadow-[var(--shadow-low)] ring-1 ring-border";
+              /*
+                SPEC-052/D3 — a faixa lateral na cor do TIPO, ao lado do selo em
+                texto que já existia. SPEC-052/D4 — e a aula de turma leva à
+                ficha: é o atalho a partir da aula; o caminho garantido é o
+                índice "Suas turmas", que não depende de haver aula no mês.
+              */
+              const faixa =
+                aula.tipo === "particular"
+                  ? "border-l-4 border-l-[var(--color-court-blue)]"
+                  : "border-l-4 border-l-[var(--color-primary-strong)]";
+              const moldura = `block rounded-3xl bg-surface p-4 shadow-[var(--shadow-low)] ring-1 ring-border ${faixa}`;
+              const verTurma =
+                aula.tipo === "turma" && aula.turmaId ? (
+                  <Link
+                    href={`/minhas-turmas/${aula.turmaId}`}
+                    className="mt-3 inline-flex items-center gap-1 text-[12px] font-extrabold text-[var(--color-primary-strong)]"
+                  >
+                    Ver turma
+                    <ChevronRight className="size-3.5" aria-hidden="true" />
+                  </Link>
+                ) : null;
 
               /**
                * **`chamada: null` é a aula PARTICULAR** (SPEC-039/LIM-039a), e
@@ -355,6 +488,7 @@ export function AgendaDoProfessor() {
                 return (
                   <div key={aula.ocupacaoId} className={moldura}>
                     {cartao}
+                    {verTurma}
                   </div>
                 );
               }
@@ -363,14 +497,18 @@ export function AgendaDoProfessor() {
                 REQ-003 — do dia à chamada em um toque. `/chamada/:id` já
                 existe desde a SPEC-014; esta tela só precisava levar até lá.
               */
+              // O cartão continua sendo o link da chamada; "Ver turma" fica
+              // FORA dele, porque link dentro de link não é HTML válido.
               return (
-                <Link
-                  key={aula.ocupacaoId}
-                  href={`/chamada/${aula.ocupacaoId}`}
-                  className={`${moldura} transition-transform active:scale-[0.99]`}
-                >
-                  {cartao}
-                </Link>
+                <div key={aula.ocupacaoId} className={moldura}>
+                  <Link
+                    href={`/chamada/${aula.ocupacaoId}`}
+                    className="block transition-transform active:scale-[0.99]"
+                  >
+                    {cartao}
+                  </Link>
+                  {verTurma}
+                </div>
               );
             })
           )}
