@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AgendaDoProfessor } from "./agenda-do-professor";
@@ -544,5 +545,156 @@ describe("SPEC-030 — aula nao realizada no calendario", () => {
     // Sem chamada não há para onde clicar: o link levaria a uma tela que o
     // servidor recusa.
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * SPEC-052 — **o tipo de aula no mês: cor E forma.**
+ *
+ * As provas acima usam o resumo **sem** `turmas`/`particulares`, e ficam
+ * assim de propósito: são o caminho do rollout — o Cliente novo diante de um
+ * `back` que ainda não manda os campos (SPEC-052, "Rollout"). Os casos do
+ * contrato novo moram aqui.
+ *
+ * A forma é afirmada por `data-forma`, e não pela classe de cor: a D3 diz que
+ * a cor nunca carrega a informação sozinha, e um teste que só olhasse a cor
+ * aprovaria dois marcadores iguais com matizes diferentes.
+ *
+ * *O que este arquivo NÃO prova é contraste na tela renderizada* — jsdom não
+ * pinta. Isso é item do DoD (ressalva R2-052-01).
+ */
+describe("SPEC-052 — o tipo de aula no mês", () => {
+  const MES_COM_TIPOS = [
+    { data: "2026-09-01", aulas: 2, turmas: 2, particulares: 0, pendentes: 1 },
+    { data: "2026-09-02", aulas: 1, turmas: 0, particulares: 1, pendentes: 0 },
+    { data: "2026-09-03", aulas: 2, turmas: 1, particulares: 1, pendentes: 0 },
+  ];
+
+  const marcadores = (botao: HTMLElement) =>
+    Array.from(botao.querySelectorAll("[data-marcador]")).map((m) => ({
+      tipo: m.getAttribute("data-marcador"),
+      forma: m.getAttribute("data-forma"),
+    }));
+
+  it("AC-005/AC-006: um marcador por tipo presente, com forma própria, e o aria-label diz os tipos", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-09-15T12:00:00.000Z"));
+    getAgendaDoProfessor.mockResolvedValue(MES_COM_TIPOS);
+
+    render(<AgendaDoProfessor />);
+
+    const soTurma = await screen.findByLabelText(
+      "1: 2 aulas de turma, 1 sem chamada",
+    );
+    const soParticular = screen.getByLabelText("2: 1 aula particular");
+    const ambos = screen.getByLabelText("3: 1 aula de turma, 1 aula particular");
+
+    expect(marcadores(soTurma)).toEqual([{ tipo: "turma", forma: "circulo" }]);
+    expect(marcadores(soParticular)).toEqual([
+      { tipo: "particular", forma: "quadrado" },
+    ]);
+    expect(marcadores(ambos)).toEqual([
+      { tipo: "turma", forma: "circulo" },
+      { tipo: "particular", forma: "quadrado" },
+    ]);
+  });
+
+  it("AC-006: a legenda em texto está na tela, com os dois marcadores", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-09-15T12:00:00.000Z"));
+    getAgendaDoProfessor.mockResolvedValue(MES_COM_TIPOS);
+
+    render(<AgendaDoProfessor />);
+
+    const legenda = await screen.findByRole("list", { name: "Legenda" });
+    expect(within(legenda).getByText("Turma")).toBeInTheDocument();
+    expect(within(legenda).getByText("Aula particular")).toBeInTheDocument();
+    expect(marcadores(legenda)).toEqual([
+      { tipo: "turma", forma: "circulo" },
+      { tipo: "particular", forma: "quadrado" },
+    ]);
+  });
+
+  it("AC-005: no dia SELECIONADO os marcadores ficam sobre a pastilha, e a pendência fora dela", async () => {
+    // D3: o fundo do selecionado é `primary-strong` — a mesma cor do círculo.
+    // Sem a pastilha, o marcador existiria no DOM e sumiria na tela.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-09-15T12:00:00.000Z"));
+    getAgendaDoProfessor.mockResolvedValue(MES_COM_TIPOS);
+
+    render(<AgendaDoProfessor />);
+    const dia = await screen.findByLabelText(
+      "1: 2 aulas de turma, 1 sem chamada",
+    );
+
+    expect(dia.querySelector("[data-pastilha]")).toBeNull();
+    fireEvent.click(dia);
+    await waitFor(() => expect(dia).toHaveAttribute("aria-pressed", "true"));
+
+    const pastilha = dia.querySelector("[data-pastilha]");
+    expect(pastilha).not.toBeNull();
+    expect(marcadores(pastilha as HTMLElement)).toEqual([
+      { tipo: "turma", forma: "circulo" },
+    ]);
+    const pendencia = dia.querySelector("[data-pendencia]");
+    expect(pendencia).not.toBeNull();
+    expect(pastilha?.contains(pendencia as Node)).toBe(false);
+  });
+
+  it("rollout: resumo SEM os campos novos mostra a grade de hoje, sem marcador de tipo e sem erro", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-09-15T12:00:00.000Z"));
+    getAgendaDoProfessor.mockResolvedValue([
+      { data: "2026-09-01", aulas: 2, pendentes: 1 },
+    ]);
+
+    render(<AgendaDoProfessor />);
+    const dia = await screen.findByLabelText("1: 2 aulas, 1 sem chamada");
+
+    expect(dia).toBeEnabled();
+    expect(marcadores(dia)).toEqual([]);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("AC-007: aula de turma tem 'Ver turma' para a ficha; aula particular não tem", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-09-15T12:00:00.000Z"));
+    getAgendaDoProfessor.mockResolvedValue(MES_COM_TIPOS);
+    getAulasDoDia.mockResolvedValue([
+      {
+        ocupacaoId: "ocup-t",
+        tipo: "turma",
+        turmaId: "t1",
+        turmaNome: "Iniciantes",
+        quadraNome: "Quadra 1",
+        horaInicio: "18:00",
+        horaFim: "19:00",
+        chamada: "pendente",
+      },
+      {
+        ocupacaoId: "ocup-p",
+        tipo: "particular",
+        turmaId: null,
+        turmaNome: null,
+        quadraNome: "Quadra 2",
+        horaInicio: "07:00",
+        horaFim: "08:00",
+        chamada: null,
+      },
+    ]);
+
+    render(<AgendaDoProfessor />);
+    fireEvent.click(
+      await screen.findByLabelText("3: 1 aula de turma, 1 aula particular"),
+    );
+
+    const verTurma = await screen.findAllByRole("link", { name: "Ver turma" });
+    expect(verTurma).toHaveLength(1);
+    expect(verTurma[0]).toHaveAttribute("href", "/minhas-turmas/t1");
+    // A chamada continua a um toque, como na SPEC-027.
+    expect(screen.getByRole("link", { name: /Iniciantes/ })).toHaveAttribute(
+      "href",
+      "/chamada/ocup-t",
+    );
   });
 });

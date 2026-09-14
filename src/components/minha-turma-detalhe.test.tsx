@@ -29,6 +29,7 @@ vi.mock("@/components/top-app-bar", () => ({ TopAppBar: () => null }));
 
 const getMinhaTurmaMock = vi.fn();
 const listarOcorrenciasMock = vi.fn();
+const listOcorrenciasMock = vi.fn();
 
 vi.mock("@/lib/api-client", async () => {
   const real =
@@ -39,6 +40,9 @@ vi.mock("@/lib/api-client", async () => {
     ...real,
     getMinhaTurma: (...a: unknown[]) => getMinhaTurmaMock(...a),
     listarOcorrenciasDaTurma: (...a: unknown[]) => listarOcorrenciasMock(...a),
+    // SPEC-052: a tela chama `listOcorrencias`; sem este mock a lista caía no
+    // `catch` em silêncio e nenhum caso aqui via ocorrência.
+    listOcorrencias: (...a: unknown[]) => listOcorrenciasMock(...a),
   };
 });
 
@@ -56,6 +60,12 @@ function responder(encontros: typeof TERCA[]) {
     alunos: [],
   });
   listarOcorrenciasMock.mockResolvedValue([]);
+  listOcorrenciasMock.mockResolvedValue({
+    data: [],
+    page: 1,
+    pageSize: 30,
+    total: 0,
+  });
 }
 
 beforeEach(() => {
@@ -114,5 +124,44 @@ describe("MinhaTurmaDetalheView — SPEC-019", () => {
     await waitFor(() => {
       expect(screen.getByText("Infantil A")).toBeInTheDocument();
     });
+  });
+});
+
+/**
+ * SPEC-052/AC-012 — **o meio da cadeia índice → ficha → aula cancelada.**
+ *
+ * A agenda do professor exclui aula cancelada, e a SPEC-052 tirou a lista de
+ * turmas; o caminho que a SPEC-031/AC-019b exige passa a ser o índice "Suas
+ * turmas" (provado em `tela-do-professor.test.tsx`) e ESTE link. O fim da
+ * cadeia — a chamada em modo histórico, sem mutação — já tem prova em
+ * `chamada-historico.test.tsx`.
+ */
+describe("SPEC-052/AC-012 — a ficha leva à aula cancelada", () => {
+  it("a ocorrência cancelada é link para a chamada", async () => {
+    responder([TERCA]);
+    listOcorrenciasMock.mockResolvedValue({
+      data: [
+        {
+          ocupacaoId: "ocup-cancelada",
+          data: "2026-09-01",
+          horaInicio: "18:00",
+          horaFim: "19:00",
+          cancelada: true,
+          chamadaFeita: false,
+          marcados: 0,
+          totalAlunos: 4,
+          podeLancar: false,
+          estado: "cancelada",
+        },
+      ],
+      page: 1,
+      pageSize: 30,
+      total: 1,
+    });
+
+    render(<MinhaTurmaDetalheView id="t1" />);
+
+    const link = await screen.findByRole("link", { name: /aula cancelada/ });
+    expect(link).toHaveAttribute("href", "/chamada/ocup-cancelada");
   });
 });

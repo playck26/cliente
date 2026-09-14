@@ -1,8 +1,8 @@
 # ARCHITECTURE — `cliente` (PlayCK)
 
-**Fonte: análise direta do código.** Data: **2026-09-10** (era 2026-09-09).
-**Conferido por comando nesta data:** 40 arquivos de teste, 398 casos, 40
-componentes.
+**Fonte: análise direta do código.** Data: **2026-09-14** (era 2026-09-10).
+**Conferido por comando nesta data:** 43 arquivos de teste, 473 casos, 42
+componentes (`vitest run --pool=threads`, em série; `ls src/components`).
 
 Planta **AS-IS**. Intenção arquitetural vive em `TARGET_ARCHITECTURE.md`
 (raiz do workspace) + ADRs em `DECISIONS.md`. Divergência entre este
@@ -61,7 +61,7 @@ page.tsx (server component, fino)
 | `/convite/[token]` | `aceitar-convite-form` | aceite de convite |
 | `/home` | `home-view` | próximas aulas e atalhos |
 | `/minhas-aulas` | `aulas-tabs` → `my-classes-list` \| `aulas-anteriores` \| `turmas-do-clube` | **SPEC-025** acrescentou a aba "Anteriores", onde o aluno avalia a aula — sem ela a avaliação seria funcionalidade sem porta de entrada, porque `GET /me/classes` só devolve o futuro. **A aula não mostra média** (decisão do Israel); a média é da turma e aparece na aba "Turmas". **SPEC-023** — duas abas: "Minhas aulas" (padrão) e "Turmas do clube". O GAP-008 (view-only) **caiu**: o aluno entra e sai de turma sozinho. As regras não moram na tela — `podeEntrar` e `motivo` vêm calculados do servidor, porque tela que deduz vira segunda cópia das regras (DEF-012) |
-| `/minhas-turmas` | `professor-tabs` → `agenda-do-professor` \| `minhas-turmas-view` | **app do professor**. **SPEC-026** acrescentou a aba **Agenda, que é a padrão** — o pedido do Israel era que ele começasse escolhendo o DIA, não a turma. O calendário marca com um ponto os dias com **chamada pendente**: a grade ele já conhece de cabeça; o que ficou por registrar, não. **SPEC-030** acrescentou o badge `nao_houve` ("Aula não realizada"), **neutro e nunca vermelho** — o vermelho quer dizer "você esqueceu", e aqui o professor respondeu; sem o estado registrado ele cairia no fallback e uma aula do mês passado apareceria como "Ainda não começou". O mês é calculado no fuso do clube, senão às 21h de 30/09 a tela abriria em outubro |
+| `/minhas-turmas` | `tela-do-professor` → `agenda-do-professor` + `suas-turmas` | **app do professor — uma tela só desde a SPEC-052.** As abas da SPEC-026 saíram (`professor-tabs` e `minhas-turmas-view` foram apagados; `?aba=` é ignorado, para favorito antigo não quebrar). A **agenda** marca o tipo de aula de cada dia por **forma e cor** — círculo `primary-strong` para turma, quadrado `court-blue` para particular, com legenda em texto e `aria-label` que nomeia os tipos; no dia selecionado os marcadores ficam sobre pastilha branca, porque o fundo do selecionado é a cor do círculo. Cada aula de turma tem **"Ver turma"**. O **índice "Suas turmas"** embaixo não é a aba de volta: é o caminho para a ficha que a SPEC-031/AC-019b exige, porque a agenda exclui aula cancelada. **Sem nota de avaliação** (SPEC-052/D6). Histórico: a **SPEC-026** tinha criado a aba Agenda como padrão — o pedido do Israel era que ele começasse escolhendo o DIA, não a turma. O calendário marca com um ponto os dias com **chamada pendente**: a grade ele já conhece de cabeça; o que ficou por registrar, não. **SPEC-030** acrescentou o badge `nao_houve` ("Aula não realizada"), **neutro e nunca vermelho** — o vermelho quer dizer "você esqueceu", e aqui o professor respondeu; sem o estado registrado ele cairia no fallback e uma aula do mês passado apareceria como "Ainda não começou". O mês é calculado no fuso do clube, senão às 21h de 30/09 a tela abriria em outubro |
 | `/minhas-turmas/[id]` | `minha-turma-detalhe` | quem está na turma e as aulas dos últimos 30 dias |
 | `/chamada/[ocupacaoId]` | `chamada-view` | **a chamada** (SPEC-014). Desenhada para uso em quadra: 3 estados visíveis, 1 toque cada, salvar explícito e barra fixa. **SPEC-015/DEF-002 (TASK-000a):** salvar exige todos os alunos marcados — antes gravava chamada pela metade — com atalho "Todos vieram" para o caso comum, e aviso quando a chamada é legada (`completude: desconhecida`). **SPEC-030:** ação **"A aula não aconteceu"**, com confirmação — é a única ação desta tela que não é um toque reversível, e responde por todos os alunos de uma vez. Some quando a aula já está marcada (repetir não faria nada) e quando alguém já foi marcado (o servidor recusaria com `CHAMADA_COM_PRESENCA`). Depois de gravar, **relê do servidor**: a `versao` nova é o que permite desfazer sem `409` |
 | `/quadras` | — | **SPEC-022**: só um `permanentRedirect` (308) para `/reservas?aba=quadras`. Deixou de ser destino, continua sendo endereço — atalho de tela inicial e link mandado por conversa não podem quebrar (INV-022b) |
@@ -366,7 +366,7 @@ afere zero requisição, com espião nos mutadores do `api-client` **e** no
 ### A barra de baixo conhece o papel (DEF-011, 2026-08-26)
 
 `bottom-nav.tsx` desenha **duas** barras: a do aluno e a do professor
-(`/minhas-turmas` e `/perfil`).
+(`/minhas-turmas`, rotulado **"Agenda"** desde a SPEC-052, e `/perfil`).
 
 **A do aluno tem quatro destinos** — `/home`, `/minhas-aulas`, `/reservas`
 e `/perfil` — em quatro colunas iguais, sem saliência.

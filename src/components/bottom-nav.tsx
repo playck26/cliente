@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
-import { CalendarCheck, Home, User, Users } from "lucide-react";
+import { CalendarCheck, CalendarDays, Home, User } from "lucide-react";
 import { TennisBallIcon } from "@/components/icons/tennis-ball-icon";
 import type { Papel } from "@/lib/api-client";
 import { getPapel } from "@/lib/auth-storage";
@@ -67,7 +67,8 @@ const ITENS_DIREITA = [
 const NAO_MUDA = () => () => {};
 
 const ITENS_DO_PROFESSOR = [
-  { href: "/minhas-turmas", label: "Turmas", Icon: Users },
+  // SPEC-052/D5 — a tela dele virou a agenda; o endereço não muda (LIM-052b).
+  { href: "/minhas-turmas", label: "Agenda", Icon: CalendarDays },
   { href: "/perfil", label: "Perfil", Icon: User },
 ] as const;
 
