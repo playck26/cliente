@@ -13,6 +13,11 @@ import { permanentRedirect } from "next/navigation";
  * sendo o passo seguinte do fluxo, e rota filha não herda o redirect do
  * índice.
  */
+/**
+ * **SPEC-053/D5 — o destino mudou**, o endereço não: a aba "Quadras" virou o
+ * cartão Quadra de `/reservas/nova`. Ir direto para lá, e não para
+ * `/reservas?aba=quadras`, evita dois `308` encadeados.
+ */
 export default function QuadrasPage() {
-  permanentRedirect("/reservas?aba=quadras");
+  permanentRedirect("/reservas/nova?tipo=quadra");
 }

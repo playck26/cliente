@@ -34,7 +34,7 @@ export default function manifest(): MetadataRoute.Manifest {
     id: "/",
     name: "PlayCK",
     short_name: "PlayCK",
-    description: "Suas aulas e reservas de quadra em um só lugar",
+    description: "Suas aulas e reservas em um só lugar",
     start_url: "/",
     scope: "/",
     display: "standalone",

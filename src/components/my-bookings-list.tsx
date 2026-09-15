@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { Paginacao } from "@/components/paginacao";
+import Link from "next/link";
 import {
   CalendarDays,
   CreditCard,
   MessageCircle,
+  Plus,
   WalletCards,
 } from "lucide-react";
 import { CapaDaQuadra } from "@/components/capa-da-quadra";
@@ -151,11 +153,11 @@ const STATUS_LABEL: Record<Booking["statusPagamento"], string> = {
  */
 const COPY_DA_ABA = {
   reservas: {
-    titulo: "Quadras na sua agenda",
+    titulo: "Na sua agenda",
     contagem: (n: number) => `${n} ${n === 1 ? "reserva" : "reservas"}`,
     rotuloDaLista: "Reservas",
     vazioTitulo: "Nenhuma reserva por vir",
-    vazioTexto: "Suas próximas reservas de quadra aparecerão aqui.",
+    vazioTexto: "Suas próximas reservas aparecerão aqui.",
   },
   anteriores: {
     titulo: "O que já passou",
@@ -166,6 +168,28 @@ const COPY_DA_ABA = {
     vazioTexto: "Suas reservas passadas aparecerão aqui.",
   },
 } as const;
+
+/**
+ * SPEC-053/D7 — **"Fazer reserva", dentro da aba Reservas.** Antes, reservar a
+ * partir daqui exigia descobrir as abas "Quadras" ou "Aula particular"; agora
+ * elas são os cartões de `/reservas/nova`. `claro` é a versão sobre o cartão
+ * verde do topo.
+ */
+function BotaoFazerReserva({ claro = false }: { claro?: boolean }) {
+  return (
+    <Link
+      href="/reservas/nova"
+      className={`mt-3 inline-flex h-10 items-center gap-1.5 rounded-2xl px-4 text-[13px] font-extrabold transition-transform active:scale-[0.98] ${
+        claro
+          ? "bg-white text-[var(--color-primary-strong)]"
+          : "bg-[var(--color-primary-strong)] text-white"
+      }`}
+    >
+      <Plus className="size-4" aria-hidden="true" />
+      Fazer reserva
+    </Link>
+  );
+}
 
 // REQ-004/005 (SPEC-005): aluno vê e cancela as próprias reservas avulsas.
 // SPEC-041: e agora com corte temporal, porque sem ele o passado se
@@ -389,6 +413,11 @@ export function MyBookingsList({
                 <p className="mt-1.5 text-[13px] font-semibold text-white/75">
                   {loading ? "Carregando reservas..." : copy.contagem(total)}
                 </p>
+                {/*
+                  SPEC-053/D7 — o botão mora na aba Reservas, no topo, sempre.
+                  Em Anteriores, não: quem olha o passado não está contratando.
+                */}
+                {aba === "reservas" ? <BotaoFazerReserva claro /> : null}
               </div>
               <div className="shrink-0 rounded-2xl bg-white/12 px-4 py-3 text-center ring-1 ring-white/20">
                 <p className="text-2xl leading-none font-extrabold">
@@ -465,6 +494,12 @@ export function MyBookingsList({
             <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
               {copy.vazioTexto}
             </p>
+            {/* SPEC-053/D7 — o vazio dizia "aparecerão aqui" sem dar o caminho. */}
+            {aba === "reservas" ? (
+              <div className="mt-4 flex justify-center">
+                <BotaoFazerReserva />
+              </div>
+            ) : null}
           </section>
         ) : (
           <section className="space-y-4" aria-label={copy.rotuloDaLista}>

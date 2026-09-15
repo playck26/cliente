@@ -138,7 +138,8 @@ type Estado =
 const ROTULO: Record<string, string> = {
   entrada: "Crédito adicionado",
   retirada: "Crédito retirado",
-  consumo: "Reserva de quadra",
+  // SPEC-053/D2 — o consumo também é o de aula particular (SPEC-039).
+  consumo: "Reserva",
   devolucao: "Reserva cancelada",
 };
 

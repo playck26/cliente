@@ -26,13 +26,13 @@ vi.mock("next/navigation", () => ({
   usePathname: () => "/reservas",
 }));
 
-// As duas listas e a moldura são mockadas de propósito: o que está sob teste
-// aqui é a aba, não o que ela mostra. As listas têm as provas delas.
-vi.mock("@/components/courts-list", () => ({
-  CourtsList: () => <div data-testid="lista-de-quadras" />,
-}));
+// A lista e a moldura são mockadas de propósito: o que está sob teste aqui é
+// a aba, não o que ela mostra. A lista tem as provas dela.
+// SPEC-053: `aba` vira atributo para as provas saberem QUAL aba montou a lista.
 vi.mock("@/components/my-bookings-list", () => ({
-  MyBookingsList: () => <div data-testid="lista-de-reservas" />,
+  MyBookingsList: ({ aba }: { aba?: string }) => (
+    <div data-testid="lista-de-reservas" data-aba={aba} />
+  ),
 }));
 vi.mock("@/components/top-app-bar", () => ({ TopAppBar: () => null }));
 vi.mock("@/components/bottom-nav", () => ({ BottomNav: () => null }));
@@ -50,12 +50,17 @@ describe("REQ-003 — qual aba abre", () => {
     expect(screen.queryByTestId("lista-de-quadras")).not.toBeInTheDocument();
   });
 
-  it("com ?aba=quadras, abre as quadras", () => {
+  it("SPEC-053: ?aba=quadras cai na aba padrão — o redirecionamento acontece antes, no servidor", () => {
+    // A página `/reservas` manda `?aba=quadras` para `/reservas/nova?tipo=quadra`
+    // com 308 (`app/reservas/redirecionamentos.test.tsx`). Se o componente
+    // chegar a ver o parâmetro, não pode montar uma aba que não existe mais.
     params.valor = "aba=quadras";
     render(<ReservasTabs />);
 
-    expect(screen.getByTestId("lista-de-quadras")).toBeInTheDocument();
-    expect(screen.queryByTestId("lista-de-reservas")).not.toBeInTheDocument();
+    expect(screen.getByTestId("lista-de-reservas")).toHaveAttribute(
+      "data-aba",
+      "reservas",
+    );
   });
 
   it("valor desconhecido cai na aba padrão, e SEM mensagem de erro", () => {
@@ -70,19 +75,19 @@ describe("REQ-003 — qual aba abre", () => {
 });
 
 describe("REQ-005 — trocar de aba é navegar", () => {
-  it("ir para Quadras empurra a URL com o parâmetro", () => {
+  it("ir para Anteriores empurra a URL com o parâmetro", () => {
     // `push` e não `replace`: é o que dá ao botão "voltar" o que desfazer.
     render(<ReservasTabs />);
 
-    fireEvent.click(screen.getByRole("tab", { name: "Quadras" }));
+    fireEvent.click(screen.getByRole("tab", { name: "Anteriores" }));
 
-    expect(push).toHaveBeenCalledWith("/reservas?aba=quadras", {
+    expect(push).toHaveBeenCalledWith("/reservas?aba=anteriores", {
       scroll: false,
     });
   });
 
   it("voltar para Reservas usa a URL limpa, sem parâmetro", () => {
-    params.valor = "aba=quadras";
+    params.valor = "aba=anteriores";
     render(<ReservasTabs />);
 
     fireEvent.click(screen.getByRole("tab", { name: "Reservas" }));
@@ -107,10 +112,23 @@ describe("acessibilidade das abas", () => {
       "aria-selected",
       "true",
     );
-    expect(screen.getByRole("tab", { name: "Quadras" })).toHaveAttribute(
+    expect(screen.getByRole("tab", { name: "Anteriores" })).toHaveAttribute(
       "aria-selected",
       "false",
     );
+  });
+
+  it("SPEC-053/AC-006: exatamente as abas Reservas e Anteriores, e o rótulo da barra é \"Suas reservas\"", () => {
+    // O nome e o corte da primeira aba são da SPEC-041/D-I4 e NÃO mudam: a
+    // reserva em andamento fica em "Reservas" até terminar (a lista pede
+    // `quando=futuras`, cortado pelo FIM — `my-bookings-list.test.tsx`).
+    render(<ReservasTabs />);
+
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual([
+      "Reservas",
+      "Anteriores",
+    ]);
+    expect(screen.getByRole("tablist", { name: "Suas reservas" })).toBeInTheDocument();
   });
 });
 
@@ -128,11 +146,14 @@ describe("a prova olha para o que diz olhar", () => {
   });
 
   it("normalizarAba só aceita os dois valores conhecidos", () => {
-    expect(normalizarAbaDeReservas("quadras")).toBe("quadras");
+    expect(normalizarAbaDeReservas("anteriores")).toBe("anteriores");
     expect(normalizarAbaDeReservas("reservas")).toBe("reservas");
+    // SPEC-053: as abas de contratar saíram — viraram `/reservas/nova`.
+    expect(normalizarAbaDeReservas("quadras")).toBe(ABA_PADRAO);
+    expect(normalizarAbaDeReservas("aula")).toBe(ABA_PADRAO);
     expect(normalizarAbaDeReservas(null)).toBe(ABA_PADRAO);
     expect(normalizarAbaDeReservas("")).toBe(ABA_PADRAO);
-    expect(normalizarAbaDeReservas("QUADRAS")).toBe(ABA_PADRAO);
-    expect(normalizarAbaDeReservas("quadras ")).toBe(ABA_PADRAO);
+    expect(normalizarAbaDeReservas("ANTERIORES")).toBe(ABA_PADRAO);
+    expect(normalizarAbaDeReservas("anteriores ")).toBe(ABA_PADRAO);
   });
 });

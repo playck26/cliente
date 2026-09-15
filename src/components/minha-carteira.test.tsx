@@ -98,7 +98,10 @@ describe("MinhaCarteira", () => {
     const linhas = await screen.findAllByRole("listitem");
     expect(linhas[0]).toHaveTextContent("Crédito adicionado");
     expect(linhas[0]).toHaveTextContent("+");
-    expect(linhas[1]).toHaveTextContent("Reserva de quadra");
+    // SPEC-053/D2: "Reserva", não "Reserva de quadra" — o consumo também é o
+    // de aula particular (SPEC-039).
+    expect(linhas[1]).toHaveTextContent("Reserva");
+    expect(linhas[1]).not.toHaveTextContent("quadra");
     expect(linhas[1]).toHaveTextContent("−");
   });
 });

@@ -202,3 +202,51 @@ describe("HomeView", () => {
     expect(alerta).not.toHaveTextContent(/forbidden/i);
   });
 });
+
+/**
+ * SPEC-053/D4 — **a Home sem Quadras.** O "mudar tudo" do Israel vale inteiro
+ * aqui: o atalho "Quadras" era duplicado (ia ao mesmo lugar que "Reservar"),
+ * e os textos passam a falar de reserva, não de quadra.
+ */
+describe("SPEC-053 — a Home sem Quadras", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getMeMock.mockResolvedValue(ALUNO);
+    listMyClassesMock.mockResolvedValue([]);
+  });
+
+  it("AC-008: três atalhos, nesta ordem — Reservar, Aulas, Reservas", async () => {
+    render(<HomeView />);
+
+    const atalhos = await screen.findByRole("region", { name: "Atalhos" });
+    const links = Array.from(atalhos.querySelectorAll("a"));
+    expect(links.map((a) => a.textContent)).toEqual(["Reservar", "Aulas", "Reservas"]);
+    expect(links.map((a) => a.getAttribute("href"))).toEqual([
+      "/reservas/nova",
+      "/minhas-aulas",
+      "/reservas",
+    ]);
+  });
+
+  it("AC-009: nenhum link da Home aponta para /quadras", async () => {
+    render(<HomeView />);
+    await screen.findByRole("region", { name: "Atalhos" });
+
+    const hrefs = screen.getAllByRole("link").map((a) => a.getAttribute("href"));
+    expect(hrefs.filter((h) => h?.startsWith("/quadras"))).toEqual([]);
+  });
+
+  it("AC-001: os textos da Home falam de reserva, não de quadra", async () => {
+    render(<HomeView />);
+
+    expect(
+      await screen.findByText("Faça sua reserva e monte seu próximo jogo."),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /Fazer reserva/ }).length).toBeGreaterThan(0);
+    expect(screen.getByText("Reservas PlayCK")).toBeInTheDocument();
+    expect(
+      screen.getByText("Veja o que o clube oferece, com valores e horários."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/quadra/i)).not.toBeInTheDocument();
+  });
+});
