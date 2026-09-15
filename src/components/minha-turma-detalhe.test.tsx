@@ -49,7 +49,10 @@ vi.mock("@/lib/api-client", async () => {
 const TERCA = { diaSemana: 2, horaInicio: "18:00", horaFim: "19:00" };
 const SABADO = { diaSemana: 6, horaInicio: "07:00", horaFim: "08:30" };
 
-function responder(encontros: typeof TERCA[]) {
+function responder(
+  encontros: typeof TERCA[],
+  status: "ativa" | "inativa" = "ativa",
+) {
   getMinhaTurmaMock.mockResolvedValue({
     id: "t1",
     nome: "Infantil A",
@@ -58,6 +61,7 @@ function responder(encontros: typeof TERCA[]) {
     nivelNome: "Iniciante",
     capacidade: 6,
     alunos: [],
+    status,
   });
   listarOcorrenciasMock.mockResolvedValue([]);
   listOcorrenciasMock.mockResolvedValue({
@@ -70,6 +74,7 @@ function responder(encontros: typeof TERCA[]) {
 
 beforeEach(() => {
   getMinhaTurmaMock.mockReset();
+  listOcorrenciasMock.mockReset();
   listarOcorrenciasMock.mockReset().mockResolvedValue([]);
 });
 
@@ -163,5 +168,99 @@ describe("SPEC-052/AC-012 — a ficha leva à aula cancelada", () => {
 
     const link = await screen.findByRole("link", { name: /aula cancelada/ });
     expect(link).toHaveAttribute("href", "/chamada/ocup-cancelada");
+  });
+});
+
+/**
+ * SPEC-056 — **a ficha de turma inativa diz o que é, e alcança a aula.**
+ *
+ * O rótulo "Turma ativa" era fixo. E a janela de 30 dias não bastava: a inativa
+ * entra no índice com aula nos últimos 90 dias, então a ficha dela pede 90 —
+ * senão a aula de 60 dias atrás, que a trouxe ao índice, não estaria aqui.
+ */
+describe("SPEC-056 — a ficha da turma inativa", () => {
+  it("AC-005: diz \"Turma inativa\", nunca \"Turma ativa\"", async () => {
+    responder([TERCA], "inativa");
+    render(<MinhaTurmaDetalheView id="t1" />);
+    expect(await screen.findByText("Turma inativa")).toBeInTheDocument();
+    expect(screen.queryByText("Turma ativa")).not.toBeInTheDocument();
+  });
+
+  it("a ativa continua dizendo \"Turma ativa\", e pede só 30 dias", async () => {
+    responder([TERCA]);
+    render(<MinhaTurmaDetalheView id="t1" />);
+    expect(await screen.findByText("Turma ativa")).toBeInTheDocument();
+    await waitFor(() => expect(listOcorrenciasMock).toHaveBeenCalled());
+    expect(listOcorrenciasMock.mock.calls.every((c) => c[1] === 30)).toBe(true);
+  });
+
+  it("a inativa pede as aulas de 90 dias, e a cancelada leva à chamada (AC-004)", async () => {
+    responder([TERCA], "inativa");
+    listOcorrenciasMock.mockImplementation((_id: string, dias: number) =>
+      Promise.resolve(
+        dias === 90
+          ? {
+              data: [
+                {
+                  ocupacaoId: "ocup-60-dias",
+                  data: "2026-07-17",
+                  horaInicio: "18:00",
+                  horaFim: "19:00",
+                  cancelada: true,
+                  chamadaFeita: false,
+                  marcados: 0,
+                  totalAlunos: 4,
+                  podeLancar: false,
+                  estado: "cancelada",
+                },
+              ],
+              page: 1,
+              pageSize: 20,
+              total: 1,
+            }
+          : { data: [], page: 1, pageSize: 20, total: 0 },
+      ),
+    );
+    render(<MinhaTurmaDetalheView id="t1" />);
+
+    const link = await screen.findByRole("link", { name: /aula cancelada/ });
+    expect(link).toHaveAttribute("href", "/chamada/ocup-60-dias");
+    expect(listOcorrenciasMock).toHaveBeenCalledWith("t1", 90, 1);
+  });
+
+  it("a resposta de 30 dias que chega DEPOIS da de 90 não apaga a lista", async () => {
+    responder([TERCA], "inativa");
+    let soltar30: (v: unknown) => void = () => undefined;
+    listOcorrenciasMock.mockImplementation((_id: string, dias: number) =>
+      dias === 30
+        ? new Promise((r) => {
+            soltar30 = r;
+          })
+        : Promise.resolve({
+            data: [
+              {
+                ocupacaoId: "ocup-60-dias",
+                data: "2026-07-17",
+                horaInicio: "18:00",
+                horaFim: "19:00",
+                cancelada: true,
+                chamadaFeita: false,
+                marcados: 0,
+                totalAlunos: 4,
+                podeLancar: false,
+                estado: "cancelada",
+              },
+            ],
+            page: 1,
+            pageSize: 20,
+            total: 1,
+          }),
+    );
+    render(<MinhaTurmaDetalheView id="t1" />);
+    await screen.findByRole("link", { name: /aula cancelada/ });
+
+    soltar30({ data: [], page: 1, pageSize: 20, total: 0 });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(screen.getByRole("link", { name: /aula cancelada/ })).toBeInTheDocument();
   });
 });

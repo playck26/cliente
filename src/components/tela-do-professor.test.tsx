@@ -46,6 +46,7 @@ const TURMA: MinhaTurma = {
   nivelNome: null,
   capacidade: 6,
   totalAlunos: 4,
+  status: "ativa",
 };
 
 const OUTRA: MinhaTurma = { ...TURMA, id: "t-2", nome: "Adulto B" };
@@ -123,5 +124,62 @@ describe("TelaDoProfessor — SPEC-052", () => {
     expect(
       await screen.findByText("Nenhuma turma atribuída a você"),
     ).toBeInTheDocument();
+  });
+});
+
+/**
+ * SPEC-056 — **a turma inativa ganha porta de entrada** (GAP-015).
+ *
+ * Turma inativada antes da primeira aula só tem aulas canceladas: a agenda não
+ * mostra nenhuma, e o índice só trazia ativas. Agora o índice pede as inativas
+ * (`incluirInativas`), e elas aparecem num grupo próprio, marcadas.
+ */
+describe("TelaDoProfessor — SPEC-056: turmas inativas", () => {
+  const INATIVA: MinhaTurma = {
+    ...TURMA,
+    id: "t-9",
+    nome: "Turma encerrada",
+    status: "inativa",
+  };
+
+  it("pede as inativas ao servidor", async () => {
+    getAgendaDoProfessor.mockResolvedValue([]);
+    listMinhasTurmas.mockResolvedValue([TURMA]);
+    render(<TelaDoProfessor />);
+    await screen.findByRole("region", { name: "Suas turmas" });
+    expect(listMinhasTurmas).toHaveBeenCalledWith(true);
+  });
+
+  it("AC-004: agenda vazia, e a inativa está em \"Turmas inativas\", marcada e com link para a ficha", async () => {
+    getAgendaDoProfessor.mockResolvedValue([]);
+    listMinhasTurmas.mockResolvedValue([TURMA, INATIVA]);
+    render(<TelaDoProfessor />);
+
+    const inativas = await screen.findByRole("region", { name: "Turmas inativas" });
+    const link = within(inativas).getByRole("link", { name: /Turma encerrada/ });
+    expect(link).toHaveAttribute("href", "/minhas-turmas/t-9");
+    expect(link).toHaveTextContent("Inativa");
+
+    // AC-006: a ativa continua em "Suas turmas", e a inativa não entra lá.
+    const ativas = screen.getByRole("region", { name: "Suas turmas" });
+    expect(within(ativas).getAllByRole("link").map((a) => a.getAttribute("href"))).toEqual([
+      "/minhas-turmas/t-1",
+    ]);
+  });
+
+  it("sem inativa, o grupo não aparece", async () => {
+    getAgendaDoProfessor.mockResolvedValue([]);
+    listMinhasTurmas.mockResolvedValue([TURMA]);
+    render(<TelaDoProfessor />);
+    await screen.findByRole("region", { name: "Suas turmas" });
+    expect(screen.queryByRole("region", { name: "Turmas inativas" })).not.toBeInTheDocument();
+  });
+
+  it("só inativas: \"Suas turmas\" diz que não há ativa, e não que o gestor nunca vinculou", async () => {
+    getAgendaDoProfessor.mockResolvedValue([]);
+    listMinhasTurmas.mockResolvedValue([INATIVA]);
+    render(<TelaDoProfessor />);
+    expect(await screen.findByText("Nenhuma turma ativa no momento.")).toBeInTheDocument();
+    expect(screen.queryByText("Nenhuma turma atribuída a você")).not.toBeInTheDocument();
   });
 });
