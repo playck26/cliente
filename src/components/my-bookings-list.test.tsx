@@ -689,3 +689,57 @@ describe("MyBookingsList — a referência temporal (SPEC-041/B5)", () => {
     ).not.toBeInTheDocument();
   });
 });
+
+/**
+ * SPEC-053/D7, AC-007 — **o botão "Fazer reserva" mora na aba Reservas.**
+ *
+ * No topo, sempre; e DENTRO do estado vazio, que antes dizia "suas próximas
+ * reservas aparecerão aqui" sem dar o caminho. Na aba Anteriores, não: quem olha
+ * o passado não está contratando.
+ */
+describe("SPEC-053/AC-007 — o botão Fazer reserva", () => {
+  beforeEach(() => {
+    listMyBookingsMock.mockReset();
+    getPublicPaymentConfigMock.mockReset().mockResolvedValue(null);
+    listCourtsMock.mockReset().mockResolvedValue({ data: [], total: 0 });
+    params.valor = "";
+  });
+
+  const botoes = () => screen.queryAllByRole("link", { name: "Fazer reserva" });
+
+  it("aba Reservas COM reservas: o botão está no topo", async () => {
+    listMyBookingsMock.mockResolvedValue({
+      page: 1,
+      pageSize: 20,
+      total: 1,
+      data: [reserva("pago")],
+    });
+
+    render(<MyBookingsList aba="reservas" />);
+
+    await waitFor(() => expect(botoes().length).toBe(1));
+    expect(botoes()[0]).toHaveAttribute("href", "/reservas/nova");
+  });
+
+  it("aba Reservas VAZIA: o botão está no topo e dentro do vazio", async () => {
+    listMyBookingsMock.mockResolvedValue({ page: 1, pageSize: 20, total: 0, data: [] });
+
+    render(<MyBookingsList aba="reservas" />);
+
+    expect(await screen.findByText("Nenhuma reserva por vir")).toBeInTheDocument();
+    expect(botoes()).toHaveLength(2);
+    for (const b of botoes()) expect(b).toHaveAttribute("href", "/reservas/nova");
+    // D2: o vazio não fala mais em "reservas de quadra".
+    expect(screen.getByText("Suas próximas reservas aparecerão aqui.")).toBeInTheDocument();
+    expect(screen.getByText("Na sua agenda")).toBeInTheDocument();
+  });
+
+  it("aba Anteriores: nenhum botão, nem vazia", async () => {
+    listMyBookingsMock.mockResolvedValue({ page: 1, pageSize: 20, total: 0, data: [] });
+
+    render(<MyBookingsList aba="anteriores" />);
+
+    expect(await screen.findByText("Nada no histórico ainda")).toBeInTheDocument();
+    expect(botoes()).toHaveLength(0);
+  });
+});

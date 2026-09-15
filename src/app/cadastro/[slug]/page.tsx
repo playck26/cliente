@@ -11,7 +11,7 @@ export default async function CadastroPage({
   return (
     <AuthShell
       titulo="Criar conta"
-      descricao="Cadastre-se para ver suas aulas e reservar quadra."
+      descricao="Cadastre-se para ver suas aulas e fazer reservas."
     >
       <CadastroPublicoForm slug={slug} />
     </AuthShell>

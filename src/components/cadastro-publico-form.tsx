@@ -91,7 +91,7 @@ export function CadastroPublicoForm({ slug }: { slug: string }) {
         <p className="font-medium">Cadastro enviado</p>
         <p className="text-sm text-[var(--color-text-secondary)]">
           {empresa?.nome} vai revisar seu cadastro. Você já pode entrar e ver o
-          app, mas só consegue reservar quadra depois que a escola aprovar.
+          app, mas só consegue fazer reservas depois que a escola aprovar.
         </p>
         <Button type="button" onClick={() => router.push("/login")}>
           Entrar agora
@@ -154,7 +154,7 @@ export function CadastroPublicoForm({ slug }: { slug: string }) {
 
       <p className="text-xs text-[var(--color-text-secondary)]">
         Seu cadastro passa por aprovação da escola antes de você poder
-        reservar quadra.
+        fazer reservas.
       </p>
 
       <Button type="submit" disabled={loading} className="w-full">

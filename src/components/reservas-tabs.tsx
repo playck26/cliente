@@ -1,8 +1,6 @@
 "use client";
 
 import { BottomNav } from "@/components/bottom-nav";
-import { AulaParticular } from "@/components/aula-particular";
-import { CourtsList } from "@/components/courts-list";
 import { MyBookingsList } from "@/components/my-bookings-list";
 import { TopAppBar } from "@/components/top-app-bar";
 import {
@@ -59,14 +57,16 @@ import {
  * duas repetiria a confusão que a SPEC-022 desfez entre `/quadras` e
  * `/reservas`.
  */
+/**
+ * **SPEC-053/D3 — "Quadras" e "Aula particular" saíram da barra**, e viraram os
+ * cartões de `/reservas/nova`. Esta tela é o lugar de ACOMPANHAR; contratar
+ * mora ao lado. `?aba=quadras` e `?aba=aula` respondem `308` na página, antes
+ * de chegar aqui. O nome e o corte da primeira aba não mudam (SPEC-041/D-I4).
+ */
 const ABAS = [
   { id: "reservas", rotulo: "Reservas" },
   { id: "anteriores", rotulo: "Anteriores" },
-  { id: "quadras", rotulo: "Quadras" },
-  { id: "aula", rotulo: "Aula particular" },
-] as const satisfies readonly AbaDaTela<
-  "reservas" | "anteriores" | "quadras" | "aula"
->[];
+] as const satisfies readonly AbaDaTela<"reservas" | "anteriores">[];
 
 type AbaId = (typeof ABAS)[number]["id"];
 
@@ -90,15 +90,14 @@ export function ReservasTabs() {
           abas={ABAS}
           ativa={ativa}
           onTrocar={irPara}
-          rotulo="Reservas e quadras"
+          rotulo="Suas reservas"
         />
       </div>
 
       {/*
-        Só o painel ativo é montado. Montar os dois faria a tela buscar as
-        reservas E as quadras a cada entrada — duas idas à rede para mostrar
-        uma. O custo é remontar ao voltar para a aba; o ganho é a tela abrir
-        no tempo de uma requisição, que é o que a pessoa sente.
+        Só o painel ativo é montado: montar os dois faria a tela buscar as duas
+        listas a cada entrada. O custo é remontar ao voltar para a aba; o ganho
+        é a tela abrir no tempo de uma requisição, que é o que a pessoa sente.
       */}
       <div
         role="tabpanel"
@@ -106,18 +105,14 @@ export function ReservasTabs() {
         aria-labelledby={`aba-${ativa}`}
         className="mt-5"
       >
-        {ativa === "aula" ? (
-          <AulaParticular />
-        ) : ativa === "quadras" ? (
-          <CourtsList />
-        ) : (
-          // A `key` força remontar ao trocar de aba, e isso é de propósito:
-          // sem ela o React reaproveitaria a instância, e a página em que a
-          // pessoa estava em "Reservas" viria junto para "Anteriores",
-          // pedindo a página 3 de uma lista que pode ter uma só.
-          // Consequência aceita: a paginação reinicia na troca (LIM-041g).
-          <MyBookingsList key={ativa} aba={ativa} />
-        )}
+        {/*
+          A `key` força remontar ao trocar de aba, e isso é de propósito: sem
+          ela o React reaproveitaria a instância, e a página em que a pessoa
+          estava em "Reservas" viria junto para "Anteriores", pedindo a página 3
+          de uma lista que pode ter uma só. Consequência aceita: a paginação
+          reinicia na troca (LIM-041g).
+        */}
+        <MyBookingsList key={ativa} aba={ativa} />
       </div>
 
       <BottomNav />

@@ -565,7 +565,7 @@ export function CourtBooking({ id }: { id: string }) {
               Reserva confirmada!
             </h2>
             <p className="mt-1 text-sm font-medium text-[var(--color-text-secondary)]">
-              Sua quadra foi reservada com sucesso.
+              Ela já aparece em Reservas.
             </p>
 
             {pagoComCredito ? (

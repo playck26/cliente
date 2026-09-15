@@ -11,7 +11,7 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "PlayCK",
-  description: "Suas aulas e reservas de quadra em um só lugar",
+  description: "Suas aulas e reservas em um só lugar",
   /**
    * SPEC-050 — os metadados que faltavam para o iOS.
    *
