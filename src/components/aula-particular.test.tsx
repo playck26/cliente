@@ -19,6 +19,7 @@ const listarProfessoresParaAula = vi.hoisted(() => vi.fn());
 const horariosDeAula = vi.hoisted(() => vi.fn());
 const marcarAulaParticular = vi.hoisted(() => vi.fn());
 const getMinhaCarteira = vi.hoisted(() => vi.fn());
+const adicionaisDisponiveis = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/api-client", async () => {
   const real =
@@ -31,6 +32,7 @@ vi.mock("@/lib/api-client", async () => {
     horariosDeAula,
     marcarAulaParticular,
     getMinhaCarteira,
+    adicionaisDisponiveis,
   };
 });
 
@@ -78,6 +80,8 @@ beforeEach(() => {
   horariosDeAula.mockResolvedValue(grade());
   marcarAulaParticular.mockResolvedValue({ reservas: [{ id: "r-1" }] });
   getMinhaCarteira.mockResolvedValue({ saldoCentavos: 50_000, movimentos: [] });
+  // SPEC-054: clube sem adicional ativo é o caso dos testes anteriores.
+  adicionaisDisponiveis.mockResolvedValue([]);
 });
 
 describe("SPEC-047 — escolher o professor", () => {
@@ -237,5 +241,92 @@ describe("SPEC-047/LIM-047f — a carteira", () => {
   it("com saldo suficiente, nenhum aviso aparece", async () => {
     await abrirGrade();
     expect(screen.queryByText(/Faltam/)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * SPEC-054/D12 e AC-008 — **adicional na aula particular do aluno.**
+ *
+ * O `valor` gravado é o preço da aula + os adicionais, e quem soma é o
+ * servidor. A tela mostra o total antes de confirmar, e o aviso de saldo usa
+ * esse total — senão diria "cabe" sobre uma aula que a carteira recusa.
+ */
+describe("SPEC-054 — adicionais na aula particular", () => {
+  const RAQUETE = {
+    id: "ad-1",
+    tipoId: "t-1",
+    tipoNome: "Raquetes",
+    nome: "Raquete",
+    preco: 15,
+    disponivel: 3,
+  };
+
+  it("depois do horário, pede a disponibilidade para ele", async () => {
+    adicionaisDisponiveis.mockResolvedValue([RAQUETE]);
+    await abrirGrade();
+    expect(adicionaisDisponiveis).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: /09:00/ }));
+    await waitFor(() =>
+      expect(adicionaisDisponiveis).toHaveBeenCalledWith(expect.any(String), [
+        "09:00-10:00",
+      ]),
+    );
+  });
+
+  it("AC-008: 2 raquetes somam ao preço, e vão no pedido — ainda sem `valor`", async () => {
+    adicionaisDisponiveis.mockResolvedValue([RAQUETE]);
+    await abrirGrade();
+    fireEvent.click(screen.getByRole("button", { name: /09:00/ }));
+    const mais = await screen.findByRole("button", { name: "Mais Raquete" });
+    fireEvent.click(mais);
+    fireEvent.click(mais);
+
+    expect(await screen.findByText("R$ 180,00")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar aula" }));
+    await waitFor(() => expect(marcarAulaParticular).toHaveBeenCalled());
+    const enviado = marcarAulaParticular.mock.calls[0][0] as Record<string, unknown>;
+    expect(enviado.adicionais).toEqual([{ adicionalId: "ad-1", quantidade: 2 }]);
+    expect(enviado).not.toHaveProperty("valor");
+  });
+
+  it("o aviso de saldo usa aula + adicionais", async () => {
+    // R$ 160: cabe a aula de R$ 150, não cabe com uma raquete de R$ 15.
+    getMinhaCarteira.mockResolvedValue({ saldoCentavos: 16_000, movimentos: [] });
+    adicionaisDisponiveis.mockResolvedValue([RAQUETE]);
+    await abrirGrade();
+    fireEvent.click(screen.getByRole("button", { name: /09:00/ }));
+    expect(screen.queryByText(/Faltam/)).not.toBeInTheDocument();
+
+    fireEvent.click(await screen.findByRole("button", { name: "Mais Raquete" }));
+    expect(await screen.findByText(/Faltam/)).toHaveTextContent("R$ 5,00");
+  });
+
+  it("sem escolha, o pedido não leva o campo", async () => {
+    adicionaisDisponiveis.mockResolvedValue([RAQUETE]);
+    await abrirGrade();
+    fireEvent.click(screen.getByRole("button", { name: /09:00/ }));
+    await screen.findByRole("button", { name: "Mais Raquete" });
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar aula" }));
+    await waitFor(() => expect(marcarAulaParticular).toHaveBeenCalled());
+    const enviado = marcarAulaParticular.mock.calls[0][0] as Record<string, unknown>;
+    expect("adicionais" in enviado).toBe(false);
+  });
+
+  it("LIM-054j: `409 ESTOQUE_ESGOTADO` mostra a mensagem e relê", async () => {
+    adicionaisDisponiveis.mockResolvedValue([RAQUETE]);
+    marcarAulaParticular.mockRejectedValue(
+      new ApiError(409, "Raquete esgotou neste horário.", "ESTOQUE_ESGOTADO"),
+    );
+    await abrirGrade();
+    fireEvent.click(screen.getByRole("button", { name: /09:00/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Mais Raquete" }));
+    const antes = adicionaisDisponiveis.mock.calls.length;
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar aula" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/esgotou/);
+    await waitFor(() =>
+      expect(adicionaisDisponiveis.mock.calls.length).toBeGreaterThan(antes),
+    );
   });
 });

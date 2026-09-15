@@ -926,10 +926,15 @@ export async function createBooking(dto: {
   quadraId: string;
   data: string;
   slots: { horaInicio: string; horaFim: string }[];
+  /** SPEC-054/D7 — valem para CADA reserva do pedido. */
+  adicionais?: ItemDoPedido[];
 }): Promise<{ reservas: Booking[] }> {
+  const { adicionais, ...resto } = dto;
   const res = await authFetch("/bookings", {
     method: "POST",
-    body: JSON.stringify(dto),
+    // SPEC-054/D9 — lista vazia NÃO vira campo: a impressão digital do pedido
+    // só é idêntica à de antes da spec sem ele.
+    body: JSON.stringify(comAdicionais(resto, adicionais)),
   });
   return (await res.json()) as { reservas: Booking[] };
 }
@@ -1255,15 +1260,67 @@ export async function marcarAulaParticular(dto: {
   horaInicio: string;
   horaFim: string;
   professorId: string;
+  /** SPEC-054 — o preço deles soma ao da aula no servidor, nunca aqui. */
+  adicionais?: ItemDoPedido[];
 }): Promise<{ reservas: Booking[] }> {
   const res = await authFetch("/bookings", {
     method: "POST",
-    body: JSON.stringify({
-      quadraId: dto.quadraId,
-      data: dto.data,
-      slots: [{ horaInicio: dto.horaInicio, horaFim: dto.horaFim }],
-      professorId: dto.professorId,
-    }),
+    body: JSON.stringify(
+      comAdicionais(
+        {
+          quadraId: dto.quadraId,
+          data: dto.data,
+          slots: [{ horaInicio: dto.horaInicio, horaFim: dto.horaFim }],
+          professorId: dto.professorId,
+        },
+        dto.adicionais,
+      ),
+    ),
   });
   return (await res.json()) as { reservas: Booking[] };
+}
+
+// =====================================================================
+// SPEC-054 — adicionais da reserva
+// =====================================================================
+
+export type AdicionalDisponivel =
+  components["schemas"]["AdicionalDisponivelResponseDto"];
+export type AdicionalDaReserva = components["schemas"]["AdicionalDaReservaDto"];
+export type ItemDoPedido = components["schemas"]["AdicionalDoPedidoDto"];
+
+/** O corpo com os itens só quando há item — ver `createBooking`. */
+function comAdicionais<T extends object>(
+  corpo: T,
+  adicionais: ItemDoPedido[] | undefined,
+): T | (T & { adicionais: ItemDoPedido[] }) {
+  return adicionais && adicionais.length > 0 ? { ...corpo, adicionais } : corpo;
+}
+
+/**
+ * SPEC-054/D8 — os adicionais ativos do clube e **o quanto cabe** no pedido: o
+ * menor saldo entre os blocos dos horários escolhidos.
+ *
+ * **É leitura, não reserva** (LIM-054j): entre ler e confirmar, outra pessoa
+ * pode levar a última raquete, e quem decide é o `POST /bookings`.
+ *
+ * O `404` vira lista vazia, e só ele: é o `back` anterior à SPEC-054, e o passo
+ * de adicionais some como se o clube não tivesse nenhum. Qualquer outro erro
+ * sobe — falha não é ausência (a lição da `capacidade-operacao`).
+ */
+export async function adicionaisDisponiveis(
+  data: string,
+  slots: readonly string[],
+): Promise<AdicionalDisponivel[]> {
+  const params = new URLSearchParams({
+    data,
+    slots: [...slots].sort().join(","),
+  });
+  try {
+    const res = await authFetch(`/adicionais/disponiveis?${params.toString()}`);
+    return (await res.json()) as AdicionalDisponivel[];
+  } catch (erro) {
+    if (erro instanceof ApiError && erro.status === 404) return [];
+    throw erro;
+  }
 }

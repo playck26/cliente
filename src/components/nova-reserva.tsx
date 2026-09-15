@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { AulaParticular } from "@/components/aula-particular";
@@ -8,6 +9,7 @@ import { CourtsList } from "@/components/courts-list";
 import { TennisBallIcon } from "@/components/icons/tennis-ball-icon";
 import { TennisCourtIcon } from "@/components/icons/tennis-court-icon";
 import { TopAppBar } from "@/components/top-app-bar";
+import { NOMES_PADRAO, lerNomesDeTipo, type NomesDeTipo } from "@/lib/nomes-de-tipo";
 
 /**
  * SPEC-053/D3 — **`/reservas/nova`: escolher o TIPO antes do horário.**
@@ -23,26 +25,30 @@ import { TopAppBar } from "@/components/top-app-bar";
  * O `tipo` vem da página (servidor), e não de `useSearchParams`: a página já
  * lê os parâmetros, e ler de novo aqui obrigaria um `Suspense` só para isso.
  *
- * *Os nomes "Quadra" e "Aula particular" são fixos nesta spec.* A SPEC-054 os
- * torna o nome que o gestor dá a cada tipo.
+ * **SPEC-054/D1 — os nomes são os que o clube deu a cada tipo.** O endereço
+ * (`?tipo=quadra`) não muda: é o comportamento, que é código. Enquanto os nomes
+ * não chegam — ou se não chegarem —, os cartões aparecem com os padrões: o
+ * nome é apresentação, e o cartão é o caminho que a pessoa veio buscar.
  */
 
 export type TipoDeReserva = "quadra" | "aula";
 
-const TIPOS = [
-  {
-    id: "quadra",
-    nome: "Quadra",
-    descricao: "Escolha a quadra, o dia e o horário.",
-    Icon: TennisCourtIcon,
-  },
-  {
-    id: "aula",
-    nome: "Aula particular",
-    descricao: "Escolha o professor; a quadra vem junto.",
-    Icon: TennisBallIcon,
-  },
-] as const;
+function tiposDeReserva(nomes: NomesDeTipo) {
+  return [
+    {
+      id: "quadra",
+      nome: nomes.quadra,
+      descricao: "Escolha a quadra, o dia e o horário.",
+      Icon: TennisCourtIcon,
+    },
+    {
+      id: "aula",
+      nome: nomes.aula,
+      descricao: "Escolha o professor; a quadra vem junto.",
+      Icon: TennisBallIcon,
+    },
+  ] as const;
+}
 
 function tipoValido(tipo: string | null): TipoDeReserva | null {
   return tipo === "quadra" || tipo === "aula" ? tipo : null;
@@ -52,6 +58,18 @@ export function NovaReserva({ tipo }: { tipo: string | null }) {
   // Tipo desconhecido mostra os cartões, sem erro: um endereço editado à mão
   // ou um link velho não pode ser punido (a regra da SPEC-022).
   const escolhido = tipoValido(tipo);
+  const [nomes, setNomes] = useState<NomesDeTipo>(NOMES_PADRAO);
+
+  useEffect(() => {
+    let vivo = true;
+    // `lerNomesDeTipo` não lança: toda falha já volta como os padrões.
+    void lerNomesDeTipo().then((lidos) => {
+      if (vivo) setNomes(lidos);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, []);
 
   return (
     <main className="app-screen min-h-screen overflow-hidden bg-background pb-36">
@@ -79,7 +97,7 @@ export function NovaReserva({ tipo }: { tipo: string | null }) {
           <AulaParticular />
         ) : (
           <ul className="space-y-3 px-5" aria-label="Tipos de reserva">
-            {TIPOS.map(({ id, nome, descricao, Icon }) => (
+            {tiposDeReserva(nomes).map(({ id, nome, descricao, Icon }) => (
               <li key={id}>
                 <Link
                   href={`/reservas/nova?tipo=${id}`}

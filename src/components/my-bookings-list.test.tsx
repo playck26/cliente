@@ -743,3 +743,38 @@ describe("SPEC-053/AC-007 — o botão Fazer reserva", () => {
     expect(botoes()).toHaveLength(0);
   });
 });
+
+/**
+ * SPEC-054/D12 — **a reserva lista os adicionais**, nas duas abas (SPEC-041/D-I4).
+ * Reserva sem adicional não ganha linha nenhuma.
+ */
+describe("SPEC-054 — os adicionais na reserva", () => {
+  const comRaquete = {
+    ...reserva("pago"),
+    id: "com",
+    adicionais: [
+      { adicionalId: "ad-1", nome: "Raquete", quantidade: 2, valorUnitario: 15 },
+    ],
+  };
+  const semNada = { ...reserva("pago"), id: "sem", adicionais: [] };
+
+  beforeEach(() => {
+    listMyBookingsMock.mockReset().mockResolvedValue({
+      page: 1,
+      pageSize: 20,
+      total: 2,
+      data: [comRaquete, semNada],
+    });
+    getPublicPaymentConfigMock.mockReset().mockResolvedValue({
+      linkPagamentoUrl: null,
+      whatsappNumero: null,
+    });
+    listCourtsMock.mockReset().mockResolvedValue({ data: [], total: 0 });
+  });
+
+  it.each(["reservas", "anteriores"] as const)("aba %s", async (aba) => {
+    render(<MyBookingsList aba={aba} />);
+    expect(await screen.findByText("2× Raquete")).toBeInTheDocument();
+    expect(screen.getAllByText(/×/)).toHaveLength(1);
+  });
+});

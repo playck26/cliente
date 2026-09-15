@@ -14,6 +14,10 @@ import {
 } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
 import { CapaDaQuadra } from "@/components/capa-da-quadra";
+import {
+  PassoDeAdicionais,
+  contarBlocos,
+} from "@/components/passo-de-adicionais";
 import { Button } from "@/components/ui/button";
 import {
   ApiError,
@@ -24,6 +28,7 @@ import {
   listCourts,
   type Availability,
   type Court,
+  type ItemDoPedido,
   type PublicPaymentConfig,
 } from "@/lib/api-client";
 import { hojeNoClubeIso, isoDeOffsetNoClube } from "@/lib/fuso";
@@ -93,6 +98,14 @@ export function CourtBooking({ id }: { id: string }) {
    * diferença decide se a tela fala ou fica calada.
    */
   const [saldoCentavos, setSaldoCentavos] = useState<number | null>(null);
+  /**
+   * SPEC-054/D12 — o passo "Adicionais": os itens escolhidos e quanto somam
+   * **numa** reserva. A `chave` troca depois de um `409 ESTOQUE_ESGOTADO`, para
+   * o passo reler o que sobrou.
+   */
+  const [adicionais, setAdicionais] = useState<ItemDoPedido[]>([]);
+  const [somaDosAdicionais, setSomaDosAdicionais] = useState(0);
+  const [chaveDosAdicionais, setChaveDosAdicionais] = useState(0);
 
   useEffect(() => {
     listCourts()
@@ -134,6 +147,9 @@ export function CourtBooking({ id }: { id: string }) {
     setAvailLoading(true);
     setAvailError(null);
     setSlotsSelecionados([]);
+    // Sem horário, não há passo de adicionais — e a escolha não sobrevive a ele.
+    setAdicionais([]);
+    setSomaDosAdicionais(0);
     // **O erro da reserva morre junto com a troca de dia ou de quadra.**
     // Sem esta linha ele sobrevivia: "nao foi possivel reservar; tente outro
     // horario" de terca continuava em cima do resumo de quarta, acusando um
@@ -185,6 +201,7 @@ export function CourtBooking({ id }: { id: string }) {
           const [horaInicio, horaFim] = rotulo.split("-");
           return { horaInicio, horaFim };
         }),
+        ...(adicionais.length > 0 ? { adicionais } : {}),
       });
       await loadAvailability(data, true);
       // **A resposta era descartada, e por isso a tela pedia pagamento de uma
@@ -211,6 +228,11 @@ export function CourtBooking({ id }: { id: string }) {
           ? err.message
           : "Não foi possível reservar; tente outro horário.",
       );
+      // LIM-054j: a disponibilidade da tela não reserva. Quem perdeu a última
+      // unidade vê o que sobrou, com o pedido ainda montado.
+      if (err instanceof ApiError && err.code === "ESTOQUE_ESGOTADO") {
+        setChaveDosAdicionais((c) => c + 1);
+      }
     } finally {
       setBookingLoading(false);
     }
@@ -238,7 +260,15 @@ export function CourtBooking({ id }: { id: string }) {
     );
   }
 
-  const total = slotsSelecionados.length * (quadra?.precoHora ?? 0);
+  /**
+   * SPEC-054/D6 — o adicional vale para CADA reserva do pedido, e horários
+   * separados são reservas separadas: `contarBlocos` repete a regra do
+   * servidor. Para o aluno é tudo-ou-nada no saldo, então o total que a tela
+   * mostra tem de ser o que vai sair da carteira.
+   */
+  const total =
+    slotsSelecionados.length * (quadra?.precoHora ?? 0) +
+    contarBlocos(slotsSelecionados) * somaDosAdicionais;
 
   /**
    * SPEC-048/D6 — **a conversão acontece AQUI, uma vez.**
@@ -458,6 +488,19 @@ export function CourtBooking({ id }: { id: string }) {
                 </div>
               ) : null}
             </section>
+
+            {slotsSelecionados.length > 0 ? (
+              <PassoDeAdicionais
+                data={data}
+                slots={slotsSelecionados}
+                chave={chaveDosAdicionais}
+                desabilitado={bookingLoading}
+                onChange={(itens, soma) => {
+                  setAdicionais(itens);
+                  setSomaDosAdicionais(soma);
+                }}
+              />
+            ) : null}
 
             {slotsSelecionados.length > 0 ? (
               <section className="rounded-3xl bg-[var(--color-court-dark)] p-4 text-white shadow-[var(--shadow-lift)]">
