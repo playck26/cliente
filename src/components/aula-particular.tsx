@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Clock, MapPin, Wallet } from "lucide-react";
 import { TennisBallIcon } from "@/components/icons/tennis-ball-icon";
+import { PassoDeAdicionais } from "@/components/passo-de-adicionais";
 import { Button } from "@/components/ui/button";
 import {
   ApiError,
@@ -13,6 +14,7 @@ import {
   marcarAulaParticular,
   type HorarioDeAula,
   type HorariosDeAula,
+  type ItemDoPedido,
   type ProfessorParaAula,
 } from "@/lib/api-client";
 import { hojeNoClubeIso, isoDeOffsetNoClube } from "@/lib/fuso";
@@ -94,6 +96,10 @@ export function AulaParticular() {
   const [marcada, setMarcada] = useState(false);
 
   const [saldoCentavos, setSaldoCentavos] = useState<number | null>(null);
+  /** SPEC-054/D12 — o passo "Adicionais", depois do horário. */
+  const [adicionais, setAdicionais] = useState<ItemDoPedido[]>([]);
+  const [somaDosAdicionais, setSomaDosAdicionais] = useState(0);
+  const [chaveDosAdicionais, setChaveDosAdicionais] = useState(0);
 
   useEffect(() => {
     listarProfessoresParaAula()
@@ -119,6 +125,8 @@ export function AulaParticular() {
     setCarregandoGrade(true);
     setErroGrade(null);
     setSlot(null);
+    setAdicionais([]);
+    setSomaDosAdicionais(0);
     // O erro de marcar morre ao trocar de dia ou de professor. Sem esta linha
     // ele sobrevive, e "não foi possível marcar" de terça fica em cima da
     // grade de quarta — a correção que a revisão adversarial do
@@ -157,6 +165,7 @@ export function AulaParticular() {
         horaInicio: slot.horaInicio,
         horaFim: slot.horaFim,
         professorId: escolhido.id,
+        ...(adicionais.length > 0 ? { adicionais } : {}),
       });
       setMarcada(true);
       // A carteira mudou: a aula foi debitada. Reler evita a tela afirmar um
@@ -170,12 +179,24 @@ export function AulaParticular() {
           ? err.message
           : "Não foi possível marcar a aula.",
       );
+      // LIM-054j: a disponibilidade da tela não reserva — relê o que sobrou.
+      if (err instanceof ApiError && err.code === "ESTOQUE_ESGOTADO") {
+        setChaveDosAdicionais((c) => c + 1);
+      }
     } finally {
       setMarcando(false);
     }
   }
 
-  const precoCentavos = escolhido ? Math.round(escolhido.precoAula * 100) : 0;
+  /**
+   * SPEC-054/AC-008 — com adicional, o que sai da carteira é a aula **mais** os
+   * adicionais. O aviso de saldo usa esse total; com o preço só da aula ele
+   * diria "cabe" sobre uma aula que a carteira recusa.
+   */
+  const somaCentavos = slot ? Math.round(somaDosAdicionais * 100) : 0;
+  const precoCentavos = escolhido
+    ? Math.round(escolhido.precoAula * 100) + somaCentavos
+    : 0;
   const faltaCredito =
     saldoCentavos !== null && escolhido !== null && saldoCentavos < precoCentavos;
 
@@ -363,7 +384,7 @@ export function AulaParticular() {
           <Wallet className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <span>
             Seu saldo é {reais(saldoCentavos / 100)} e a aula custa{" "}
-            {reais(escolhido.precoAula)}. Faltam{" "}
+            {reais(precoCentavos / 100)}. Faltam{" "}
             {reais((precoCentavos - saldoCentavos) / 100)} —{" "}
             <Link href="/perfil" className="underline">
               veja sua carteira
@@ -478,6 +499,19 @@ export function AulaParticular() {
       </section>
 
       {slot ? (
+        <PassoDeAdicionais
+          data={data}
+          slots={[`${slot.horaInicio}-${slot.horaFim}`]}
+          chave={chaveDosAdicionais}
+          desabilitado={marcando}
+          onChange={(itens, soma) => {
+            setAdicionais(itens);
+            setSomaDosAdicionais(soma);
+          }}
+        />
+      ) : null}
+
+      {slot ? (
         <section className="space-y-3 rounded-3xl bg-surface p-4 shadow-[var(--shadow-lift)] ring-1 ring-border">
           <p className="flex items-center gap-2 text-sm font-semibold text-[var(--color-text-secondary)]">
             <Clock className="size-4 shrink-0" aria-hidden="true" />
@@ -488,15 +522,18 @@ export function AulaParticular() {
             {slot.quadraNome}
           </p>
           <p className="text-[22px] font-extrabold">
-            {reais(escolhido.precoAula)}
+            {reais(precoCentavos / 100)}
           </p>
           {/*
-            **O preço é o do professor, e inclui a quadra** (D5). A tela não
-            soma nada: somar aqui criaria um segundo cálculo de preço, e o que
-            a carteira debita é o que o servidor gravou.
+            **O preço é o do professor, e inclui a quadra** (SPEC-047/D5): a
+            tela não soma quadra. O que ela soma, desde a SPEC-054, são os
+            adicionais — a D6 exige o total antes de confirmar. O débito
+            continua sendo o que o servidor gravou.
           */}
           <p className="text-xs font-semibold text-[var(--color-text-secondary)]">
-            Valor da aula, quadra incluída.
+            {somaCentavos > 0
+              ? `Aula ${reais(escolhido.precoAula)} (quadra incluída) + adicionais ${reais(somaCentavos / 100)}.`
+              : "Valor da aula, quadra incluída."}
           </p>
 
           {erroMarcar ? (

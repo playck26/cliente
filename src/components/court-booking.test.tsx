@@ -30,6 +30,7 @@ const disponibilidade = vi.hoisted(() => vi.fn());
 const reservar = vi.hoisted(() => vi.fn());
 const configDePagamento = vi.hoisted(() => vi.fn());
 const carteira = vi.hoisted(() => vi.fn());
+const disponiveis = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/api-client", async () => {
   const real =
@@ -43,6 +44,7 @@ vi.mock("@/lib/api-client", async () => {
     createBooking: reservar,
     getPublicPaymentConfig: configDePagamento,
     getMinhaCarteira: carteira,
+    adicionaisDisponiveis: disponiveis,
   };
 });
 
@@ -89,6 +91,8 @@ beforeEach(() => {
   // R$ 500,00. A quadra custa R$ 120/h, entao um horario cabe com folga --
   // quem testa o caso sem saldo sobrescreve.
   carteira.mockResolvedValue({ saldoCentavos: 50_000, movimentos: [] });
+  // SPEC-054: clube sem adicional ativo é o caso dos testes anteriores.
+  disponiveis.mockResolvedValue([]);
 });
 
 /** Seleciona o horário e confirma — o caminho que todo caso percorre. */
@@ -245,5 +249,107 @@ describe("SPEC-048 — o saldo aparece ANTES", () => {
     // Repetir o saldo antigo aqui seria a tela afirmar um número que ela mesma
     // acabou de tornar falso.
     expect(screen.getByText(/Seu saldo agora é R\$\s*380,00/)).toBeInTheDocument();
+  });
+});
+
+/**
+ * SPEC-054/D12 — **o passo "Adicionais" na reserva de quadra.**
+ *
+ * Aparece depois da escolha do horário, e só se o clube tem adicional ativo. O
+ * adicional vale para CADA reserva do pedido (D6), e o total e o que sai da
+ * carteira têm de dizer o mesmo que o servidor vai debitar — para o aluno é
+ * tudo-ou-nada (`SALDO_INSUFICIENTE`).
+ */
+describe("SPEC-054 — adicionais na reserva de quadra", () => {
+  const RAQUETE = {
+    id: "ad-1",
+    tipoId: "t-1",
+    tipoNome: "Raquetes",
+    nome: "Raquete",
+    preco: 15,
+    disponivel: 3,
+  };
+
+  it("a disponibilidade só é pedida depois do horário, e para ele", async () => {
+    disponiveis.mockResolvedValue([RAQUETE]);
+    render(<CourtBooking id={QUADRA} />);
+    const horario = await screen.findByRole("button", { name: /10:00/ });
+    expect(disponiveis).not.toHaveBeenCalled();
+    fireEvent.click(horario);
+    await waitFor(() =>
+      expect(disponiveis).toHaveBeenCalledWith(expect.any(String), ["10:00-11:00"]),
+    );
+  });
+
+  it("2 raquetes entram no total e no que sai do saldo, e vão no pedido", async () => {
+    disponiveis.mockResolvedValue([RAQUETE]);
+    render(<CourtBooking id={QUADRA} />);
+    fireEvent.click(await screen.findByRole("button", { name: /10:00/ }));
+    const mais = await screen.findByRole("button", { name: "Mais Raquete" });
+    fireEvent.click(mais);
+    fireEvent.click(mais);
+
+    // R$ 120 da hora + 2 × R$ 15; saldo de R$ 500.
+    expect(await screen.findByText(/Ficam R\$\s*350,00/)).toBeInTheDocument();
+    expect(screen.getByText("R$ 150,00")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("Confirmar reserva"));
+    await waitFor(() => expect(reservar).toHaveBeenCalled());
+    const [dto] = reservar.mock.calls[0] as [{ adicionais?: unknown }];
+    expect(dto.adicionais).toEqual([{ adicionalId: "ad-1", quantidade: 2 }]);
+  });
+
+  it("D6: dois horários SEPARADOS são duas reservas — o adicional conta duas vezes", async () => {
+    disponiveis.mockResolvedValue([RAQUETE]);
+    disponibilidade.mockResolvedValue({
+      estado: "aberto",
+      slots: [
+        { slot: "10:00-11:00", status: "livre" },
+        { slot: "11:00-12:00", status: "ocupado_avulso" },
+        { slot: "15:00-16:00", status: "livre" },
+      ],
+    });
+    render(<CourtBooking id={QUADRA} />);
+    fireEvent.click(await screen.findByRole("button", { name: /10:00/ }));
+    fireEvent.click(screen.getByRole("button", { name: /15:00/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Mais Raquete" }));
+
+    // 2 × R$ 120 + 2 reservas × R$ 15 = R$ 270.
+    expect(await screen.findByText("R$ 270,00")).toBeInTheDocument();
+  });
+
+  it("sem escolha, o pedido não leva o campo", async () => {
+    disponiveis.mockResolvedValue([RAQUETE]);
+    render(<CourtBooking id={QUADRA} />);
+    fireEvent.click(await screen.findByRole("button", { name: /10:00/ }));
+    await screen.findByRole("button", { name: "Mais Raquete" });
+    fireEvent.click(screen.getByText("Confirmar reserva"));
+    await waitFor(() => expect(reservar).toHaveBeenCalled());
+    const [dto] = reservar.mock.calls[0] as [Record<string, unknown>];
+    expect("adicionais" in dto).toBe(false);
+  });
+
+  it("clube sem adicional ativo: o passo não aparece", async () => {
+    render(<CourtBooking id={QUADRA} />);
+    fireEvent.click(await screen.findByRole("button", { name: /10:00/ }));
+    await waitFor(() => expect(disponiveis).toHaveBeenCalled());
+    expect(screen.queryByText("Adicionais")).not.toBeInTheDocument();
+  });
+
+  it("LIM-054j: `409 ESTOQUE_ESGOTADO` mostra a mensagem e relê o que sobrou", async () => {
+    disponiveis.mockResolvedValue([RAQUETE]);
+    reservar.mockRejectedValue(
+      new ApiError(409, "Raquete esgotou neste horário.", "ESTOQUE_ESGOTADO"),
+    );
+    render(<CourtBooking id={QUADRA} />);
+    fireEvent.click(await screen.findByRole("button", { name: /10:00/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Mais Raquete" }));
+    const antes = disponiveis.mock.calls.length;
+    fireEvent.click(screen.getByText("Confirmar reserva"));
+
+    expect(await screen.findByText("Raquete esgotou neste horário.")).toBeInTheDocument();
+    await waitFor(() => expect(disponiveis.mock.calls.length).toBeGreaterThan(antes));
+    // O pedido continua montado: a pessoa ajusta e tenta de novo.
+    expect(screen.getByText("Confirmar reserva")).toBeInTheDocument();
   });
 });

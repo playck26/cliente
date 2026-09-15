@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NovaReserva } from "./nova-reserva";
 
 /**
@@ -21,6 +21,18 @@ vi.mock("@/components/aula-particular", () => ({
 }));
 vi.mock("@/components/top-app-bar", () => ({ TopAppBar: () => null }));
 vi.mock("@/components/bottom-nav", () => ({ BottomNav: () => null }));
+
+const lerNomesDeTipo = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/nomes-de-tipo", async () => {
+  const real =
+    await vi.importActual<typeof import("@/lib/nomes-de-tipo")>("@/lib/nomes-de-tipo");
+  return { ...real, lerNomesDeTipo };
+});
+
+beforeEach(() => {
+  lerNomesDeTipo.mockReset();
+  lerNomesDeTipo.mockResolvedValue({ quadra: "Quadra", aula: "Aula particular" });
+});
 
 describe("NovaReserva — SPEC-053/D3", () => {
   it("AC-004: sem tipo, mostra os dois cartões, cada um com o seu endereço", () => {
@@ -67,5 +79,35 @@ describe("NovaReserva — SPEC-053/D3", () => {
     expect(
       screen.getByRole("link", { name: /Trocar o tipo/ }),
     ).toHaveAttribute("href", "/reservas/nova");
+  });
+});
+
+/**
+ * SPEC-054/D1 e D12 — **o nome que o clube deu a cada tipo.**
+ *
+ * O gestor dá nome; não inventa regra. O endereço (`?tipo=quadra`) não muda —
+ * é o comportamento, que é código —, só o texto que o aluno lê.
+ */
+describe("NovaReserva — SPEC-054: os nomes do clube", () => {
+  it("os cartões usam os nomes configurados, com os mesmos endereços", async () => {
+    lerNomesDeTipo.mockResolvedValue({ quadra: "Espaço", aula: "Aula com professor" });
+    render(<NovaReserva tipo={null} />);
+
+    expect(await screen.findByRole("link", { name: /Espaço/ })).toHaveAttribute(
+      "href",
+      "/reservas/nova?tipo=quadra",
+    );
+    expect(
+      screen.getByRole("link", { name: /Aula com professor/ }),
+    ).toHaveAttribute("href", "/reservas/nova?tipo=aula");
+    expect(screen.queryByText("Aula particular")).not.toBeInTheDocument();
+  });
+
+  it("enquanto os nomes não chegam, os cartões já estão lá com os padrões", () => {
+    lerNomesDeTipo.mockReturnValue(new Promise(() => undefined));
+    render(<NovaReserva tipo={null} />);
+    // O nome é apresentação: o caminho que a pessoa veio buscar não espera por ele.
+    expect(screen.getByRole("link", { name: /Quadra/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Aula particular/ })).toBeInTheDocument();
   });
 });

@@ -11,6 +11,7 @@ import {
   WalletCards,
 } from "lucide-react";
 import { CapaDaQuadra } from "@/components/capa-da-quadra";
+import { ItensDaReserva } from "@/components/itens-da-reserva";
 import { CourtLines } from "@/components/court-lines";
 import { Button } from "@/components/ui/button";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -593,6 +594,12 @@ export function MyBookingsList({
                         </p>
                       </div>
                     </div>
+
+                    {/* SPEC-054/D12 — o que foi alugado junto, nas duas abas. */}
+                    <ItensDaReserva
+                      adicionais={booking.adicionais}
+                      className="mt-3 px-1"
+                    />
 
                     {/*
                       SPEC-041/AC-006 — **o grid inteiro some numa cancelada,
