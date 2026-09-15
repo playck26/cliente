@@ -717,8 +717,19 @@ export async function getAulasDoDia(
   return (await res.json()) as AulaDoDiaDoProfessor[];
 }
 
-export async function listMinhasTurmas(): Promise<MinhaTurma[]> {
-  const res = await authFetch("/me/teacher/classes");
+/**
+ * SPEC-056/D1 — `incluirInativas` traz também as turmas INATIVAS do professor
+ * com aula nos últimos 90 dias ou no futuro. **O back anterior à SPEC-056
+ * recusa o parâmetro com `400`** (`forbidNonWhitelisted`): back antes do Cliente.
+ */
+export async function listMinhasTurmas(
+  incluirInativas = false,
+): Promise<MinhaTurma[]> {
+  const res = await authFetch(
+    incluirInativas
+      ? "/me/teacher/classes?incluirInativas=true"
+      : "/me/teacher/classes",
+  );
   return (await res.json()) as MinhaTurma[];
 }
 

@@ -78,6 +78,14 @@ export function MinhaTurmaDetalheView({ id }: { id: string }) {
    * Efeito separado do da turma **de propósito**: trocar de página não deve
    * rebuscar a turma nem piscar o cabeçalho.
    */
+  /**
+   * SPEC-056/D3 — **a inativa pede 90 dias.** Ela entra no índice com aula nos
+   * últimos 90 dias; com 30, a aula de 60 dias atrás que a trouxe até aqui não
+   * estaria na lista. A ativa segue com 30. Antes de a turma chegar, 30 — e se
+   * ela vier inativa, a lista é pedida de novo com 90.
+   */
+  const dias = turma?.status === "inativa" ? 90 : 30;
+
   useEffect(() => {
     // Falha aqui não derruba a tela: a lista de alunos continua útil sem as
     // ocorrências, e a chamada é a parte que pode esperar um retry.
@@ -87,15 +95,26 @@ export function MinhaTurmaDetalheView({ id }: { id: string }) {
     // `react-hooks/set-state-in-effect` está certa, e desligá-la seria trocar
     // um aviso legítimo por conveniência — foi o que a SPEC-026 já decidiu na
     // agenda do professor.
-    listOcorrencias(id, 30, pagina)
+    // `atual` descarta a resposta de um pedido que já não vale: a de 30 dias
+    // pode chegar DEPOIS da de 90 e apagaria a lista da turma inativa.
+    let atual = true;
+    listOcorrencias(id, dias, pagina)
       .then((r) => {
+        if (!atual) return;
         setOcorrencias(r.data);
         setTotal(r.total);
         setTamanho(r.pageSize);
       })
-      .catch(() => setOcorrencias([]))
-      .finally(() => setOcorrenciasCarregando(false));
-  }, [id, pagina]);
+      .catch(() => {
+        if (atual) setOcorrencias([]);
+      })
+      .finally(() => {
+        if (atual) setOcorrenciasCarregando(false);
+      });
+    return () => {
+      atual = false;
+    };
+  }, [id, pagina, dias]);
 
   return (
     <div className="app-screen flex min-h-full flex-col bg-[var(--color-background)]">
@@ -124,7 +143,8 @@ export function MinhaTurmaDetalheView({ id }: { id: string }) {
               <CourtLines className="opacity-30" />
               <div className="relative z-10">
                 <p className="text-xs font-bold tracking-[0.14em] text-white/65 uppercase">
-                  Turma ativa
+                  {/* SPEC-056 — era "Turma ativa" fixo, até para turma inativa. */}
+                  {turma.status === "inativa" ? "Turma inativa" : "Turma ativa"}
                 </p>
                 <h1 className="mt-2 text-3xl leading-tight font-extrabold">
                   {turma.nome}
