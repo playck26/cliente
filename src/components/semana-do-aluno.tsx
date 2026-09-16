@@ -57,7 +57,25 @@ function rotuloCurto(iso: string): string {
   return `${dia}/${mes}`;
 }
 
-export function SemanaDoAluno({ aulas }: { aulas: MyClass[] }) {
+/**
+ * **SPEC-057/TASK-003 — `mostrarQuadra` existe por causa da home.**
+ *
+ * A home não escreve a palavra "quadra" (SPEC-053/AC-001, decisão 6 do
+ * Israel), e cada aula desta vista mostra o nome da quadra — que na primeira
+ * empresa real se chama "Quadra 1". Montar a semana lá reintroduziria a
+ * palavra que a 053 tirou.
+ *
+ * **Por prop, e não por edição:** a TASK-002 também mexe neste componente
+ * (drill down). Apagar a linha da quadra aqui tiraria informação de
+ * `/minhas-aulas`, onde ela é útil e permitida. O contexto decide.
+ */
+export function SemanaDoAluno({
+  aulas,
+  mostrarQuadra = true,
+}: {
+  aulas: MyClass[];
+  mostrarQuadra?: boolean;
+}) {
   const hoje = hojeNoClubeIso();
   const [domingo, setDomingo] = useState(() => domingoDaSemana(hoje));
 
@@ -194,13 +212,15 @@ export function SemanaDoAluno({ aulas }: { aulas: MyClass[] }) {
                           Aula não realizada
                         </p>
                       ) : null}
-                      <p className="mt-0.5 flex items-center gap-1.5 text-[12px] font-semibold text-[var(--color-text-secondary)]">
-                        <TennisCourtIcon
-                          className="size-3.5 shrink-0"
-                          aria-hidden="true"
-                        />
-                        <span className="truncate">{aula.quadraNome}</span>
-                      </p>
+                      {mostrarQuadra ? (
+                        <p className="mt-0.5 flex items-center gap-1.5 text-[12px] font-semibold text-[var(--color-text-secondary)]">
+                          <TennisCourtIcon
+                            className="size-3.5 shrink-0"
+                            aria-hidden="true"
+                          />
+                          <span className="truncate">{aula.quadraNome}</span>
+                        </p>
+                      ) : null}
                     </div>
                   ))
                 )}
