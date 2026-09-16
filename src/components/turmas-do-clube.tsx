@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { Check, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { NotaDaTurma } from "@/components/nota-da-turma";
 import {
   apareceParaMim,
   escondidosPeloFiltro,
@@ -12,11 +11,9 @@ import {
 import {
   ApiError,
   entrarNaTurma,
-  getMediaDaTurma,
   getMeuCadastro,
   listTurmasDisponiveis,
   sairDaTurma,
-  type MediaDaTurma,
   type TurmaDisponivel,
 } from "@/lib/api-client";
 import { AvisoDePrazo } from "@/components/aviso-de-prazo";
@@ -56,14 +53,6 @@ export function TurmasDoClube() {
   const [erro, setErro] = useState<string | null>(null);
   const [agindoEm, setAgindoEm] = useState<string | null>(null);
   /**
-   * SPEC-025 — a média de cada turma, buscada em paralelo depois da lista.
-   *
-   * Fora da lista de propósito: a média é informação **secundária**, e
-   * segurar a tela inteira esperando por ela faria a pessoa esperar mais
-   * para ver o que veio fazer. Turma sem média ainda não desenha estrela.
-   */
-  const [medias, setMedias] = useState<Record<string, MediaDaTurma>>({});
-  /**
    * SPEC-057/TASK-004 (card 5350) — o nível do aluno, para recortar a lista.
    *
    * **Buscado à parte e com falha tolerada**, como a média: o nível é
@@ -78,13 +67,20 @@ export function TurmasDoClube() {
     listTurmasDisponiveis()
       .then((lista) => {
         setTurmas(lista);
-        // Cada uma por sua conta: a falha de uma média não pode derrubar a
-        // lista, que é o que a pessoa veio ver.
-        for (const t of lista) {
-          void getMediaDaTurma(t.id)
-            .then((m) => setMedias((atual) => ({ ...atual, [t.id]: m })))
-            .catch(() => undefined);
-        }
+        /*
+          SPEC-057/TASK-002/D12 (card 5352) — **a nota saiu da tela do
+          aluno.** O card pede "ocultar nota da turma do usuário final e do
+          professor"; a SPEC-052 já tinha tirado do professor e deixado a do
+          aluno inalterada de propósito.
+
+          A busca saiu junto com o render: manter a chamada alimentando um
+          estado que ninguém lê seria uma ida à rede por turma, por nada.
+
+          **A rota `GET /me/classes/:id/avaliacao` continua existindo** — ela
+          é retirada só depois que este Cliente estiver no ar, que é a ordem
+          de uma contração (D12). O `PUT` de avaliar segue sendo do aluno: ele
+          avalia, o gestor lê.
+        */
       })
       .catch((e: unknown) =>
         setErro(
@@ -244,7 +240,7 @@ export function TurmasDoClube() {
                         {turma.nivelNome}
                       </p>
                     )}
-                    <NotaDaTurma media={medias[turma.id]} />
+
                   </div>
 
                   {turma.jaEstouNela && (

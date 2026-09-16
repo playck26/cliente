@@ -8,6 +8,7 @@ import { TennisCourtIcon } from "@/components/icons/tennis-court-icon";
 import { CourtLines } from "@/components/court-lines";
 import { TennisBallIcon } from "@/components/icons/tennis-ball-icon";
 import { SemanaDoAluno } from "@/components/semana-do-aluno";
+import { hojeNoClubeIso } from "@/lib/fuso";
 import {
   ApiError,
   avisarFalta,
@@ -91,6 +92,20 @@ export function MyClassesList() {
   const [error, setError] = useState<string | null>(null);
   /** SPEC-031: qual ocorrência está com ação em voo. Um por vez basta. */
   const [agindoEm, setAgindoEm] = useState<string | null>(null);
+  /**
+   * SPEC-057/TASK-002/D11 — **as aulas de semanas passadas, buscadas sob
+   * demanda.**
+   *
+   * `GET /me/classes` sem janela devolve o futuro, que é o que a LISTA
+   * mostra. Quando o aluno navega a semana para trás, a vista de semana pede
+   * a janela daquele intervalo — e o resultado **soma**, em vez de
+   * substituir: trocar apagaria as próximas aulas da lista ao lado.
+   *
+   * `Map` por `ocupacaoId` porque janelas vizinhas se sobrepõem, e a mesma
+   * aula não pode aparecer duas vezes no dia.
+   */
+  const [doPassado, setDoPassado] = useState<Map<string, MyClass>>(new Map());
+  const [janelasPedidas] = useState<Set<string>>(() => new Set());
   const { vista, irPara } = useVista();
 
   const carregar = useCallback(
@@ -110,6 +125,30 @@ export function MyClassesList() {
   useEffect(() => {
     void carregar().finally(() => setLoading(false));
   }, [carregar]);
+
+  /**
+   * **Só busca o que ainda não tem, e só para trás.** A janela do futuro já
+   * está em `aulas`; pedir de novo seria uma ida à rede para o mesmo dado.
+   */
+  const pedirJanela = useCallback(
+    (janela: { de: string; ate: string }) => {
+      const chave = `${janela.de}:${janela.ate}`;
+      if (janela.ate >= hojeNoClubeIso() || janelasPedidas.has(chave)) return;
+      janelasPedidas.add(chave);
+      void listMyClasses(janela)
+        .then((lista) => {
+          setDoPassado((atual) => {
+            const proximo = new Map(atual);
+            for (const aula of lista) proximo.set(aula.ocupacaoId, aula);
+            return proximo;
+          });
+        })
+        // Falha aqui não derruba a tela: a semana volta a mostrar "—", que é
+        // o que ela mostrava antes desta task.
+        .catch(() => undefined);
+    },
+    [janelasPedidas],
+  );
 
   /**
    * SPEC-031/REQ-006 — avisar que vai faltar, e desfazer.
@@ -268,7 +307,10 @@ export function MyClassesList() {
             </p>
           </section>
         ) : vista === "semana" ? (
-          <SemanaDoAluno aulas={aulas} />
+          <SemanaDoAluno
+            aulas={[...aulas, ...doPassado.values()]}
+            onJanela={pedirJanela}
+          />
         ) : (
           <section className="space-y-3" aria-label="Próximas aulas">
             {aulas.map((aula, index) => (

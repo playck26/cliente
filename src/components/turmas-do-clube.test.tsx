@@ -260,108 +260,44 @@ describe("estados vazios", () => {
  * O mínimo continua valendo — ele é de **privacidade** antes de estatística.
  * O que mudou é que a linha sempre aparece: sem média, ela diz o que falta.
  */
-describe("a nota da turma", () => {
-  it("mostra as estrelas e a média quando há nota", async () => {
+/**
+ * SPEC-057/TASK-002/D12 (card 5352) — **a nota saiu desta tela.**
+ *
+ * Havia aqui um bloco de seis provas sobre as estrelas: a média proporcional,
+ * o caso de uma avaliação só, a turma sem nota. Elas mediam comportamento que
+ * a SPEC-025 e a SPEC-028 construíram, e que **este card manda remover** —
+ * *"ocultar nota da turma do usuário final e do professor"*. A SPEC-052 já
+ * tinha tirado do professor.
+ *
+ * Elas **não foram apagadas em silêncio**: viraram a prova do contrário. O
+ * que estas duas guardam é que a nota não volta por descuido, e que a busca
+ * saiu junto com o desenho — manter a chamada alimentando um estado que
+ * ninguém lê seria uma ida à rede por turma, por nada.
+ *
+ * A regra da média em si (proporcional, a partir da primeira avaliação)
+ * continua provada em `nota-da-turma.test.tsx`, que é de quem a desenha.
+ */
+describe("SPEC-057/TASK-002 — a nota não aparece mais para o aluno", () => {
+  beforeEach(() => {
     listTurmasDisponiveis.mockResolvedValue([turma()]);
-    getMediaDaTurma.mockResolvedValue({
-      media: 4.3,
-      quantidade: 7,
-      minimoParaMedia: 3,
-    });
-    render(<TurmasDoClube />);
-
-    expect(
-      await screen.findByLabelText("Nota 4,3 de 5, em 7 avaliações"),
-    ).toBeInTheDocument();
-    expect(screen.getByText("4,3")).toBeInTheDocument();
-    expect(screen.getByText("(7)")).toBeInTheDocument();
   });
 
-  it("turma sem nenhuma avaliação diz isso, em vez de sumir", async () => {
-    // Ausência de estrela é dúvida; estrela vazia é informação.
-    listTurmasDisponiveis.mockResolvedValue([turma()]);
-    getMediaDaTurma.mockResolvedValue({
-      media: null,
-      quantidade: 0,
-      minimoParaMedia: 3,
-    });
+  it("nenhuma estrela, nenhuma média, nenhum `avaliações`", async () => {
     render(<TurmasDoClube />);
-
-    expect(await screen.findByText("Ainda sem avaliações")).toBeInTheDocument();
-    expect(screen.getByLabelText("Ainda sem nota")).toBeInTheDocument();
-  });
-
-  /**
-   * **SPEC-028 — estas duas provas foram INVERTIDAS, e o motivo fica junto.**
-   *
-   * Elas exigiam o contrário: que a média NÃO aparecesse com 2 avaliações, e
-   * que a tela dissesse "2 de 3 avaliações". Era o mínimo de 3 (D4 da
-   * SPEC-025), removido por decisão do Israel em 2026-08-30 — ele viu a tela e
-   * perguntou *"o que seria 2 de 3 aval?"*.
-   *
-   * Invertidas em vez de apagadas: quem abrir o `git log` daqui a seis meses
-   * vai encontrar uma prova que dizia o oposto, e precisa achar o porquê no
-   * mesmo lugar.
-   *
-   * **O que se perdeu:** o mínimo era privacidade. Com uma nota, a média É
-   * aquela nota. Sinalizado a ele antes; decisão dele.
-   */
-  it("com 2 avaliações, a média APARECE — antes era escondida", async () => {
-    listTurmasDisponiveis.mockResolvedValue([turma()]);
-    getMediaDaTurma.mockResolvedValue({ media: 4.5, quantidade: 2 });
-    render(<TurmasDoClube />);
-
-    expect(await screen.findByText("4,5")).toBeInTheDocument();
-    expect(screen.getByText("(2)")).toBeInTheDocument();
-    // E a contagem some do lugar onde ela fingia ser nota.
-    expect(screen.queryByText(/de 3 avaliações/)).not.toBeInTheDocument();
-  });
-
-  it("com UMA avaliação também — é o caso que custa a privacidade", async () => {
-    // Explícito de propósito: numa turma de dois alunos, esta média é a nota
-    // de um deles, e o professor sabe de quem. Está aqui para ninguém achar
-    // que foi descuido.
-    listTurmasDisponiveis.mockResolvedValue([turma()]);
-    getMediaDaTurma.mockResolvedValue({ media: 2, quantidade: 1 });
-    render(<TurmasDoClube />);
-
-    expect(await screen.findByText("2,0")).toBeInTheDocument();
-    expect(
-      screen.getByLabelText("Nota 2,0 de 5, em 1 avaliação"),
-    ).toBeInTheDocument();
-  });
-
-  it("as estrelas preenchem PROPORCIONALMENTE, não arredondado", async () => {
-    // O defeito anterior: `n <= Math.round(nota)` desenhava a MESMA imagem
-    // para 4,3 e 4,4. Agora a largura da fileira dourada é a nota / 5.
-    listTurmasDisponiveis.mockResolvedValue([turma()]);
-    getMediaDaTurma.mockResolvedValue({ media: 3.5, quantidade: 4 });
-    const { container } = render(<TurmasDoClube />);
-
-    await screen.findByText("3,5");
-    const dourada = container.querySelector<HTMLElement>("[style*='width']");
-    expect(dourada?.style.width).toBe("70%");
-  });
-
-  it("enquanto a média não chega, não desenha meia estrela", async () => {
-    // Meia estrela piscando é pior que esperar meio segundo.
-    listTurmasDisponiveis.mockResolvedValue([turma()]);
-    getMediaDaTurma.mockReturnValue(new Promise(() => undefined));
-    render(<TurmasDoClube />);
-
     await screen.findByText("Iniciantes");
-    expect(screen.queryByLabelText(/Nota/)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Ainda sem nota")).not.toBeInTheDocument();
+
+    expect(screen.queryByText(/avaliaç/i)).toBeNull();
+    expect(screen.queryByText(/^[0-5],[0-9]$/)).toBeNull();
+  });
+
+  it("e a tela não pede a média ao servidor", async () => {
+    render(<TurmasDoClube />);
+    await screen.findByText("Iniciantes");
+
+    expect(getMediaDaTurma).not.toHaveBeenCalled();
   });
 });
 
-/**
- * SPEC-057/TASK-004 (card 5350) — **"só as turmas do meu nível".**
- *
- * A regra mora em `lib/filtro-de-nivel.ts` e tem provas próprias; estas aqui
- * são da TELA: que ela pergunta o nível do aluno, oferece o escape, e escreve
- * o vazio certo.
- */
 describe("SPEC-057/TASK-004 — o recorte por nível", () => {
   const A = "nivel-a";
   const B = "nivel-b";
