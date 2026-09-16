@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { TennisCourtIcon } from "@/components/icons/tennis-court-icon";
 import { hojeNoClubeIso } from "@/lib/fuso";
@@ -72,9 +73,15 @@ function rotuloCurto(iso: string): string {
 export function SemanaDoAluno({
   aulas,
   mostrarQuadra = true,
+  mostrarLinkDaTurma = true,
 }: {
   aulas: MyClass[];
   mostrarQuadra?: boolean;
+  /**
+   * SPEC-057/TASK-002/D10 — a HOME monta esta vista sem destino para o
+   * clique (LIM-057h). Falso lá, verdadeiro em `/minhas-aulas`.
+   */
+  mostrarLinkDaTurma?: boolean;
 }) {
   const hoje = hojeNoClubeIso();
   const [domingo, setDomingo] = useState(() => domingoDaSemana(hoje));
@@ -196,11 +203,30 @@ export function SemanaDoAluno({
                 ) : (
                   doDia.map((aula) => (
                     <div key={aula.ocupacaoId} className="min-w-0">
+                      {/*
+                        **SPEC-057/TASK-002/D10 — a semana também leva à
+                        ficha.** Antes estes itens eram `<div>` sem clique
+                        nenhum: a vista mostrava a semana e terminava ali.
+
+                        `mostrarLinkDaTurma` existe porque a HOME monta este
+                        mesmo componente (SPEC-057/TASK-003), e lá o clique
+                        ainda não tem destino — LIM-057h. Contexto decide,
+                        como no nome da quadra.
+                      */}
                       <p
                         className={`truncate text-[14px] font-extrabold ${aula.naoRealizada ? "text-[var(--color-text-secondary)] line-through" : "text-[var(--color-text-primary)]"}`}
                       >
                         {aula.horaInicio}–{aula.horaFim} ·{" "}
-                        {aula.turmaNome ?? "Turma"}
+                        {mostrarLinkDaTurma ? (
+                          <Link
+                            href={`/minhas-aulas/turma/${aula.turmaId}`}
+                            className="hover:underline"
+                          >
+                            {aula.turmaNome ?? "Turma"}
+                          </Link>
+                        ) : (
+                          (aula.turmaNome ?? "Turma")
+                        )}
                       </p>
                       {/* SPEC-030 / achado 1 da 2ª validação cruzada — esta
                           vista ignorava `naoRealizada` e mostrava a aula

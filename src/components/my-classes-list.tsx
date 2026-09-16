@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { CalendarDays, CalendarRange, Clock, List } from "lucide-react";
 import { TennisCourtIcon } from "@/components/icons/tennis-court-icon";
@@ -280,8 +281,24 @@ export function MyClassesList() {
                     <p className="text-[11px] font-extrabold tracking-[0.14em] text-[var(--color-primary-strong)] uppercase">
                       {formatarData(aula.data)} • {aula.horaInicio}
                     </p>
+                    {/*
+                      **SPEC-057/TASK-002/D10 — daqui se chega à turma.**
+                      O card pede *"clicar para ver sua turma"*, e o nome é o
+                      alvo natural: é o que a pessoa lê para saber de que
+                      turma se trata.
+
+                      **Link no NOME, e não no cartão inteiro**, porque o
+                      cartão já tem ação própria ("Vou faltar"). Cartão
+                      clicável com botão dentro é a armadilha clássica: o
+                      toque no botão vira navegação em metade das vezes.
+                    */}
                     <h2 className="mt-1 truncate text-[19px] font-extrabold text-[var(--color-text-primary)]">
-                      {aula.turmaNome ?? "Turma"}
+                      <Link
+                        href={`/minhas-aulas/turma/${aula.turmaId}`}
+                        className="hover:underline"
+                      >
+                        {aula.turmaNome ?? "Turma"}
+                      </Link>
                     </h2>
                     <p className="mt-1 flex items-center gap-1.5 text-[13px] font-semibold text-[var(--color-text-secondary)]">
                       <TennisCourtIcon

@@ -1371,7 +1371,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        get: operations["MeClassesController_minhaTurma"];
         put?: never;
         post: operations["MeClassesController_entrar"];
         delete: operations["MeClassesController_sair"];
@@ -3329,6 +3329,25 @@ export interface components {
             message: string;
             /** @example 2 */
             horasExigidas?: number;
+        };
+        ColegaDeTurmaResponseDto: {
+            /** @example João Silva */
+            nome: string;
+            nivelNome: string | null;
+            souEu: boolean;
+        };
+        TurmaDoAlunoDetalheResponseDto: {
+            /** Format: uuid */
+            id: string;
+            nome: string;
+            /** @enum {string} */
+            status: "ativa" | "inativa";
+            capacidade: number;
+            encontros: components["schemas"]["TurmaEncontroResponseDto"][];
+            quadraNome: string;
+            nivelNome: string | null;
+            professorNome: string | null;
+            colegas: components["schemas"]["ColegaDeTurmaResponseDto"][];
         };
         AulaAnteriorResponseDto: {
             /** Format: uuid */
@@ -6530,7 +6549,12 @@ export interface operations {
     };
     MeClassesController_myUpcomingClasses: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description AAAA-MM-DD */
+                de?: string;
+                /** @description AAAA-MM-DD */
+                ate?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -6562,6 +6586,27 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TurmaDisponivelResponseDto"][];
+                };
+            };
+        };
+    };
+    MeClassesController_minhaTurma: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TurmaDoAlunoDetalheResponseDto"];
                 };
             };
         };

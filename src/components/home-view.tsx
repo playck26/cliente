@@ -134,7 +134,11 @@ export function HomeView() {
           o nome da quadra.
         */}
         {!loading && !error && ehAluno && !agendaIndisponivel ? (
-          <SemanaDoAluno aulas={aulas} mostrarQuadra={false} />
+          <SemanaDoAluno
+            aulas={aulas}
+            mostrarQuadra={false}
+            mostrarLinkDaTurma={false}
+          />
         ) : null}
 
         <section className="relative overflow-hidden rounded-3xl bg-[var(--color-court-dark)] p-5 text-white shadow-[var(--shadow-lift)]">
