@@ -5,9 +5,15 @@ import { Check, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NotaDaTurma } from "@/components/nota-da-turma";
 import {
+  apareceParaMim,
+  escondidosPeloFiltro,
+  filtroFazSentido,
+} from "@/lib/filtro-de-nivel";
+import {
   ApiError,
   entrarNaTurma,
   getMediaDaTurma,
+  getMeuCadastro,
   listTurmasDisponiveis,
   sairDaTurma,
   type MediaDaTurma,
@@ -57,6 +63,16 @@ export function TurmasDoClube() {
    * para ver o que veio fazer. Turma sem média ainda não desenha estrela.
    */
   const [medias, setMedias] = useState<Record<string, MediaDaTurma>>({});
+  /**
+   * SPEC-057/TASK-004 (card 5350) — o nível do aluno, para recortar a lista.
+   *
+   * **Buscado à parte e com falha tolerada**, como a média: o nível é
+   * informação de recorte, não o conteúdo. Se `/me/cadastro` cair, a tela
+   * mostra **tudo** — errar mostrando demais é recuperável; errar escondendo
+   * faria o clube parecer vazio.
+   */
+  const [meuNivelId, setMeuNivelId] = useState<string | null>(null);
+  const [verTodas, setVerTodas] = useState(false);
 
   const carregar = () =>
     listTurmasDisponiveis()
@@ -80,6 +96,9 @@ export function TurmasDoClube() {
       .finally(() => setCarregando(false));
 
   useEffect(() => {
+    void getMeuCadastro()
+      .then((cadastro) => setMeuNivelId(cadastro.nivelId))
+      .catch(() => undefined);
     void carregar();
     // `carregar` fora das dependencias de proposito: ela e recriada a cada
     // render e entraria em laco. E o mesmo padrao das outras listas deste
@@ -117,6 +136,12 @@ export function TurmasDoClube() {
     );
   }
 
+  const ofereceFiltro = filtroFazSentido(turmas, meuNivelId);
+  const visiveis = turmas.filter((t) =>
+    apareceParaMim(t, meuNivelId, verTodas),
+  );
+  const escondidas = escondidosPeloFiltro(turmas, meuNivelId, verTodas);
+
   return (
     <div className="space-y-4 px-5">
       {/* SPEC-031/REQ-002 — o prazo aparece ANTES do toque. Sem isto a regra
@@ -133,15 +158,62 @@ export function TurmasDoClube() {
         </p>
       )}
 
+      {/*
+        **O filtro só aparece quando muda alguma coisa** (`filtroFazSentido`):
+        num clube sem nivelamento, ou para o aluno que ainda não foi
+        classificado, ele seria um interruptor que não acende luz — e ocupa
+        espaço numa tela de 390px.
+      */}
+      {ofereceFiltro && (
+        <div
+          className="flex gap-2"
+          role="group"
+          aria-label="Filtrar turmas por nível"
+        >
+          {[
+            { rotulo: "Meu nível", ativo: !verTodas, valor: false },
+            { rotulo: "Todas", ativo: verTodas, valor: true },
+          ].map(({ rotulo, ativo, valor }) => (
+            <button
+              key={rotulo}
+              type="button"
+              aria-pressed={ativo}
+              onClick={() => setVerTodas(valor)}
+              className={`min-h-9 rounded-full px-4 text-[13px] font-extrabold transition-colors ${
+                ativo
+                  ? "bg-[var(--color-primary-strong)] text-white"
+                  : "bg-surface text-[var(--color-text-secondary)] ring-1 ring-border"
+              }`}
+            >
+              {rotulo}
+            </button>
+          ))}
+        </div>
+      )}
+
       {turmas.length === 0 ? (
         <section className="rounded-3xl bg-surface p-6 text-center shadow-[var(--shadow-low)] ring-1 ring-border">
           <p className="text-[13px] font-bold text-[var(--color-text-secondary)]">
             Este clube ainda não tem turmas cadastradas.
           </p>
         </section>
+      ) : visiveis.length === 0 ? (
+        /*
+          **Vazio do recorte ≠ clube sem turma.** A primeira frase tem saída
+          (o botão "Todas"); a segunda não tem. Escrever a segunda no lugar
+          da primeira faria o aluno achar que o clube não tem turma nenhuma.
+        */
+        <section className="rounded-3xl bg-surface p-6 text-center shadow-[var(--shadow-low)] ring-1 ring-border">
+          <p className="text-[13px] font-bold text-[var(--color-text-secondary)]">
+            Nenhuma turma do seu nível por enquanto.
+            {escondidas > 0
+              ? ` Toque em "Todas" para ver as outras ${escondidas === 1 ? "turma" : "turmas"} do clube.`
+              : ""}
+          </p>
+        </section>
       ) : (
         <section className="space-y-3" aria-label="Turmas do clube">
-          {turmas.map((turma) => {
+          {visiveis.map((turma) => {
             const lotada = turma.matriculados >= turma.capacidade;
             const ocupado = turma.capacidade
               ? Math.min(100, (turma.matriculados / turma.capacidade) * 100)
@@ -165,6 +237,11 @@ export function TurmasDoClube() {
                               `${DIAS[encontro.diaSemana]} ${encontro.horaInicio}`,
                           )
                           .join(" · ")}
+                      </p>
+                    )}
+                    {turma.nivelNome && (
+                      <p className="mt-0.5 text-[12px] font-extrabold text-[var(--color-primary-strong)]">
+                        {turma.nivelNome}
                       </p>
                     )}
                     <NotaDaTurma media={medias[turma.id]} />

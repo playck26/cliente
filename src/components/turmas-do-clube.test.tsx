@@ -12,6 +12,7 @@ import { ApiError } from "@/lib/api-client";
  */
 
 const listTurmasDisponiveis = vi.hoisted(() => vi.fn());
+const getMeuCadastro = vi.hoisted(() => vi.fn());
 const getMediaDaTurma = vi.hoisted(() => vi.fn());
 const entrarNaTurma = vi.hoisted(() => vi.fn());
 const sairDaTurma = vi.hoisted(() => vi.fn());
@@ -24,6 +25,7 @@ vi.mock("@/lib/api-client", async () => {
   return {
     ...real,
     listTurmasDisponiveis,
+    getMeuCadastro,
     getMediaDaTurma,
     entrarNaTurma,
     sairDaTurma,
@@ -41,12 +43,18 @@ function turma(patch: Record<string, unknown> = {}) {
     podeEntrar: true,
     motivo: null,
     encontros: [{ diaSemana: 2, horaInicio: "18:00", horaFim: "19:00" }],
+    nivelId: null,
+    nivelNome: null,
     ...patch,
   };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // SPEC-057/TASK-004 — a tela passou a perguntar o nível do aluno. Padrão
+  // SEM nível: é o estado da maioria em produção, e nele o recorte não
+  // esconde nada — as provas antigas continuam medindo o que mediam.
+  getMeuCadastro.mockResolvedValue({ nivelId: null });
   getMediaDaTurma.mockResolvedValue({
     media: null,
     quantidade: 0,
@@ -344,5 +352,134 @@ describe("a nota da turma", () => {
     await screen.findByText("Iniciantes");
     expect(screen.queryByLabelText(/Nota/)).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Ainda sem nota")).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * SPEC-057/TASK-004 (card 5350) — **"só as turmas do meu nível".**
+ *
+ * A regra mora em `lib/filtro-de-nivel.ts` e tem provas próprias; estas aqui
+ * são da TELA: que ela pergunta o nível do aluno, oferece o escape, e escreve
+ * o vazio certo.
+ */
+describe("SPEC-057/TASK-004 — o recorte por nível", () => {
+  const A = "nivel-a";
+  const B = "nivel-b";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getMediaDaTurma.mockRejectedValue(new Error("sem média"));
+    getMeuCadastro.mockResolvedValue({ nivelId: A });
+  });
+
+  it("AC-023: por padrão, some a turma de outro nível", async () => {
+    listTurmasDisponiveis.mockResolvedValue([
+      turma({ id: "t1", nome: "Do meu nível", nivelId: A, nivelNome: "A" }),
+      turma({ id: "t2", nome: "De outro nível", nivelId: B, nivelNome: "B" }),
+    ]);
+
+    render(<TurmasDoClube />);
+
+    expect(await screen.findByText("Do meu nível")).toBeInTheDocument();
+    expect(screen.queryByText("De outro nível")).toBeNull();
+  });
+
+  it("AC-023: e o nível da turma aparece no cartão", async () => {
+    listTurmasDisponiveis.mockResolvedValue([
+      turma({ nivelId: A, nivelNome: "Iniciante" }),
+    ]);
+
+    render(<TurmasDoClube />);
+
+    expect(await screen.findByText("Iniciante")).toBeInTheDocument();
+  });
+
+  it("AC-025: `Ver todas` revela o que o recorte escondeu", async () => {
+    listTurmasDisponiveis.mockResolvedValue([
+      turma({ id: "t1", nome: "Do meu nível", nivelId: A, nivelNome: "A" }),
+      turma({ id: "t2", nome: "De outro nível", nivelId: B, nivelNome: "B" }),
+    ]);
+
+    render(<TurmasDoClube />);
+    await screen.findByText("Do meu nível");
+
+    fireEvent.click(screen.getByRole("button", { name: /Todas/ }));
+
+    expect(await screen.findByText("De outro nível")).toBeInTheDocument();
+  });
+
+  /** **INV-141** — o caso da maioria dos alunos hoje. */
+  it("AC-024: aluno SEM nível vê tudo, e o filtro nem aparece", async () => {
+    getMeuCadastro.mockResolvedValue({ nivelId: null });
+    listTurmasDisponiveis.mockResolvedValue([
+      turma({ id: "t1", nome: "Do nível A", nivelId: A, nivelNome: "A" }),
+      turma({ id: "t2", nome: "Do nível B", nivelId: B, nivelNome: "B" }),
+    ]);
+
+    render(<TurmasDoClube />);
+
+    expect(await screen.findByText("Do nível A")).toBeInTheDocument();
+    expect(screen.getByText("Do nível B")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Todas/ })).toBeNull();
+  });
+
+  it("AC-024: turma SEM nível aparece para quem tem nível", async () => {
+    listTurmasDisponiveis.mockResolvedValue([
+      turma({ id: "t1", nome: "Sem nivelamento", nivelId: null }),
+      turma({ id: "t2", nome: "De outro nível", nivelId: B, nivelNome: "B" }),
+    ]);
+
+    render(<TurmasDoClube />);
+
+    expect(await screen.findByText("Sem nivelamento")).toBeInTheDocument();
+    expect(screen.queryByText("De outro nível")).toBeNull();
+  });
+
+  /**
+   * **AC-025 — o vazio tem de dizer a verdade.** "Nenhuma turma do seu nível"
+   * e "o clube não tem turma" são coisas diferentes, e só a primeira tem
+   * saída.
+   */
+  it("AC-025: vazio do filtro é diferente de clube sem turma", async () => {
+    listTurmasDisponiveis.mockResolvedValue([
+      turma({ id: "t2", nome: "De outro nível", nivelId: B, nivelNome: "B" }),
+    ]);
+
+    render(<TurmasDoClube />);
+
+    expect(
+      await screen.findByText(/Nenhuma turma do seu nível/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/ainda não tem turmas cadastradas/),
+    ).toBeNull();
+  });
+
+  it("clube sem turma nenhuma continua com a mensagem de sempre", async () => {
+    listTurmasDisponiveis.mockResolvedValue([]);
+
+    render(<TurmasDoClube />);
+
+    expect(
+      await screen.findByText(/ainda não tem turmas cadastradas/),
+    ).toBeInTheDocument();
+  });
+
+  /**
+   * **O filtro não pode derrubar a tela.** O nível é informação secundária:
+   * se `/me/cadastro` falhar, a lista continua — sem recorte, que é o
+   * comportamento seguro (mostra mais, não menos).
+   */
+  it("falha ao ler o cadastro: a lista aparece inteira, sem filtro", async () => {
+    getMeuCadastro.mockRejectedValue(new Error("rede"));
+    listTurmasDisponiveis.mockResolvedValue([
+      turma({ id: "t1", nome: "Do nível A", nivelId: A, nivelNome: "A" }),
+      turma({ id: "t2", nome: "Do nível B", nivelId: B, nivelNome: "B" }),
+    ]);
+
+    render(<TurmasDoClube />);
+
+    expect(await screen.findByText("Do nível A")).toBeInTheDocument();
+    expect(screen.getByText("Do nível B")).toBeInTheDocument();
   });
 });

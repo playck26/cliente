@@ -15,6 +15,7 @@ import { MinhasReposicoes } from "./minhas-reposicoes";
  * sobre dados reais.
  */
 const getMeuCreditoDeReposicao = vi.hoisted(() => vi.fn());
+const getMeuCadastro = vi.hoisted(() => vi.fn());
 const listarOportunidadesDeReposicao = vi.hoisted(() => vi.fn());
 const marcarReposicao = vi.hoisted(() => vi.fn());
 const desmarcarReposicao = vi.hoisted(() => vi.fn());
@@ -27,6 +28,7 @@ vi.mock("@/lib/api-client", async () => {
   return {
     ...real,
     getMeuCreditoDeReposicao,
+    getMeuCadastro,
     listarOportunidadesDeReposicao,
     marcarReposicao,
     desmarcarReposicao,
@@ -72,6 +74,10 @@ const oportunidade = {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // SPEC-057/TASK-004 — a tela passou a perguntar o nível do aluno. Padrão
+  // SEM nível: nele o recorte não esconde nada, e as provas antigas
+  // continuam medindo exatamente o que mediam.
+  getMeuCadastro.mockResolvedValue({ nivelId: null });
   getMeuCreditoDeReposicao.mockResolvedValue(credito());
   listarOportunidadesDeReposicao.mockResolvedValue([oportunidade]);
 });
@@ -228,5 +234,83 @@ describe("SPEC-046 — aulas para repor", () => {
     expect(
       await screen.findByText(/Você já usou 2 de 2 reposições deste mês/),
     ).toBeInTheDocument();
+  });
+});
+
+/**
+ * SPEC-057/TASK-004/AC-026 — **o filtro de nível não pode esconder um
+ * direito pago.**
+ *
+ * O veredito independente da SPEC-057 levantou este caso e ele virou prova:
+ * aluno de nível A, **um crédito na mão**, e a única vaga do clube numa turma
+ * de nível B. Filtrar é exibição — o crédito continua lá, o escape revela a
+ * vaga, e o `POST` nunca ganhou recusa por nível.
+ */
+describe("SPEC-057/TASK-004 — nível nas oportunidades (AC-026)", () => {
+  const A = "nivel-a";
+  const B = "nivel-b";
+
+  const abrirEscolha = async () => {
+    render(<MinhasReposicoes />);
+    fireEvent.click(await screen.findByText("Repor"));
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getMeuCadastro.mockResolvedValue({ nivelId: A });
+    getMeuCreditoDeReposicao.mockResolvedValue(credito());
+  });
+
+  it("a única vaga é de OUTRO nível: a tela diz isso, e não `sem vaga`", async () => {
+    listarOportunidadesDeReposicao.mockResolvedValue([
+      { ...oportunidade, nivelId: B, nivelNome: "Avançado" },
+    ]);
+
+    await abrirEscolha();
+
+    expect(
+      await screen.findByText(/Nenhum horário do seu nível/),
+    ).toBeInTheDocument();
+    // A frase antiga mentiria: há vaga, ela só não é do nível dele.
+    expect(
+      screen.queryByText(/Nenhuma turma com vaga nos próximos dias/),
+    ).toBeNull();
+  });
+
+  it("`Todas` revela a vaga, e ela continua marcável", async () => {
+    listarOportunidadesDeReposicao.mockResolvedValue([
+      { ...oportunidade, nivelId: B, nivelNome: "Avançado" },
+    ]);
+    marcarReposicao.mockResolvedValue(undefined);
+
+    await abrirEscolha();
+    fireEvent.click(await screen.findByRole("button", { name: "Todas" }));
+
+    expect(await screen.findByText("Iniciante Quinta")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Marcar"));
+    await waitFor(() => {
+      expect(marcarReposicao).toHaveBeenCalledWith("f-1", "oc-9");
+    });
+  });
+
+  it("do meu nível: aparece sem precisar do escape", async () => {
+    listarOportunidadesDeReposicao.mockResolvedValue([
+      { ...oportunidade, nivelId: A, nivelNome: "Iniciante" },
+    ]);
+
+    await abrirEscolha();
+
+    expect(await screen.findByText("Iniciante Quinta")).toBeInTheDocument();
+  });
+
+  it("sem nível nenhum nas opções, o filtro não aparece", async () => {
+    listarOportunidadesDeReposicao.mockResolvedValue([
+      { ...oportunidade, nivelId: null, nivelNome: null },
+    ]);
+
+    await abrirEscolha();
+
+    expect(await screen.findByText("Iniciante Quinta")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Todas" })).toBeNull();
   });
 });

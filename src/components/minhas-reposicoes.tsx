@@ -2,6 +2,12 @@
 
 import { useEffect, useState } from "react";
 import {
+  apareceParaMim,
+  escondidosPeloFiltro,
+  filtroFazSentido,
+} from "@/lib/filtro-de-nivel";
+import {
+  getMeuCadastro,
   ApiError,
   desmarcarReposicao,
   getMeuCreditoDeReposicao,
@@ -115,6 +121,21 @@ export function MinhasReposicoes() {
   const [escolhendo, setEscolhendo] = useState<string | null>(null);
   const [opcoes, setOpcoes] = useState<OportunidadeDeReposicao[] | null>(null);
   const [ocupada, setOcupada] = useState(false);
+  /**
+   * SPEC-057/TASK-004 (card 5350) — **o mesmo recorte da lista de turmas.**
+   *
+   * Esta lista é a que mais confunde: ela traz ocorrências de **todas** as
+   * turmas ativas do clube das quais o aluno não participa.
+   *
+   * **E é a que mais exige cuidado**, porque aqui há um direito já pago: o
+   * crédito de reposição. O veredito independente da SPEC-057 levantou
+   * exatamente este caso — aluno de nível A, crédito na mão, e a única vaga
+   * numa turma de nível B. Por isso o escape ("Todas") vale aqui igual, e
+   * **filtrar não consome, não expira e não bloqueia** nada: o `POST`
+   * continua aceitando a vaga escondida (D16).
+   */
+  const [meuNivelId, setMeuNivelId] = useState<string | null>(null);
+  const [verTodas, setVerTodas] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
   async function recarregar() {
@@ -122,6 +143,12 @@ export function MinhasReposicoes() {
   }
 
   useEffect(() => {
+    // Falha tolerada, como na lista de turmas: sem o nível a tela mostra
+    // TUDO. Errar mostrando demais é recuperável; esconder uma vaga de um
+    // crédito pago não é.
+    void getMeuCadastro()
+      .then((cadastro) => setMeuNivelId(cadastro.nivelId))
+      .catch(() => undefined);
     let ativo = true;
     getMeuCreditoDeReposicao()
       .then((d) => {
@@ -189,6 +216,11 @@ export function MinhasReposicoes() {
     }
   }
 
+  const visiveis = (opcoes ?? []).filter((o) =>
+    apareceParaMim(o, meuNivelId, verTodas),
+  );
+  const escondidas = escondidosPeloFiltro(opcoes ?? [], meuNivelId, verTodas);
+
   return (
     <section className="rounded-3xl bg-surface p-4 shadow-[var(--shadow-low)] ring-1 ring-border">
       <div className="flex items-baseline justify-between gap-3">
@@ -249,6 +281,33 @@ export function MinhasReposicoes() {
             </button>
           </div>
 
+          {opcoes !== null && filtroFazSentido(opcoes, meuNivelId) && (
+            <div
+              className="mt-2 flex gap-2"
+              role="group"
+              aria-label="Filtrar horários por nível"
+            >
+              {[
+                { rotulo: "Meu nível", ativo: !verTodas, valor: false },
+                { rotulo: "Todas", ativo: verTodas, valor: true },
+              ].map(({ rotulo, ativo, valor }) => (
+                <button
+                  key={rotulo}
+                  type="button"
+                  aria-pressed={ativo}
+                  onClick={() => setVerTodas(valor)}
+                  className={`min-h-8 rounded-full px-3 text-[12px] font-extrabold transition-colors ${
+                    ativo
+                      ? "bg-[var(--color-primary-strong)] text-white"
+                      : "bg-surface text-[var(--color-text-secondary)] ring-1 ring-border"
+                  }`}
+                >
+                  {rotulo}
+                </button>
+              ))}
+            </div>
+          )}
+
           {opcoes === null ? (
             <p className="mt-2 text-[12px] text-[var(--color-text-secondary)]">
               Carregando...
@@ -260,9 +319,20 @@ export function MinhasReposicoes() {
               Nenhuma turma com vaga nos próximos dias. Tente de novo mais
               tarde.
             </p>
+          ) : visiveis.length === 0 ? (
+            /*
+              **O crédito não pode sumir atrás do filtro.** Há vaga; ela só
+              não é do nível dele. Dizer "nenhuma turma com vaga" aqui seria a
+              tela escondendo um direito que o aluno já pagou.
+            */
+            <p className="mt-2 text-[12px] text-[var(--color-text-secondary)]">
+              Nenhum horário do seu nível. Toque em &ldquo;Todas&rdquo; para
+              ver {escondidas === 1 ? "o outro horário" : "os outros horários"}{" "}
+              com vaga.
+            </p>
           ) : (
             <ul className="mt-2">
-              {opcoes.map((o) => (
+              {visiveis.map((o) => (
                 <li
                   key={o.ocupacaoId}
                   className="flex items-center justify-between gap-2 border-b border-border py-2 last:border-b-0"
@@ -274,6 +344,7 @@ export function MinhasReposicoes() {
                     <p className="truncate text-[12px] text-[var(--color-text-secondary)]">
                       {diaEHora(o.data, o.horaInicio)} · {o.quadraNome} ·{" "}
                       {o.vagas === 1 ? "1 vaga" : `${o.vagas} vagas`}
+                      {o.nivelNome ? ` · ${o.nivelNome}` : ""}
                     </p>
                   </div>
                   <button
