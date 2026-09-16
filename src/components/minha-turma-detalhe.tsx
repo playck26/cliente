@@ -50,10 +50,17 @@ export function MinhaTurmaDetalheView({ id }: { id: string }) {
   const [total, setTotal] = useState(0);
   const [tamanho, setTamanho] = useState(20);
   const [ocorrenciasCarregando, setOcorrenciasCarregando] = useState(true);
+  const [erroDeOcorrencias, setErroDeOcorrencias] = useState(false);
+  const [tentativa, setTentativa] = useState(0);
 
   const trocarPagina = (nova: number) => {
     setOcorrenciasCarregando(true);
     setPagina(nova);
+  };
+
+  const tentarDeNovo = () => {
+    setOcorrenciasCarregando(true);
+    setTentativa((n) => n + 1);
   };
 
   useEffect(() => {
@@ -104,9 +111,16 @@ export function MinhaTurmaDetalheView({ id }: { id: string }) {
         setOcorrencias(r.data);
         setTotal(r.total);
         setTamanho(r.pageSize);
+        setErroDeOcorrencias(false);
       })
       .catch(() => {
-        if (atual) setOcorrencias([]);
+        if (!atual) return;
+        setOcorrencias([]);
+        // DEF-033 — a falha precisa APARECER. Antes, o `catch` esvaziava a
+        // lista e a tela dizia a mesma coisa que diria para uma turma sem
+        // aula nenhuma: nada. Quem via a ficha muda não tinha como saber se
+        // era para tentar de novo.
+        setErroDeOcorrencias(true);
       })
       .finally(() => {
         if (atual) setOcorrenciasCarregando(false);
@@ -114,7 +128,7 @@ export function MinhaTurmaDetalheView({ id }: { id: string }) {
     return () => {
       atual = false;
     };
-  }, [id, pagina, dias]);
+  }, [id, pagina, dias, tentativa]);
 
   return (
     <div className="app-screen flex min-h-full flex-col bg-[var(--color-background)]">
@@ -198,9 +212,41 @@ export function MinhaTurmaDetalheView({ id }: { id: string }) {
               </div>
             </section>
 
-            {ocorrencias.length > 0 ? (
+            {/*
+              **DEF-033 — a ficha não pode ficar muda.** No teste em aparelho
+              da SPEC-056 a turma inativa abriu com o cabeçalho e "Alunos
+              (0/4)", e NADA entre os dois: o bloco inteiro era
+              `ocorrencias.length > 0 ? … : null`, então "esta turma não tem
+              aula na janela" e "a busca falhou" tinham a mesma aparência —
+              nenhuma. O cabeçalho agora fica sempre, e a tela diz qual dos
+              três casos é: carregando, falhou (com nova tentativa), vazio
+              (dizendo a janela, que é 90 dias na turma inativa e 30 na ativa
+              — a diferença muda o que "nenhuma aula" significa).
+            */}
+            <h2 className="text-lg font-extrabold">Aulas e chamadas</h2>
+
+            {erroDeOcorrencias ? (
+              <div
+                role="alert"
+                className="flex flex-wrap items-center gap-3 rounded-2xl bg-surface px-4 py-3 text-[13px] font-bold text-[var(--color-text-secondary)] ring-1 ring-border"
+              >
+                <span>Não foi possível carregar as aulas.</span>
+                <button
+                  type="button"
+                  onClick={tentarDeNovo}
+                  className="rounded-full bg-[var(--color-primary-strong)] px-3 py-1 text-[13px] font-bold text-white"
+                >
+                  Tentar de novo
+                </button>
+              </div>
+            ) : ocorrencias.length === 0 ? (
+              ocorrenciasCarregando ? null : (
+                <p className="text-sm text-[var(--color-text-secondary)]">
+                  {`Nenhuma aula nos últimos ${dias} dias.`}
+                </p>
+              )
+            ) : (
               <>
-                <h2 className="text-lg font-extrabold">Aulas e chamadas</h2>
                 <ul className="flex flex-col gap-2">
                   {ocorrencias.map((o) => {
                     const conteudo = (
@@ -282,7 +328,7 @@ export function MinhaTurmaDetalheView({ id }: { id: string }) {
                   rotulo="aulas e chamadas"
                 />
               </>
-            ) : null}
+            )}
 
             <h2 className="text-lg font-extrabold">
               Alunos ({turma.alunos.length}/{turma.capacidade})

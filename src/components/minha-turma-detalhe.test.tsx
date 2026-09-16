@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MinhaTurmaDetalheView } from "./minha-turma-detalhe";
 
@@ -262,5 +262,76 @@ describe("SPEC-056 — a ficha da turma inativa", () => {
     soltar30({ data: [], page: 1, pageSize: 20, total: 0 });
     await new Promise((r) => setTimeout(r, 50));
     expect(screen.getByRole("link", { name: /aula cancelada/ })).toBeInTheDocument();
+  });
+});
+
+/**
+ * DEF-033 — **a ficha ficava MUDA quando não havia aula.**
+ *
+ * Achado no teste em aparelho da SPEC-056 (2026-09-16): a ficha da turma inativa
+ * mostrou o cabeçalho e "Alunos (0/4)", e nada entre os dois. O bloco de aulas era
+ * `ocorrencias.length > 0 ? … : null`, então "esta turma não tem aula na janela" e
+ * "a busca falhou" tinham a mesma aparência: nenhuma.
+ */
+describe("DEF-033 — a ficha sem aulas diz o que houve", () => {
+  it("lista vazia: diz que não há aula na janela, com a janela da turma ATIVA (30 dias)", async () => {
+    responder([TERCA]);
+    render(<MinhaTurmaDetalheView id="t1" />);
+    expect(await screen.findByText("Aulas e chamadas")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Nenhuma aula nos últimos 30 dias."),
+    ).toBeInTheDocument();
+  });
+
+  it("na turma INATIVA, a janela citada é a de 90 dias", async () => {
+    responder([TERCA], "inativa");
+    render(<MinhaTurmaDetalheView id="t1" />);
+    expect(
+      await screen.findByText("Nenhuma aula nos últimos 90 dias."),
+    ).toBeInTheDocument();
+  });
+
+  it("**falha na busca NÃO é lista vazia**: aparece o aviso, e o botão de tentar de novo", async () => {
+    responder([TERCA]);
+    listOcorrenciasMock.mockRejectedValue(new Error("rede"));
+    render(<MinhaTurmaDetalheView id="t1" />);
+
+    const aviso = await screen.findByRole("alert");
+    expect(aviso).toHaveTextContent("Não foi possível carregar as aulas.");
+    expect(screen.queryByText("Nenhuma aula nos últimos 30 dias.")).toBeNull();
+
+    listOcorrenciasMock.mockResolvedValue({
+      data: [
+        {
+          ocupacaoId: "ocup-1",
+          data: "2026-09-18",
+          horaInicio: "11:00",
+          horaFim: "12:00",
+          cancelada: true,
+          chamadaFeita: false,
+          marcados: 0,
+          totalAlunos: 0,
+          podeLancar: false,
+          estado: "cancelada",
+        },
+      ],
+      page: 1,
+      pageSize: 20,
+      total: 1,
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
+    expect(
+      await screen.findByRole("link", { name: /aula cancelada/ }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("enquanto carrega, não acusa vazio nem erro", async () => {
+    responder([TERCA]);
+    listOcorrenciasMock.mockReturnValue(new Promise(() => undefined));
+    render(<MinhaTurmaDetalheView id="t1" />);
+    await screen.findByText("Infantil A");
+    expect(screen.queryByText(/Nenhuma aula nos últimos/)).toBeNull();
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });
