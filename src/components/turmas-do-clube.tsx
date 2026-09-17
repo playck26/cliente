@@ -76,10 +76,10 @@ export function TurmasDoClube() {
           A busca saiu junto com o render: manter a chamada alimentando um
           estado que ninguém lê seria uma ida à rede por turma, por nada.
 
-          **A rota `GET /me/classes/:id/avaliacao` continua existindo** — ela
-          é retirada só depois que este Cliente estiver no ar, que é a ordem
-          de uma contração (D12). O `PUT` de avaliar segue sendo do aluno: ele
-          avalia, o gestor lê.
+          **A rota `GET /me/classes/:id/avaliacao` saiu do Back** depois que
+          este Cliente foi ao ar (2026-09-17), na ordem de uma contração (D12),
+          e com ela `getMediaDaTurma` e o componente `NotaDaTurma`. O `PUT` de
+          avaliar segue sendo do aluno: ele avalia, o gestor lê.
         */
       })
       .catch((e: unknown) =>

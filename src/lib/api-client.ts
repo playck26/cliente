@@ -166,7 +166,6 @@ export type AulaDoDiaDoProfessor =
 /** SPEC-025 — apelidos do schema, nunca escritos a mao (INV-059). */
 export type AulaAnterior = components["schemas"]["AulaAnteriorResponseDto"];
 export type MinhaAvaliacao = components["schemas"]["MinhaAvaliacaoResponseDto"];
-export type MediaDaTurma = components["schemas"]["MediaDaTurmaResponseDto"];
 
 /** SPEC-024 — apelidos do schema, nunca escritos a mao (INV-059). */
 export type AceitesPendentes =
@@ -917,18 +916,6 @@ export async function avaliarAula(
     body: JSON.stringify(dados),
   });
   return (await res.json()) as MinhaAvaliacao;
-}
-
-/**
- * SPEC-025 — a media da TURMA, agregada das notas das aulas dela.
- *
- * A aula nao tem media propria (decisao do Israel). Esta resposta NAO traz
- * autoria nem comentario — INV-025a, e o servidor garante isso com um DTO
- * separado, nao com um filtro.
- */
-export async function getMediaDaTurma(turmaId: string): Promise<MediaDaTurma> {
-  const res = await authFetch(`/me/classes/${turmaId}/avaliacao`);
-  return (await res.json()) as MediaDaTurma;
 }
 
 export async function listTurmasDisponiveis(): Promise<TurmaDisponivel[]> {

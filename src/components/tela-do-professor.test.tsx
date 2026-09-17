@@ -19,7 +19,6 @@ import { TelaDoProfessor } from "./tela-do-professor";
 const getAgendaDoProfessor = vi.hoisted(() => vi.fn());
 const getAulasDoDia = vi.hoisted(() => vi.fn());
 const listMinhasTurmas = vi.hoisted(() => vi.fn());
-const getMediaDaTurma = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/api-client", async () => {
   const real =
@@ -31,7 +30,6 @@ vi.mock("@/lib/api-client", async () => {
     getAgendaDoProfessor,
     getAulasDoDia,
     listMinhasTurmas,
-    getMediaDaTurma,
   };
 });
 
@@ -54,7 +52,6 @@ const OUTRA: MinhaTurma = { ...TURMA, id: "t-2", nome: "Adulto B" };
 beforeEach(() => {
   vi.clearAllMocks();
   getAulasDoDia.mockResolvedValue([]);
-  getMediaDaTurma.mockResolvedValue({ media: 4, avaliacoes: 3 });
 });
 
 describe("TelaDoProfessor — SPEC-052", () => {
@@ -112,7 +109,11 @@ describe("TelaDoProfessor — SPEC-052", () => {
 
     await screen.findByText("Nenhuma aula sua neste mês.");
     await waitFor(() => expect(listMinhasTurmas).toHaveBeenCalled());
-    expect(getMediaDaTurma).not.toHaveBeenCalled();
+    expect(screen.queryByText(/avaliaç/i)).toBeNull();
+    // SPEC-057/TASK-002/D12 — a função que buscava a média não existe mais.
+    const real =
+      await vi.importActual<Record<string, unknown>>("@/lib/api-client");
+    expect(real).not.toHaveProperty("getMediaDaTurma");
   });
 
   it("professor sem turma: o índice diz o que fazer, em vez de sumir", async () => {

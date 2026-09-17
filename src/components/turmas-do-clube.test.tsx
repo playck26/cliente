@@ -13,7 +13,6 @@ import { ApiError } from "@/lib/api-client";
 
 const listTurmasDisponiveis = vi.hoisted(() => vi.fn());
 const getMeuCadastro = vi.hoisted(() => vi.fn());
-const getMediaDaTurma = vi.hoisted(() => vi.fn());
 const entrarNaTurma = vi.hoisted(() => vi.fn());
 const sairDaTurma = vi.hoisted(() => vi.fn());
 
@@ -26,7 +25,6 @@ vi.mock("@/lib/api-client", async () => {
     ...real,
     listTurmasDisponiveis,
     getMeuCadastro,
-    getMediaDaTurma,
     entrarNaTurma,
     sairDaTurma,
   };
@@ -55,11 +53,6 @@ beforeEach(() => {
   // SEM nível: é o estado da maioria em produção, e nele o recorte não
   // esconde nada — as provas antigas continuam medindo o que mediam.
   getMeuCadastro.mockResolvedValue({ nivelId: null });
-  getMediaDaTurma.mockResolvedValue({
-    media: null,
-    quantidade: 0,
-    minimoParaMedia: 3,
-  });
   entrarNaTurma.mockResolvedValue(undefined);
   sairDaTurma.mockResolvedValue(undefined);
 });
@@ -274,8 +267,9 @@ describe("estados vazios", () => {
  * saiu junto com o desenho — manter a chamada alimentando um estado que
  * ninguém lê seria uma ida à rede por turma, por nada.
  *
- * A regra da média em si (proporcional, a partir da primeira avaliação)
- * continua provada em `nota-da-turma.test.tsx`, que é de quem a desenha.
+ * Depois que este Cliente foi ao ar, a contração terminou: a rota saiu do
+ * Back, e `getMediaDaTurma` e `NotaDaTurma` saíram daqui. (Este comentário
+ * citava um `nota-da-turma.test.tsx` que nunca existiu.)
  */
 describe("SPEC-057/TASK-002 — a nota não aparece mais para o aluno", () => {
   beforeEach(() => {
@@ -290,11 +284,11 @@ describe("SPEC-057/TASK-002 — a nota não aparece mais para o aluno", () => {
     expect(screen.queryByText(/^[0-5],[0-9]$/)).toBeNull();
   });
 
-  it("e a tela não pede a média ao servidor", async () => {
-    render(<TurmasDoClube />);
-    await screen.findByText("Iniciantes");
+  it("e o cliente nem tem mais como pedir a média — a função saiu", async () => {
+    const real =
+      await vi.importActual<Record<string, unknown>>("@/lib/api-client");
 
-    expect(getMediaDaTurma).not.toHaveBeenCalled();
+    expect(real).not.toHaveProperty("getMediaDaTurma");
   });
 });
 
@@ -304,7 +298,6 @@ describe("SPEC-057/TASK-004 — o recorte por nível", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    getMediaDaTurma.mockRejectedValue(new Error("sem média"));
     getMeuCadastro.mockResolvedValue({ nivelId: A });
   });
 
