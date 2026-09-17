@@ -74,6 +74,10 @@ function quadra(
     status: "ativa" as const,
     createdAt: "2026-08-26T00:00:00.000Z",
     imagemUrl: null,
+    // SPEC-057/TASK-005/D19 — o contrato da quadra ganhou cor e código da
+    // agenda do gestor. O app do aluno não os usa; a fixture acompanha o tipo.
+    cor: "#00763A" as const,
+    codigoAgenda: "1",
   } satisfies Court;
 }
 
