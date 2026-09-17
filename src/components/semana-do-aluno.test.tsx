@@ -170,3 +170,33 @@ describe("SPEC-030 — a aula não realizada na Semana", () => {
     expect(screen.queryByText("Aula não realizada")).not.toBeInTheDocument();
   });
 });
+
+/**
+ * SPEC-057/TASK-002/D10 (card 5352) — **a semana leva à ficha da turma.**
+ *
+ * Antes desta task, cada aula aqui era um `<div>` sem clique: a vista
+ * mostrava a semana e terminava ali. O card pede *"clicar para ver sua
+ * turma"*.
+ */
+describe("SPEC-057/TASK-002 — o drill down", () => {
+  it("o nome da turma vira link para a ficha", () => {
+    render(<SemanaDoAluno aulas={[aula({ turmaId: "t-77" })]} />);
+
+    const link = screen.getByRole("link", { name: "Iniciantes" });
+    expect(link).toHaveAttribute("href", "/minhas-aulas/turma/t-77");
+  });
+
+  /**
+   * **LIM-057h.** A home monta esta mesma vista, e lá o clique ainda não tem
+   * destino: a ficha existe, mas a home não carrega o passado nem oferece a
+   * navegação. Prometer o link ali seria a tela fingindo.
+   */
+  it("`mostrarLinkDaTurma={false}` mantém o nome como texto", () => {
+    render(
+      <SemanaDoAluno aulas={[aula({ turmaId: "t-77" })]} mostrarLinkDaTurma={false} />,
+    );
+
+    expect(screen.queryByRole("link", { name: "Iniciantes" })).toBeNull();
+    expect(screen.getByText(/Iniciantes/)).toBeInTheDocument();
+  });
+});

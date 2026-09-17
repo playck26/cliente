@@ -1,5 +1,5 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MyClass } from "@/lib/api-client";
 
 /**
@@ -48,6 +48,7 @@ vi.mock("@/lib/api-client", () => ({
     }),
 }));
 
+const { savePapel } = await import("@/lib/auth-storage");
 const { HomeView } = await import("./home-view");
 
 const ALUNO = {
@@ -70,10 +71,21 @@ const ALUNO = {
  * `AulaDoAlunoResponseDto` nunca teve, e não tinha `ocupacaoId` nem
  * `turmaId`. Era um retrato de um contrato que não existe.
  */
+/**
+ * **SPEC-057/TASK-003 — o relogio e fixado, e a fixture mora na semana dele.**
+ *
+ * A home passou a mostrar a SEMANA. Sem `setSystemTime`, a aula da fixture
+ * cairia dentro ou fora da semana corrente conforme o dia em que a suite
+ * rodasse — o sorteio que o DEF-020 ja custou caro duas vezes neste projeto.
+ *
+ * **2026-09-02 e uma QUARTA**; a semana vai de domingo 30/08 a sabado 05/09.
+ */
+const QUARTA = new Date("2026-09-02T15:00:00.000Z"); // 12h em Sao Paulo
+
 const AULA: MyClass = {
   ocupacaoId: "oc1",
   turmaId: "t1",
-  data: "2026-09-01",
+  data: "2026-09-02",
   horaInicio: "08:00",
   horaFim: "09:00",
   quadraId: "q1",
@@ -86,15 +98,24 @@ const AULA: MyClass = {
 describe("HomeView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(QUARTA);
   });
 
-  it("aluno: busca as aulas e mostra a próxima", async () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("AC-020: aluno — a home mostra a SEMANA, com uma busca só", async () => {
     getMeMock.mockResolvedValue(ALUNO);
     listMyClassesMock.mockResolvedValue([AULA]);
 
     render(<HomeView />);
 
-    expect(await screen.findByText("Turma A")).toBeInTheDocument();
+    // A semana renderiza `hora–hora · turma` numa linha só.
+    expect(await screen.findByText(/Turma A/)).toBeInTheDocument();
+    expect(screen.getByText("30/08 – 05/09")).toBeInTheDocument();
+    // **Sem rede nova**: a home já tinha as aulas no estado.
     expect(listMyClassesMock).toHaveBeenCalledTimes(1);
   });
 
@@ -126,6 +147,8 @@ describe("HomeView", () => {
     render(<HomeView />);
 
     expect((await screen.findAllByText(/Olá, Ana/)).length).toBeGreaterThan(0);
+    // **AC-019** — este aviso morava DENTRO do hero, que a TASK-003 remove.
+    // Se ele sair junto, a falha de agenda volta a ser silenciosa.
     expect(await screen.findByRole("status")).toHaveTextContent(
       /não foi possível carregar sua agenda/i,
     );
@@ -145,7 +168,10 @@ describe("HomeView", () => {
    * ela em segundo, `aulas[0]` acertaria por acidente e a prova voltaria a
    * não provar nada.
    */
-  it("a aula NÃO REALIZADA não vira `Próxima aula`, mesmo vindo primeiro", async () => {
+  it("SPEC-030 na semana: a não realizada APARECE, e aparece marcada", async () => {
+    // **A regra mudou de lugar, não sumiu.** Sem o destaque "Próxima aula",
+    // o risco da SPEC-030 deixa de ser "a não realizada virar destaque" e
+    // passa a ser "a não realizada parecer uma aula normal na semana".
     getMeMock.mockResolvedValue(ALUNO);
     listMyClassesMock.mockResolvedValue([
       { ...AULA, turmaNome: "Turma Chuva", naoRealizada: true },
@@ -154,42 +180,35 @@ describe("HomeView", () => {
 
     render(<HomeView />);
 
-    expect(await screen.findByText("Turma B")).toBeInTheDocument();
-    expect(screen.queryByText("Turma Chuva")).not.toBeInTheDocument();
+    expect(await screen.findByText(/Turma Chuva/)).toBeInTheDocument();
+    expect(screen.getByText("Aula não realizada")).toBeInTheDocument();
+    expect(screen.getByText(/Turma B/)).toBeInTheDocument();
   });
 
-  // O par: a aula normal em primeiro continua sendo a destacada. Sem ele, um
-  // `find` invertido — que escolhesse justamente a não realizada — passaria
-  // na prova acima.
-  it("a aula normal em primeiro continua sendo a destacada", async () => {
+  // O par: a aula NORMAL não pode sair marcada. Sem ele, marcar todas
+  // passaria na prova acima.
+  it("a aula normal NÃO é marcada como não realizada", async () => {
     getMeMock.mockResolvedValue(ALUNO);
-    listMyClassesMock.mockResolvedValue([
-      { ...AULA, turmaNome: "Turma B" },
-      { ...AULA, ocupacaoId: "oc2", turmaNome: "Turma Chuva", naoRealizada: true },
-    ]);
+    listMyClassesMock.mockResolvedValue([{ ...AULA, turmaNome: "Turma B" }]);
 
     render(<HomeView />);
 
-    expect(await screen.findByText("Turma B")).toBeInTheDocument();
-    expect(screen.getByText("Próxima aula")).toBeInTheDocument();
+    expect(await screen.findByText(/Turma B/)).toBeInTheDocument();
+    expect(screen.queryByText("Aula não realizada")).not.toBeInTheDocument();
   });
 
   // Julgamento pedido na 3ª rodada e aceito como coerente: com TODAS as aulas
   // não realizadas, a home não inventa um destaque. Fica registrado em prova
   // porque "defensável" sem prova é só opinião — e o próximo a mexer aqui
   // precisa saber que o vazio é decisão, não descuido.
-  it("com TODAS não realizadas, não há destaque — e a home não quebra", async () => {
+  it("agenda vazia: a semana aparece assim mesmo, com os dias livres", async () => {
     getMeMock.mockResolvedValue(ALUNO);
-    listMyClassesMock.mockResolvedValue([
-      { ...AULA, turmaNome: "Turma Chuva", naoRealizada: true },
-    ]);
+    listMyClassesMock.mockResolvedValue([]);
 
     render(<HomeView />);
 
-    expect(await screen.findByText("Sua agenda")).toBeInTheDocument();
-    expect(screen.getByText("Pronto para jogar?")).toBeInTheDocument();
-    expect(screen.queryByText("Turma Chuva")).not.toBeInTheDocument();
-    expect(screen.queryByText("Próxima aula")).not.toBeInTheDocument();
+    expect(await screen.findByText("30/08 – 05/09")).toBeInTheDocument();
+    expect(screen.getAllByText("Sem aula").length).toBeGreaterThan(0);
   });
 
   it("se o próprio `/auth/me` falhar com 403, a mensagem é humana", async () => {
@@ -208,45 +227,95 @@ describe("HomeView", () => {
  * aqui: o atalho "Quadras" era duplicado (ia ao mesmo lugar que "Reservar"),
  * e os textos passam a falar de reserva, não de quadra.
  */
-describe("SPEC-053 — a Home sem Quadras", () => {
+describe("SPEC-057/TASK-003 — a home abre na agenda", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(QUARTA);
     getMeMock.mockResolvedValue(ALUNO);
-    listMyClassesMock.mockResolvedValue([]);
+    // **Fixture PREENCHIDA, de propósito.** A prova antiga da AC-001 usava
+    // agenda vazia, e por isso passava sem nunca exercitar a semana — que é
+    // justamente onde o nome da quadra apareceria.
+    listMyClassesMock.mockResolvedValue([AULA]);
   });
 
-  it("AC-008: três atalhos, nesta ordem — Reservar, Aulas, Reservas", async () => {
-    render(<HomeView />);
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
-    const atalhos = await screen.findByRole("region", { name: "Atalhos" });
-    const links = Array.from(atalhos.querySelectorAll("a"));
-    expect(links.map((a) => a.textContent)).toEqual(["Reservar", "Aulas", "Reservas"]);
-    expect(links.map((a) => a.getAttribute("href"))).toEqual([
-      "/reservas/nova",
-      "/minhas-aulas",
-      "/reservas",
-    ]);
+  /**
+   * **AC-018 — a faixa de atalhos sai inteira.**
+   *
+   * Dois dos três eram duplicata literal do menu inferior: mesmo rótulo,
+   * mesmo destino e mesmo ícone (`Aulas`→`/minhas-aulas`,
+   * `Reservas`→`/reservas`). Encolher para um item deixaria uma faixa de um
+   * item, que é decoração — o precedente do Admin (SPEC-052/D7) removeu a
+   * faixa, não a encolheu.
+   */
+  it("AC-018: não há faixa de atalhos, card `Sua agenda` nem hero", async () => {
+    render(<HomeView />);
+    await screen.findByText("30/08 – 05/09");
+
+    expect(screen.queryByRole("region", { name: "Atalhos" })).toBeNull();
+    expect(screen.queryByText("Abrir agenda")).toBeNull();
+    expect(screen.queryByText("Próxima aula")).toBeNull();
+    expect(screen.queryByText("Pronto para jogar?")).toBeNull();
+  });
+
+  it("AC-018: o que os atalhos levavam continua a um toque, no menu inferior", async () => {
+    // **A barra lê o papel do `localStorage`, gravado no login** — sem isso
+    // ela desenha a versão que não sabe quem é, e a prova mediria o mock, não
+    // o produto. `savePapel` é o mesmo caminho que o login usa.
+    savePapel("aluno");
+
+    render(<HomeView />);
+    await screen.findByText("30/08 – 05/09");
+
+    const hrefs = screen.getAllByRole("link").map((a) => a.getAttribute("href"));
+    expect(hrefs).toContain("/minhas-aulas");
+    expect(hrefs).toContain("/reservas");
+    expect(hrefs).toContain("/reservas/nova");
   });
 
   it("AC-009: nenhum link da Home aponta para /quadras", async () => {
     render(<HomeView />);
-    await screen.findByRole("region", { name: "Atalhos" });
+    await screen.findByText("30/08 – 05/09");
 
     const hrefs = screen.getAllByRole("link").map((a) => a.getAttribute("href"));
     expect(hrefs.filter((h) => h?.startsWith("/quadras"))).toEqual([]);
   });
 
-  it("AC-001: os textos da Home falam de reserva, não de quadra", async () => {
+  /**
+   * **AC-021 — e agora COM aula na tela.** `SemanaDoAluno` mostra o nome da
+   * quadra ("Quadra 1") em cada aula; na home isso reintroduziria a palavra
+   * que a SPEC-053/AC-001 tirou daqui. A ocultação é por contexto, não por
+   * edição destrutiva do componente — a TASK-002 também mexe nele.
+   */
+  it("AC-021: a palavra `quadra` continua ausente, COM aula na semana", async () => {
     render(<HomeView />);
+    await screen.findByText(/Turma A/);
 
-    expect(
-      await screen.findByText("Faça sua reserva e monte seu próximo jogo."),
-    ).toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: /Fazer reserva/ }).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/quadra/i)).not.toBeInTheDocument();
+  });
+
+  it("AC-021: e o texto de reserva continua lá", async () => {
+    render(<HomeView />);
+    await screen.findByText(/Turma A/);
+
     expect(screen.getByText("Reservas PlayCK")).toBeInTheDocument();
     expect(
       screen.getByText("Veja o que o clube oferece, com valores e horários."),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/quadra/i)).not.toBeInTheDocument();
+  });
+
+  /**
+   * **LIM-057h** — até a TASK-002, a semana da home não tem clique nem
+   * passado. A tela não pode fingir que tem.
+   */
+  it("LIM-057h: a semana da home não vira link de turma", async () => {
+    render(<HomeView />);
+    const aula = await screen.findByText(/Turma A/);
+
+    expect(aula.closest("a")).toBeNull();
   });
 });

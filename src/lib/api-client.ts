@@ -138,6 +138,9 @@ export type Booking = components["schemas"]["OcupacaoResponseDto"];
 export type ItemDaListaDeReservas =
   components["schemas"]["ItemDaListaDeReservasDto"];
 
+export type TurmaDoAlunoDetalhe =
+  components["schemas"]["TurmaDoAlunoDetalheResponseDto"];
+export type ColegaDeTurma = components["schemas"]["ColegaDeTurmaResponseDto"];
 export type MyClass = components["schemas"]["AulaDoAlunoResponseDto"];
 
 /**
@@ -813,9 +816,38 @@ export async function desmarcarReposicao(id: string): Promise<void> {
   await authFetch(`/me/reposicoes/${id}`, { method: "DELETE" });
 }
 
-export async function listMyClasses(): Promise<MyClass[]> {
-  const res = await authFetch("/me/classes");
+/**
+ * SPEC-057/TASK-002/D11 — **a janela é opcional, e a ausência dela é o
+ * contrato de antes.**
+ *
+ * Sem `de`/`ate`, o servidor devolve do dia corrente em diante, como sempre.
+ * Com os dois, devolve a janela pedida — é o que permite à vista de semana
+ * navegar para trás em vez de mostrar sete travessões.
+ *
+ * Os dois **juntos**: o servidor recusa meia janela com `400`, e mandar um só
+ * daqui seria pedir um erro que a tela já sabe evitar.
+ */
+export async function listMyClasses(janela?: {
+  de: string;
+  ate: string;
+}): Promise<MyClass[]> {
+  const q = janela ? `?de=${janela.de}&ate=${janela.ate}` : "";
+  const res = await authFetch(`/me/classes${q}`);
   return (await res.json()) as MyClass[];
+}
+
+/**
+ * SPEC-057/TASK-002 (card 5352) — **a ficha da turma do aluno.**
+ *
+ * Professor, nível, encontros, quadra e os colegas (nome e nível). Turma em
+ * que ele não está matriculado responde **404**, não 403: confirmar que ela
+ * existe já seria informação.
+ */
+export async function getMinhaTurmaDoAluno(
+  id: string,
+): Promise<TurmaDoAlunoDetalhe> {
+  const res = await authFetch(`/me/classes/${id}`);
+  return (await res.json()) as TurmaDoAlunoDetalhe;
 }
 
 /**

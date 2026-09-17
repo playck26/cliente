@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { TennisCourtIcon } from "@/components/icons/tennis-court-icon";
 import { hojeNoClubeIso } from "@/lib/fuso";
@@ -57,12 +58,65 @@ function rotuloCurto(iso: string): string {
   return `${dia}/${mes}`;
 }
 
-export function SemanaDoAluno({ aulas }: { aulas: MyClass[] }) {
+/**
+ * **SPEC-057/TASK-003 — `mostrarQuadra` existe por causa da home.**
+ *
+ * A home não escreve a palavra "quadra" (SPEC-053/AC-001, decisão 6 do
+ * Israel), e cada aula desta vista mostra o nome da quadra — que na primeira
+ * empresa real se chama "Quadra 1". Montar a semana lá reintroduziria a
+ * palavra que a 053 tirou.
+ *
+ * **Por prop, e não por edição:** a TASK-002 também mexe neste componente
+ * (drill down). Apagar a linha da quadra aqui tiraria informação de
+ * `/minhas-aulas`, onde ela é útil e permitida. O contexto decide.
+ */
+export function SemanaDoAluno({
+  aulas,
+  mostrarQuadra = true,
+  mostrarLinkDaTurma = true,
+  onJanela,
+}: {
+  aulas: MyClass[];
+  mostrarQuadra?: boolean;
+  /**
+   * SPEC-057/TASK-002/D10 — a HOME monta esta vista sem destino para o
+   * clique (LIM-057h). Falso lá, verdadeiro em `/minhas-aulas`.
+   */
+  mostrarLinkDaTurma?: boolean;
+  /**
+   * SPEC-057/TASK-002/D11 — **avisa quando a semana muda, com a janela.**
+   *
+   * Este componente continua sem buscar nada: quem busca é quem o monta. A
+   * mudança é que agora ele **diz qual janela está olhando**, e o pai decide
+   * se pede ao servidor.
+   *
+   * Sem isto, navegar para trás mostrava sete travessões para sempre — o
+   * `GET /me/classes` devolvia só o futuro, e a tela não tinha como pedir
+   * outra coisa. É o que o card chama de *"clicar para semanas anteriores e
+   * ver as aulas que se passaram"*.
+   *
+   * **A home não passa este callback** (LIM-057h): lá a semana é só a
+   * corrente.
+   */
+  onJanela?: (janela: { de: string; ate: string }) => void;
+}) {
   const hoje = hojeNoClubeIso();
   const [domingo, setDomingo] = useState(() => domingoDaSemana(hoje));
 
   const dias = Array.from({ length: 7 }, (_, i) => somarDias(domingo, i));
   const sabado = dias[6];
+
+  /**
+   * **Avisa no evento, não em `useEffect`.** Quem muda a semana é o toque na
+   * seta; reagir por efeito faria a primeira pintura disparar uma busca que
+   * ninguém pediu — e o pai já tem as aulas futuras.
+   */
+  const irParaSemana = (novoDomingo: string) => {
+    setDomingo(novoDomingo);
+    if (onJanela) {
+      onJanela({ de: novoDomingo, ate: somarDias(novoDomingo, 6) });
+    }
+  };
 
   // Agrupa uma vez, em vez de filtrar sete vezes dentro do render.
   const porDia = new Map<string, MyClass[]>();
@@ -82,7 +136,7 @@ export function SemanaDoAluno({ aulas }: { aulas: MyClass[] }) {
         <button
           type="button"
           aria-label="Semana anterior"
-          onClick={() => setDomingo(somarDias(domingo, -7))}
+          onClick={() => irParaSemana(somarDias(domingo, -7))}
           className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-surface shadow-[var(--shadow-low)] ring-1 ring-border transition-transform active:scale-95"
         >
           <ChevronLeft className="size-5" aria-hidden="true" />
@@ -111,7 +165,7 @@ export function SemanaDoAluno({ aulas }: { aulas: MyClass[] }) {
         <button
           type="button"
           aria-label="Próxima semana"
-          onClick={() => setDomingo(somarDias(domingo, 7))}
+          onClick={() => irParaSemana(somarDias(domingo, 7))}
           className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-surface shadow-[var(--shadow-low)] ring-1 ring-border transition-transform active:scale-95"
         >
           <ChevronRight className="size-5" aria-hidden="true" />
@@ -126,7 +180,7 @@ export function SemanaDoAluno({ aulas }: { aulas: MyClass[] }) {
       {!ehSemanaDeHoje && (
         <button
           type="button"
-          onClick={() => setDomingo(domingoDaSemana(hoje))}
+          onClick={() => irParaSemana(domingoDaSemana(hoje))}
           className="mx-auto block rounded-full bg-[var(--color-secondary-container)] px-4 py-1.5 text-[12px] font-extrabold text-[var(--color-primary-strong)]"
         >
           Voltar para esta semana
@@ -178,11 +232,30 @@ export function SemanaDoAluno({ aulas }: { aulas: MyClass[] }) {
                 ) : (
                   doDia.map((aula) => (
                     <div key={aula.ocupacaoId} className="min-w-0">
+                      {/*
+                        **SPEC-057/TASK-002/D10 — a semana também leva à
+                        ficha.** Antes estes itens eram `<div>` sem clique
+                        nenhum: a vista mostrava a semana e terminava ali.
+
+                        `mostrarLinkDaTurma` existe porque a HOME monta este
+                        mesmo componente (SPEC-057/TASK-003), e lá o clique
+                        ainda não tem destino — LIM-057h. Contexto decide,
+                        como no nome da quadra.
+                      */}
                       <p
                         className={`truncate text-[14px] font-extrabold ${aula.naoRealizada ? "text-[var(--color-text-secondary)] line-through" : "text-[var(--color-text-primary)]"}`}
                       >
                         {aula.horaInicio}–{aula.horaFim} ·{" "}
-                        {aula.turmaNome ?? "Turma"}
+                        {mostrarLinkDaTurma ? (
+                          <Link
+                            href={`/minhas-aulas/turma/${aula.turmaId}`}
+                            className="hover:underline"
+                          >
+                            {aula.turmaNome ?? "Turma"}
+                          </Link>
+                        ) : (
+                          (aula.turmaNome ?? "Turma")
+                        )}
                       </p>
                       {/* SPEC-030 / achado 1 da 2ª validação cruzada — esta
                           vista ignorava `naoRealizada` e mostrava a aula
@@ -194,13 +267,15 @@ export function SemanaDoAluno({ aulas }: { aulas: MyClass[] }) {
                           Aula não realizada
                         </p>
                       ) : null}
-                      <p className="mt-0.5 flex items-center gap-1.5 text-[12px] font-semibold text-[var(--color-text-secondary)]">
-                        <TennisCourtIcon
-                          className="size-3.5 shrink-0"
-                          aria-hidden="true"
-                        />
-                        <span className="truncate">{aula.quadraNome}</span>
-                      </p>
+                      {mostrarQuadra ? (
+                        <p className="mt-0.5 flex items-center gap-1.5 text-[12px] font-semibold text-[var(--color-text-secondary)]">
+                          <TennisCourtIcon
+                            className="size-3.5 shrink-0"
+                            aria-hidden="true"
+                          />
+                          <span className="truncate">{aula.quadraNome}</span>
+                        </p>
+                      ) : null}
                     </div>
                   ))
                 )}
@@ -210,10 +285,16 @@ export function SemanaDoAluno({ aulas }: { aulas: MyClass[] }) {
         })}
       </ul>
 
-      {jaPassouAlgumDia(dias, hoje) && (
+      {/*
+        **SPEC-057/TASK-002/D11 — o rodapé mudou porque a aba sumiu.** Ele
+        mandava para "Anteriores", que deixou de existir. Sem `onJanela` (a
+        home), o "—" continua querendo dizer "não sei"; com ele, a semana
+        passada é buscada de verdade e o travessão vira ausência de aula.
+      */}
+      {jaPassouAlgumDia(dias, hoje) && !onJanela && (
         <p className="px-1 text-[11px] font-semibold text-[var(--color-text-secondary)]">
-          Os dias com “—” já passaram. Aulas que já aconteceram ficam na aba
-          <strong className="font-extrabold"> Anteriores</strong>.
+          Os dias com “—” já passaram. Para ver as aulas que aconteceram, abra
+          <strong className="font-extrabold"> Aulas</strong>.
         </p>
       )}
     </section>

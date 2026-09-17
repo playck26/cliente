@@ -1,20 +1,21 @@
 import { Suspense } from "react";
-import { AulasTabs } from "@/components/aulas-tabs";
+import { TelaDeAulas } from "@/components/tela-de-aulas";
 
 /**
- * SPEC-023 — a tela de aulas passou a ter duas abas: as minhas, e as turmas
- * do clube em que dá para entrar (ver `aulas-tabs.tsx`).
+ * SPEC-057/TASK-002/D11 — **a agenda é a tela.** As abas "Próximas /
+ * Anteriores / Turmas" saíram; o catálogo e o histórico ganharam endereço
+ * próprio, alcançável daqui.
  *
- * `Suspense` com `fallback` pela mesma razão de `/reservas`:
- * `useSearchParams` obriga a barreira, e barreira sem fallback pisca branco
- * sobre fundo escuro.
+ * `Suspense` continua: `MyClassesList` usa `useSearchParams` para lembrar a
+ * vista (lista ou semana), e barreira sem fallback pisca branco sobre fundo
+ * escuro.
  */
 export default function MinhasAulasPage() {
   return (
     <Suspense
       fallback={<div className="app-screen min-h-screen bg-background" />}
     >
-      <AulasTabs />
+      <TelaDeAulas />
     </Suspense>
   );
 }

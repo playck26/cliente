@@ -3,14 +3,17 @@
 import { useEffect, useState } from "react";
 import { Check, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { NotaDaTurma } from "@/components/nota-da-turma";
+import {
+  apareceParaMim,
+  escondidosPeloFiltro,
+  filtroFazSentido,
+} from "@/lib/filtro-de-nivel";
 import {
   ApiError,
   entrarNaTurma,
-  getMediaDaTurma,
+  getMeuCadastro,
   listTurmasDisponiveis,
   sairDaTurma,
-  type MediaDaTurma,
   type TurmaDisponivel,
 } from "@/lib/api-client";
 import { AvisoDePrazo } from "@/components/aviso-de-prazo";
@@ -50,25 +53,34 @@ export function TurmasDoClube() {
   const [erro, setErro] = useState<string | null>(null);
   const [agindoEm, setAgindoEm] = useState<string | null>(null);
   /**
-   * SPEC-025 — a média de cada turma, buscada em paralelo depois da lista.
+   * SPEC-057/TASK-004 (card 5350) — o nível do aluno, para recortar a lista.
    *
-   * Fora da lista de propósito: a média é informação **secundária**, e
-   * segurar a tela inteira esperando por ela faria a pessoa esperar mais
-   * para ver o que veio fazer. Turma sem média ainda não desenha estrela.
+   * **Buscado à parte e com falha tolerada**, como a média: o nível é
+   * informação de recorte, não o conteúdo. Se `/me/cadastro` cair, a tela
+   * mostra **tudo** — errar mostrando demais é recuperável; errar escondendo
+   * faria o clube parecer vazio.
    */
-  const [medias, setMedias] = useState<Record<string, MediaDaTurma>>({});
+  const [meuNivelId, setMeuNivelId] = useState<string | null>(null);
+  const [verTodas, setVerTodas] = useState(false);
 
   const carregar = () =>
     listTurmasDisponiveis()
       .then((lista) => {
         setTurmas(lista);
-        // Cada uma por sua conta: a falha de uma média não pode derrubar a
-        // lista, que é o que a pessoa veio ver.
-        for (const t of lista) {
-          void getMediaDaTurma(t.id)
-            .then((m) => setMedias((atual) => ({ ...atual, [t.id]: m })))
-            .catch(() => undefined);
-        }
+        /*
+          SPEC-057/TASK-002/D12 (card 5352) — **a nota saiu da tela do
+          aluno.** O card pede "ocultar nota da turma do usuário final e do
+          professor"; a SPEC-052 já tinha tirado do professor e deixado a do
+          aluno inalterada de propósito.
+
+          A busca saiu junto com o render: manter a chamada alimentando um
+          estado que ninguém lê seria uma ida à rede por turma, por nada.
+
+          **A rota `GET /me/classes/:id/avaliacao` continua existindo** — ela
+          é retirada só depois que este Cliente estiver no ar, que é a ordem
+          de uma contração (D12). O `PUT` de avaliar segue sendo do aluno: ele
+          avalia, o gestor lê.
+        */
       })
       .catch((e: unknown) =>
         setErro(
@@ -80,6 +92,9 @@ export function TurmasDoClube() {
       .finally(() => setCarregando(false));
 
   useEffect(() => {
+    void getMeuCadastro()
+      .then((cadastro) => setMeuNivelId(cadastro.nivelId))
+      .catch(() => undefined);
     void carregar();
     // `carregar` fora das dependencias de proposito: ela e recriada a cada
     // render e entraria em laco. E o mesmo padrao das outras listas deste
@@ -117,6 +132,12 @@ export function TurmasDoClube() {
     );
   }
 
+  const ofereceFiltro = filtroFazSentido(turmas, meuNivelId);
+  const visiveis = turmas.filter((t) =>
+    apareceParaMim(t, meuNivelId, verTodas),
+  );
+  const escondidas = escondidosPeloFiltro(turmas, meuNivelId, verTodas);
+
   return (
     <div className="space-y-4 px-5">
       {/* SPEC-031/REQ-002 — o prazo aparece ANTES do toque. Sem isto a regra
@@ -133,15 +154,62 @@ export function TurmasDoClube() {
         </p>
       )}
 
+      {/*
+        **O filtro só aparece quando muda alguma coisa** (`filtroFazSentido`):
+        num clube sem nivelamento, ou para o aluno que ainda não foi
+        classificado, ele seria um interruptor que não acende luz — e ocupa
+        espaço numa tela de 390px.
+      */}
+      {ofereceFiltro && (
+        <div
+          className="flex gap-2"
+          role="group"
+          aria-label="Filtrar turmas por nível"
+        >
+          {[
+            { rotulo: "Meu nível", ativo: !verTodas, valor: false },
+            { rotulo: "Todas", ativo: verTodas, valor: true },
+          ].map(({ rotulo, ativo, valor }) => (
+            <button
+              key={rotulo}
+              type="button"
+              aria-pressed={ativo}
+              onClick={() => setVerTodas(valor)}
+              className={`min-h-9 rounded-full px-4 text-[13px] font-extrabold transition-colors ${
+                ativo
+                  ? "bg-[var(--color-primary-strong)] text-white"
+                  : "bg-surface text-[var(--color-text-secondary)] ring-1 ring-border"
+              }`}
+            >
+              {rotulo}
+            </button>
+          ))}
+        </div>
+      )}
+
       {turmas.length === 0 ? (
         <section className="rounded-3xl bg-surface p-6 text-center shadow-[var(--shadow-low)] ring-1 ring-border">
           <p className="text-[13px] font-bold text-[var(--color-text-secondary)]">
             Este clube ainda não tem turmas cadastradas.
           </p>
         </section>
+      ) : visiveis.length === 0 ? (
+        /*
+          **Vazio do recorte ≠ clube sem turma.** A primeira frase tem saída
+          (o botão "Todas"); a segunda não tem. Escrever a segunda no lugar
+          da primeira faria o aluno achar que o clube não tem turma nenhuma.
+        */
+        <section className="rounded-3xl bg-surface p-6 text-center shadow-[var(--shadow-low)] ring-1 ring-border">
+          <p className="text-[13px] font-bold text-[var(--color-text-secondary)]">
+            Nenhuma turma do seu nível por enquanto.
+            {escondidas > 0
+              ? ` Toque em "Todas" para ver as outras ${escondidas === 1 ? "turma" : "turmas"} do clube.`
+              : ""}
+          </p>
+        </section>
       ) : (
         <section className="space-y-3" aria-label="Turmas do clube">
-          {turmas.map((turma) => {
+          {visiveis.map((turma) => {
             const lotada = turma.matriculados >= turma.capacidade;
             const ocupado = turma.capacidade
               ? Math.min(100, (turma.matriculados / turma.capacidade) * 100)
@@ -167,7 +235,12 @@ export function TurmasDoClube() {
                           .join(" · ")}
                       </p>
                     )}
-                    <NotaDaTurma media={medias[turma.id]} />
+                    {turma.nivelNome && (
+                      <p className="mt-0.5 text-[12px] font-extrabold text-[var(--color-primary-strong)]">
+                        {turma.nivelNome}
+                      </p>
+                    )}
+
                   </div>
 
                   {turma.jaEstouNela && (

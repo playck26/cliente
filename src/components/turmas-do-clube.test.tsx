@@ -12,6 +12,7 @@ import { ApiError } from "@/lib/api-client";
  */
 
 const listTurmasDisponiveis = vi.hoisted(() => vi.fn());
+const getMeuCadastro = vi.hoisted(() => vi.fn());
 const getMediaDaTurma = vi.hoisted(() => vi.fn());
 const entrarNaTurma = vi.hoisted(() => vi.fn());
 const sairDaTurma = vi.hoisted(() => vi.fn());
@@ -24,6 +25,7 @@ vi.mock("@/lib/api-client", async () => {
   return {
     ...real,
     listTurmasDisponiveis,
+    getMeuCadastro,
     getMediaDaTurma,
     entrarNaTurma,
     sairDaTurma,
@@ -41,12 +43,18 @@ function turma(patch: Record<string, unknown> = {}) {
     podeEntrar: true,
     motivo: null,
     encontros: [{ diaSemana: 2, horaInicio: "18:00", horaFim: "19:00" }],
+    nivelId: null,
+    nivelNome: null,
     ...patch,
   };
 }
 
 beforeEach(() => {
   vi.clearAllMocks();
+  // SPEC-057/TASK-004 — a tela passou a perguntar o nível do aluno. Padrão
+  // SEM nível: é o estado da maioria em produção, e nele o recorte não
+  // esconde nada — as provas antigas continuam medindo o que mediam.
+  getMeuCadastro.mockResolvedValue({ nivelId: null });
   getMediaDaTurma.mockResolvedValue({
     media: null,
     quantidade: 0,
@@ -252,97 +260,162 @@ describe("estados vazios", () => {
  * O mínimo continua valendo — ele é de **privacidade** antes de estatística.
  * O que mudou é que a linha sempre aparece: sem média, ela diz o que falta.
  */
-describe("a nota da turma", () => {
-  it("mostra as estrelas e a média quando há nota", async () => {
+/**
+ * SPEC-057/TASK-002/D12 (card 5352) — **a nota saiu desta tela.**
+ *
+ * Havia aqui um bloco de seis provas sobre as estrelas: a média proporcional,
+ * o caso de uma avaliação só, a turma sem nota. Elas mediam comportamento que
+ * a SPEC-025 e a SPEC-028 construíram, e que **este card manda remover** —
+ * *"ocultar nota da turma do usuário final e do professor"*. A SPEC-052 já
+ * tinha tirado do professor.
+ *
+ * Elas **não foram apagadas em silêncio**: viraram a prova do contrário. O
+ * que estas duas guardam é que a nota não volta por descuido, e que a busca
+ * saiu junto com o desenho — manter a chamada alimentando um estado que
+ * ninguém lê seria uma ida à rede por turma, por nada.
+ *
+ * A regra da média em si (proporcional, a partir da primeira avaliação)
+ * continua provada em `nota-da-turma.test.tsx`, que é de quem a desenha.
+ */
+describe("SPEC-057/TASK-002 — a nota não aparece mais para o aluno", () => {
+  beforeEach(() => {
     listTurmasDisponiveis.mockResolvedValue([turma()]);
-    getMediaDaTurma.mockResolvedValue({
-      media: 4.3,
-      quantidade: 7,
-      minimoParaMedia: 3,
-    });
-    render(<TurmasDoClube />);
-
-    expect(
-      await screen.findByLabelText("Nota 4,3 de 5, em 7 avaliações"),
-    ).toBeInTheDocument();
-    expect(screen.getByText("4,3")).toBeInTheDocument();
-    expect(screen.getByText("(7)")).toBeInTheDocument();
   });
 
-  it("turma sem nenhuma avaliação diz isso, em vez de sumir", async () => {
-    // Ausência de estrela é dúvida; estrela vazia é informação.
-    listTurmasDisponiveis.mockResolvedValue([turma()]);
-    getMediaDaTurma.mockResolvedValue({
-      media: null,
-      quantidade: 0,
-      minimoParaMedia: 3,
-    });
+  it("nenhuma estrela, nenhuma média, nenhum `avaliações`", async () => {
+    render(<TurmasDoClube />);
+    await screen.findByText("Iniciantes");
+
+    expect(screen.queryByText(/avaliaç/i)).toBeNull();
+    expect(screen.queryByText(/^[0-5],[0-9]$/)).toBeNull();
+  });
+
+  it("e a tela não pede a média ao servidor", async () => {
+    render(<TurmasDoClube />);
+    await screen.findByText("Iniciantes");
+
+    expect(getMediaDaTurma).not.toHaveBeenCalled();
+  });
+});
+
+describe("SPEC-057/TASK-004 — o recorte por nível", () => {
+  const A = "nivel-a";
+  const B = "nivel-b";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    getMediaDaTurma.mockRejectedValue(new Error("sem média"));
+    getMeuCadastro.mockResolvedValue({ nivelId: A });
+  });
+
+  it("AC-023: por padrão, some a turma de outro nível", async () => {
+    listTurmasDisponiveis.mockResolvedValue([
+      turma({ id: "t1", nome: "Do meu nível", nivelId: A, nivelNome: "A" }),
+      turma({ id: "t2", nome: "De outro nível", nivelId: B, nivelNome: "B" }),
+    ]);
+
     render(<TurmasDoClube />);
 
-    expect(await screen.findByText("Ainda sem avaliações")).toBeInTheDocument();
-    expect(screen.getByLabelText("Ainda sem nota")).toBeInTheDocument();
+    expect(await screen.findByText("Do meu nível")).toBeInTheDocument();
+    expect(screen.queryByText("De outro nível")).toBeNull();
+  });
+
+  it("AC-023: e o nível da turma aparece no cartão", async () => {
+    listTurmasDisponiveis.mockResolvedValue([
+      turma({ nivelId: A, nivelNome: "Iniciante" }),
+    ]);
+
+    render(<TurmasDoClube />);
+
+    expect(await screen.findByText("Iniciante")).toBeInTheDocument();
+  });
+
+  it("AC-025: `Ver todas` revela o que o recorte escondeu", async () => {
+    listTurmasDisponiveis.mockResolvedValue([
+      turma({ id: "t1", nome: "Do meu nível", nivelId: A, nivelNome: "A" }),
+      turma({ id: "t2", nome: "De outro nível", nivelId: B, nivelNome: "B" }),
+    ]);
+
+    render(<TurmasDoClube />);
+    await screen.findByText("Do meu nível");
+
+    fireEvent.click(screen.getByRole("button", { name: /Todas/ }));
+
+    expect(await screen.findByText("De outro nível")).toBeInTheDocument();
+  });
+
+  /** **INV-141** — o caso da maioria dos alunos hoje. */
+  it("AC-024: aluno SEM nível vê tudo, e o filtro nem aparece", async () => {
+    getMeuCadastro.mockResolvedValue({ nivelId: null });
+    listTurmasDisponiveis.mockResolvedValue([
+      turma({ id: "t1", nome: "Do nível A", nivelId: A, nivelNome: "A" }),
+      turma({ id: "t2", nome: "Do nível B", nivelId: B, nivelNome: "B" }),
+    ]);
+
+    render(<TurmasDoClube />);
+
+    expect(await screen.findByText("Do nível A")).toBeInTheDocument();
+    expect(screen.getByText("Do nível B")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Todas/ })).toBeNull();
+  });
+
+  it("AC-024: turma SEM nível aparece para quem tem nível", async () => {
+    listTurmasDisponiveis.mockResolvedValue([
+      turma({ id: "t1", nome: "Sem nivelamento", nivelId: null }),
+      turma({ id: "t2", nome: "De outro nível", nivelId: B, nivelNome: "B" }),
+    ]);
+
+    render(<TurmasDoClube />);
+
+    expect(await screen.findByText("Sem nivelamento")).toBeInTheDocument();
+    expect(screen.queryByText("De outro nível")).toBeNull();
   });
 
   /**
-   * **SPEC-028 — estas duas provas foram INVERTIDAS, e o motivo fica junto.**
-   *
-   * Elas exigiam o contrário: que a média NÃO aparecesse com 2 avaliações, e
-   * que a tela dissesse "2 de 3 avaliações". Era o mínimo de 3 (D4 da
-   * SPEC-025), removido por decisão do Israel em 2026-08-30 — ele viu a tela e
-   * perguntou *"o que seria 2 de 3 aval?"*.
-   *
-   * Invertidas em vez de apagadas: quem abrir o `git log` daqui a seis meses
-   * vai encontrar uma prova que dizia o oposto, e precisa achar o porquê no
-   * mesmo lugar.
-   *
-   * **O que se perdeu:** o mínimo era privacidade. Com uma nota, a média É
-   * aquela nota. Sinalizado a ele antes; decisão dele.
+   * **AC-025 — o vazio tem de dizer a verdade.** "Nenhuma turma do seu nível"
+   * e "o clube não tem turma" são coisas diferentes, e só a primeira tem
+   * saída.
    */
-  it("com 2 avaliações, a média APARECE — antes era escondida", async () => {
-    listTurmasDisponiveis.mockResolvedValue([turma()]);
-    getMediaDaTurma.mockResolvedValue({ media: 4.5, quantidade: 2 });
+  it("AC-025: vazio do filtro é diferente de clube sem turma", async () => {
+    listTurmasDisponiveis.mockResolvedValue([
+      turma({ id: "t2", nome: "De outro nível", nivelId: B, nivelNome: "B" }),
+    ]);
+
     render(<TurmasDoClube />);
 
-    expect(await screen.findByText("4,5")).toBeInTheDocument();
-    expect(screen.getByText("(2)")).toBeInTheDocument();
-    // E a contagem some do lugar onde ela fingia ser nota.
-    expect(screen.queryByText(/de 3 avaliações/)).not.toBeInTheDocument();
+    expect(
+      await screen.findByText(/Nenhuma turma do seu nível/),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/ainda não tem turmas cadastradas/),
+    ).toBeNull();
   });
 
-  it("com UMA avaliação também — é o caso que custa a privacidade", async () => {
-    // Explícito de propósito: numa turma de dois alunos, esta média é a nota
-    // de um deles, e o professor sabe de quem. Está aqui para ninguém achar
-    // que foi descuido.
-    listTurmasDisponiveis.mockResolvedValue([turma()]);
-    getMediaDaTurma.mockResolvedValue({ media: 2, quantidade: 1 });
+  it("clube sem turma nenhuma continua com a mensagem de sempre", async () => {
+    listTurmasDisponiveis.mockResolvedValue([]);
+
     render(<TurmasDoClube />);
 
-    expect(await screen.findByText("2,0")).toBeInTheDocument();
     expect(
-      screen.getByLabelText("Nota 2,0 de 5, em 1 avaliação"),
+      await screen.findByText(/ainda não tem turmas cadastradas/),
     ).toBeInTheDocument();
   });
 
-  it("as estrelas preenchem PROPORCIONALMENTE, não arredondado", async () => {
-    // O defeito anterior: `n <= Math.round(nota)` desenhava a MESMA imagem
-    // para 4,3 e 4,4. Agora a largura da fileira dourada é a nota / 5.
-    listTurmasDisponiveis.mockResolvedValue([turma()]);
-    getMediaDaTurma.mockResolvedValue({ media: 3.5, quantidade: 4 });
-    const { container } = render(<TurmasDoClube />);
+  /**
+   * **O filtro não pode derrubar a tela.** O nível é informação secundária:
+   * se `/me/cadastro` falhar, a lista continua — sem recorte, que é o
+   * comportamento seguro (mostra mais, não menos).
+   */
+  it("falha ao ler o cadastro: a lista aparece inteira, sem filtro", async () => {
+    getMeuCadastro.mockRejectedValue(new Error("rede"));
+    listTurmasDisponiveis.mockResolvedValue([
+      turma({ id: "t1", nome: "Do nível A", nivelId: A, nivelNome: "A" }),
+      turma({ id: "t2", nome: "Do nível B", nivelId: B, nivelNome: "B" }),
+    ]);
 
-    await screen.findByText("3,5");
-    const dourada = container.querySelector<HTMLElement>("[style*='width']");
-    expect(dourada?.style.width).toBe("70%");
-  });
-
-  it("enquanto a média não chega, não desenha meia estrela", async () => {
-    // Meia estrela piscando é pior que esperar meio segundo.
-    listTurmasDisponiveis.mockResolvedValue([turma()]);
-    getMediaDaTurma.mockReturnValue(new Promise(() => undefined));
     render(<TurmasDoClube />);
 
-    await screen.findByText("Iniciantes");
-    expect(screen.queryByLabelText(/Nota/)).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Ainda sem nota")).not.toBeInTheDocument();
+    expect(await screen.findByText("Do nível A")).toBeInTheDocument();
+    expect(screen.getByText("Do nível B")).toBeInTheDocument();
   });
 });
