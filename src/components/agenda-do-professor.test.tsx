@@ -504,6 +504,34 @@ describe("SPEC-030 — aula nao realizada no calendario", () => {
     expect(screen.queryByText("Chamada pendente")).not.toBeInTheDocument();
   });
 
+  // SPEC-057/TASK-001/D4 — o mesmo cuidado para a aula sem ninguém: neutro,
+  // sem ponto vermelho e sem cair no fallback.
+  it("mostra 'Sem participantes', neutro, sem cobrar chamada", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-09-15T12:00:00.000Z"));
+    getAgendaDoProfessor.mockResolvedValue([
+      { data: "2026-09-01", aulas: 1, pendentes: 0 },
+    ]);
+    getAulasDoDia.mockResolvedValue([
+      {
+        ocupacaoId: "ocup-4",
+        turmaId: "t1",
+        turmaNome: "Infantil A",
+        quadraNome: "Quadra 1",
+        horaInicio: "09:00",
+        horaFim: "10:00",
+        chamada: "sem_participantes",
+      },
+    ]);
+
+    render(<AgendaDoProfessor />);
+    fireEvent.click(await screen.findByLabelText("1: 1 aula"));
+
+    expect(await screen.findByText("Sem participantes")).toBeInTheDocument();
+    expect(screen.queryByText("Ainda não começou")).not.toBeInTheDocument();
+    expect(screen.queryByText("Chamada pendente")).not.toBeInTheDocument();
+  });
+
   /**
    * SPEC-039/LIM-039a — **a aula particular, e o defeito que ela deixou em
    * produção.**

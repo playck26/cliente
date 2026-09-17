@@ -202,6 +202,15 @@ export class ApiError extends Error {
      * codigo especifico.
      */
     public code?: string,
+    /**
+     * SPEC-057/TASK-001/D2 — **o corpo inteiro do erro, quando havia um.**
+     *
+     * O `409 CHAMADA_DESATUALIZADA` passou a carregar `fechamentoAutomatico`,
+     * e a tela precisa dele para escolher a frase. Campo solto e não um
+     * `fechamentoAutomatico?` aqui: o próximo sinal de outro erro não deve
+     * precisar mexer nesta classe.
+     */
+    public corpo?: Record<string, unknown>,
   ) {
     super(message);
   }
@@ -235,15 +244,21 @@ async function parseError(res: Response, fallback: string): Promise<ApiError> {
       ? body.code
       : undefined;
 
+  const corpo =
+    body && typeof body === "object"
+      ? (body as Record<string, unknown>)
+      : undefined;
+
   if (res.status === 403 && message === FORBIDDEN_CRU) {
     return new ApiError(
       res.status,
       "Sua conta não tem acesso a esta área.",
       code,
+      corpo,
     );
   }
 
-  return new ApiError(res.status, message, code);
+  return new ApiError(res.status, message, code, corpo);
 }
 
 /**
