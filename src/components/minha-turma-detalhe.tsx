@@ -277,7 +277,9 @@ export function MinhaTurmaDetalheView({ id }: { id: string }) {
                               ? "aula cancelada"
                               : o.estado === "nao_houve"
                                 ? "aula não realizada"
-                                : o.chamadaFeita
+                                : o.estado === "sem_participantes"
+                                  ? "sem participantes"
+                                  : o.chamadaFeita
                                   ? `chamada feita · ${o.marcados}/${o.totalAlunos}`
                                   : o.podeLancar
                                     ? "fazer chamada"

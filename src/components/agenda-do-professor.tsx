@@ -569,6 +569,16 @@ function EstadoDaChamada({ estado }: { estado: string | null }) {
       classe:
         "bg-[var(--color-surface-container-high)] text-[var(--color-text-secondary)]",
     },
+    /*
+      SPEC-057/TASK-001/D4 — terminou depois da ativação da presença
+      automática, sem ninguém matriculado nem repondo. Neutro, como o
+      `nao_houve`: não há chamada que o professor tenha deixado de fazer.
+    */
+    sem_participantes: {
+      texto: "Sem participantes",
+      classe:
+        "bg-[var(--color-surface-container-high)] text-[var(--color-text-secondary)]",
+    },
   };
   /**
    * **`null` é a aula particular** (SPEC-039/LIM-039a), e ela precisa de

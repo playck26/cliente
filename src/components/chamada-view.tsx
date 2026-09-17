@@ -16,11 +16,45 @@ import {
   type StatusPresenca,
 } from "@/lib/api-client";
 
+/**
+ * SPEC-057/TASK-001/D7 — **"Justificou" saiu das opções.** Com a presença
+ * automática, a correção do professor é dizer quem FALTOU; a terceira opção
+ * dividia a mesma falta em duas marcas sem mudar nada na frequência.
+ *
+ * O valor continua existindo: chamada antiga com `justificado` é lida e
+ * mostrada (ver `JustificadoLegado`), e salvar sem tocar nesse aluno mantém a
+ * marca. O que muda é só que a tela não oferece mais criar uma.
+ */
 const OPCOES: { valor: StatusPresenca; label: string; Icon: typeof Check }[] = [
   { valor: "presente", label: "Veio", Icon: Check },
   { valor: "ausente", label: "Faltou", Icon: Minus },
-  { valor: "justificado", label: "Justificou", Icon: CircleSlash },
 ];
+
+/** `2026-09-25T17:00:00.000Z` → `25/09 às 14:00`, no relógio de quem lê. */
+function formatarPrazo(iso: string): string {
+  const d = new Date(iso);
+  const dois = (n: number) => String(n).padStart(2, "0");
+  return `${dois(d.getDate())}/${dois(d.getMonth() + 1)} às ${dois(d.getHours())}:${dois(d.getMinutes())}`;
+}
+
+const ROTULO: Record<string, string> = {
+  presente: "Veio",
+  ausente: "Faltou",
+  justificado: "Justificou",
+};
+
+/**
+ * SPEC-057/TASK-001/D2 — o que a revisão da versão atual encontrou, para a
+ * tela dizer antes de o professor salvar de novo.
+ */
+interface Revisao {
+  /** Estavam no rascunho e não estão mais na chamada. */
+  removidos: string[];
+  /** Entraram na chamada e precisam ser marcados. */
+  novos: string[];
+  /** O salvo difere do rascunho — o rascunho foi mantido. */
+  divergentes: { nome: string; salvo: string; rascunho: string }[];
+}
 
 /**
  * SPEC-014 — a chamada.
@@ -49,7 +83,16 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
   const [marcas, setMarcas] = useState<Record<string, StatusPresenca>>({});
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
-  const [conflito, setConflito] = useState(false);
+  /**
+   * SPEC-057/TASK-001/D2 — o 409, com o sinal do servidor. `null` sem
+   * conflito. `fechamentoAutomatico` escolhe a frase; ele diz que a chamada
+   * NASCEU automática, não que a última mudança foi do job.
+   */
+  const [conflito, setConflito] = useState<{
+    fechamentoAutomatico: boolean;
+  } | null>(null);
+  const [revisando, setRevisando] = useState(false);
+  const [revisao, setRevisao] = useState<Revisao | null>(null);
   const [salvo, setSalvo] = useState(false);
   /**
    * **SPEC-030 / achado 2 da 3ª validação cruzada (MÉDIA) — o rascunho que a
@@ -75,6 +118,12 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
    * que já aconteceu.
    */
   const [releituraFalhou, setReleituraFalhou] = useState(false);
+  /**
+   * SPEC-057/TASK-001/D5 — o relógio do prazo é o da abertura da tela, e não
+   * o de cada render: render tem de ser puro. Tela aberta que atravessa o
+   * prazo descobre pelo `422 AULA_ANTIGA` do servidor, que é o portão.
+   */
+  const [abertaEm] = useState(() => Date.now());
 
   useEffect(() => {
     getChamada(ocupacaoId)
@@ -129,7 +178,7 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
   async function salvar() {
     if (!chamada) return;
     setErro(null);
-    setConflito(false);
+    setConflito(null);
     setSalvando(true);
     // O retrato do que está saindo. Tudo o que a resposta afirmar vale sobre
     // ESTE conjunto, não sobre o que a tela mostrar quando ela chegar.
@@ -158,10 +207,15 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
       // Não relê do servidor: **sabemos exatamente o que foi gravado**, e um
       // GET a mais na pior rede do produto (em quadra) não paga o que já
       // temos em mãos.
+      setRevisao(null);
       setChamada({
         ...chamada,
         versao: res.versao,
         completude: "completa",
+        // SPEC-057/TASK-001/D5 — salvar é ratificar: a origem atual vira a do
+        // professor, e a inicial (como a chamada nasceu) fica.
+        origem: "professor",
+        origemInicial: chamada.origemInicial ?? "professor",
         alunos: chamada.alunos.map((a) => ({
           ...a,
           status: enviadas[a.alunoId] ?? a.status,
@@ -178,7 +232,9 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
       setSalvo(edicoes.current === edicoesNoEnvio);
     } catch (err) {
       if (err instanceof ApiError && err.status === 409) {
-        setConflito(true);
+        setConflito({
+          fechamentoAutomatico: err.corpo?.fechamentoAutomatico === true,
+        });
       } else {
         setErro(
           err instanceof ApiError ? err.message : "Não foi possível salvar.",
@@ -186,6 +242,72 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
       }
     } finally {
       setSalvando(false);
+    }
+  }
+
+  /**
+   * SPEC-057/TASK-001/D2 — **revisar a versão atual sem perder o rascunho.**
+   *
+   * Era `window.location.reload()`, que jogava fora exatamente o que o aviso
+   * prometia guardar ("suas marcações continuam aqui"). Agora:
+   *
+   * - relê pelo GET, sem recarregar a página;
+   * - reaplica o rascunho **só aos alunos que continuam na chamada**;
+   * - lista quem saiu, quem entrou (e precisa ser marcado) e onde o salvo
+   *   difere do rascunho;
+   * - **não salva sozinho**: o professor confere e toca em Salvar de novo,
+   *   agora contra a versão atual.
+   *
+   * GET que falha conserva tudo — rascunho e aviso — e diz isso. Recarregar a
+   * página ou fechar o navegador perde o rascunho (LIM-057k): ele mora só na
+   * memória, sem storage de dado pessoal.
+   */
+  async function revisarVersaoAtual() {
+    if (!chamada) return;
+    setErro(null);
+    setRevisando(true);
+    const rascunho = marcas;
+    try {
+      const atual = await getChamada(chamada.ocupacaoId);
+      const idsAtuais = new Set(atual.alunos.map((a) => a.alunoId));
+      const idsAntigos = new Set(chamada.alunos.map((a) => a.alunoId));
+      const reaplicadas: Record<string, StatusPresenca> = {};
+      for (const aluno of atual.alunos) {
+        const minha = rascunho[aluno.alunoId];
+        if (minha) reaplicadas[aluno.alunoId] = minha;
+      }
+      setRevisao({
+        removidos: chamada.alunos
+          .filter((a) => rascunho[a.alunoId] && !idsAtuais.has(a.alunoId))
+          .map((a) => a.nome),
+        novos: atual.alunos
+          .filter((a) => !idsAntigos.has(a.alunoId))
+          .map((a) => a.nome),
+        divergentes: atual.alunos
+          .filter(
+            (a) =>
+              a.status !== null &&
+              rascunho[a.alunoId] !== undefined &&
+              rascunho[a.alunoId] !== a.status,
+          )
+          .map((a) => ({
+            nome: a.nome,
+            salvo: ROTULO[a.status as string] ?? String(a.status),
+            rascunho: ROTULO[rascunho[a.alunoId]] ?? rascunho[a.alunoId],
+          })),
+      });
+      setChamada(atual);
+      setMarcas(reaplicadas);
+      edicoes.current += 1;
+      setSalvo(false);
+      setConflito(null);
+    } catch {
+      setErro(
+        "Não foi possível carregar a versão atual. Suas marcações continuam " +
+          "aqui — tente revisar de novo.",
+      );
+    } finally {
+      setRevisando(false);
     }
   }
 
@@ -202,6 +324,9 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
     if (
       !window.confirm(
         "Registrar que esta aula NÃO aconteceu?\n\n" +
+          (automaticaNaoRevisada
+            ? "As presenças do fechamento automático serão apagadas. "
+            : "") +
           "Ela sai da lista de chamadas pendentes e não conta na frequência " +
           "de ninguém. Você pode desfazer lançando a chamada normalmente.",
       )
@@ -209,7 +334,7 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
       return;
     }
     setErro(null);
-    setConflito(false);
+    setConflito(null);
     setSalvando(true);
     const edicoesNoEnvio = edicoes.current;
     try {
@@ -264,6 +389,17 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
   /** SPEC-030 — alguém já declarou que esta aula não aconteceu. */
   const naoHouve = chamada?.completude === "nao_houve";
   /**
+   * SPEC-057/TASK-001/D5 — a chamada que nasceu automática tem prazo próprio:
+   * sete dias desde o fechamento. Passado, a tela vira histórico — o servidor
+   * recusaria com `AULA_ANTIGA`, e oferecer a ação seria ensinar pelo erro.
+   */
+  const prazoEncerrado = Boolean(
+    chamada?.corrigivelAte &&
+      new Date(chamada.corrigivelAte).getTime() <= abertaEm,
+  );
+  /** SPEC-057/TASK-001/D5 — fechada pelo job e ainda sem revisão humana. */
+  const automaticaNaoRevisada = chamada?.origem === "automatica";
+  /**
    * SPEC-031/AC-019b — **modo histórico: a aula cancelada é alcançável e é
    * somente leitura.**
    *
@@ -278,7 +414,7 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
    * numa tela declarada somente leitura. O critério é a ausência de **toda**
    * ação mutadora.
    */
-  const historico = chamada?.cancelada === true;
+  const historico = chamada?.cancelada === true || prazoEncerrado;
   /**
    * **SPEC-030 / achado 3 da validação cruzada (MÉDIA).**
    *
@@ -295,6 +431,14 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
   const temPresencaSalva = Boolean(
     chamada?.alunos.some((a) => a.status !== null),
   );
+  /**
+   * SPEC-057/TASK-001/D5 — **a exceção estreita.** Presença salva esconde o
+   * botão, menos quando quem salvou foi o fechamento automático e ninguém
+   * revisou: ali as presenças são presunção, e o servidor aceita declarar que
+   * a aula não aconteceu (apagando-as) dentro do prazo.
+   */
+  const podeDizerQueNaoHouve =
+    !naoHouve && (!temPresencaSalva || automaticaNaoRevisada) && !releituraFalhou;
   // INV-026: o servidor recusa chamada incompleta. A tela impede antes de a
   // pessoa tentar, porque descobrir isso por erro de rede, em quadra, é o
   // pior momento possível.
@@ -365,7 +509,7 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
             Eles são pré-existentes, mas só ficaram alcançáveis por navegação
             normal porque este mesmo PR criou o link para a aula cancelada — o
             link expôs uma contradição que já morava aqui. */}
-        {historico ? (
+        {historico && chamada?.cancelada ? (
           <p
             role="status"
             className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-high)] p-3 text-sm"
@@ -374,6 +518,46 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
             registro fica aqui, inclusive quem avisou que ia faltar
             {naoHouve ? " e o registro de que ela não aconteceu" : ""}. Nada
             mais pode ser alterado.
+          </p>
+        ) : null}
+        {prazoEncerrado && !chamada?.cancelada && chamada?.corrigivelAte ? (
+          <p
+            role="status"
+            className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-high)] p-3 text-sm"
+          >
+            <strong>Prazo de correção encerrado.</strong> Esta chamada foi
+            fechada automaticamente e podia ser corrigida até{" "}
+            {formatarPrazo(chamada.corrigivelAte)}. Agora é histórico somente
+            leitura.
+          </p>
+        ) : null}
+
+        {/* SPEC-057/TASK-001/D1/D5 — de onde veio o que está salvo. Sem isso,
+            "todos vieram" gravado pelo job e "todos vieram" dito pelo
+            professor seriam a mesma tela. */}
+        {chamada && !historico && chamada.origem === "automatica" && chamada.corrigivelAte ? (
+          <p
+            role="status"
+            className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-high)] p-3 text-sm"
+          >
+            <strong>Fechada automaticamente.</strong> Presenças automáticas são
+            presumidas; faltas devem ser corrigidas pelo professor. Marque quem
+            faltou e salve até {formatarPrazo(chamada.corrigivelAte)}.
+          </p>
+        ) : null}
+        {chamada &&
+        !historico &&
+        chamada.origemInicial === "automatica" &&
+        chamada.origem !== "automatica" &&
+        chamada.corrigivelAte ? (
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            Fechada automaticamente e revisada. Correções até{" "}
+            {formatarPrazo(chamada.corrigivelAte)}.
+          </p>
+        ) : null}
+        {chamada?.origem === "legada_humana" ? (
+          <p className="text-sm text-[var(--color-text-secondary)]">
+            Registro humano anterior à automação.
           </p>
         ) : null}
 
@@ -394,18 +578,45 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
             role="alert"
             className="flex flex-col gap-2 rounded-lg border border-[var(--color-error)] p-3 text-sm"
           >
+            {/* SPEC-057/TASK-001/D2 — a frase genérica não diz "outro
+                aparelho": quem mudou pode ter sido o fechamento automático,
+                outra pessoa ou esta mesma conta noutra aba. */}
             <span>
-              Esta chamada mudou em outro aparelho. Suas marcações continuam
-              aqui — recarregue para ver o que está salvo antes de decidir.
+              {conflito.fechamentoAutomatico
+                ? "Esta aula foi fechada automaticamente e a chamada mudou desde sua leitura. Revise a versão atual."
+                : "Esta chamada mudou desde sua leitura. Revise a versão atual."}{" "}
+              Suas marcações continuam aqui e nada foi salvo.
             </span>
             <Button
               type="button"
               variant="outline"
               className="self-start"
-              onClick={() => window.location.reload()}
+              disabled={revisando}
+              onClick={() => void revisarVersaoAtual()}
             >
-              Recarregar
+              {revisando ? "Carregando..." : "Revisar versão atual"}
             </Button>
+          </div>
+        ) : null}
+
+        {revisao ? (
+          <div
+            role="status"
+            className="flex flex-col gap-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-high)] p-3 text-sm"
+          >
+            <strong>Versão atual carregada — confira antes de salvar.</strong>
+            <span>Suas marcações foram mantidas para quem continua na chamada.</span>
+            {revisao.divergentes.map((d) => (
+              <span key={`d-${d.nome}`}>
+                {d.nome}: salvo “{d.salvo}”, seu rascunho “{d.rascunho}”.
+              </span>
+            ))}
+            {revisao.novos.length > 0 ? (
+              <span>Entraram e precisam ser marcados: {revisao.novos.join(", ")}.</span>
+            ) : null}
+            {revisao.removidos.length > 0 ? (
+              <span>Não estão mais nesta chamada: {revisao.removidos.join(", ")}.</span>
+            ) : null}
           </div>
         ) : null}
 
@@ -427,11 +638,14 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
                         tela diz por que ele ainda aparece aqui. */}
                     {!aluno.naTurmaHoje ? (
                       <span className="rounded-full bg-[var(--color-surface-container-high)] px-2 py-0.5 text-xs text-[var(--color-text-secondary)]">
-                        não está mais na turma
+                        {aluno.reposicao ? "repondo aula" : "não está mais na turma"}
                       </span>
                     ) : null}
+                    {marcas[aluno.alunoId] === "justificado" ? (
+                      <JustificadoLegado />
+                    ) : null}
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     {OPCOES.map(({ valor, label, Icon }) => {
                       const ativo = marcas[aluno.alunoId] === valor;
                       return (
@@ -506,7 +720,7 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
               `CHAMADA_COM_PRESENCA`. Marca local não conta: ela é
               reversível, e sumir com o botão por causa dela deixava o
               professor sem saída (achado 3 da validação cruzada). */}
-          {!naoHouve && !temPresencaSalva && !releituraFalhou ? (
+          {podeDizerQueNaoHouve ? (
             <Button
               type="button"
               variant="ghost"
@@ -520,5 +734,21 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
         </div>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * SPEC-057/TASK-001/D7 — a marca antiga que a tela não oferece mais.
+ *
+ * Sem este selo, o aluno marcado `justificado` apareceria com os dois botões
+ * apagados, e a tela contaria como "marcado" alguém que o professor não vê
+ * marcado. Tocar em Veio ou Faltou troca a marca; não tocar mantém.
+ */
+function JustificadoLegado() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-surface-container-high)] px-2 py-0.5 text-xs text-[var(--color-text-secondary)]">
+      <CircleSlash className="size-3" aria-hidden="true" />
+      Justificou (registro antigo)
+    </span>
   );
 }

@@ -166,7 +166,6 @@ export type AulaDoDiaDoProfessor =
 /** SPEC-025 — apelidos do schema, nunca escritos a mao (INV-059). */
 export type AulaAnterior = components["schemas"]["AulaAnteriorResponseDto"];
 export type MinhaAvaliacao = components["schemas"]["MinhaAvaliacaoResponseDto"];
-export type MediaDaTurma = components["schemas"]["MediaDaTurmaResponseDto"];
 
 /** SPEC-024 — apelidos do schema, nunca escritos a mao (INV-059). */
 export type AceitesPendentes =
@@ -203,6 +202,15 @@ export class ApiError extends Error {
      * codigo especifico.
      */
     public code?: string,
+    /**
+     * SPEC-057/TASK-001/D2 — **o corpo inteiro do erro, quando havia um.**
+     *
+     * O `409 CHAMADA_DESATUALIZADA` passou a carregar `fechamentoAutomatico`,
+     * e a tela precisa dele para escolher a frase. Campo solto e não um
+     * `fechamentoAutomatico?` aqui: o próximo sinal de outro erro não deve
+     * precisar mexer nesta classe.
+     */
+    public corpo?: Record<string, unknown>,
   ) {
     super(message);
   }
@@ -236,15 +244,21 @@ async function parseError(res: Response, fallback: string): Promise<ApiError> {
       ? body.code
       : undefined;
 
+  const corpo =
+    body && typeof body === "object"
+      ? (body as Record<string, unknown>)
+      : undefined;
+
   if (res.status === 403 && message === FORBIDDEN_CRU) {
     return new ApiError(
       res.status,
       "Sua conta não tem acesso a esta área.",
       code,
+      corpo,
     );
   }
 
-  return new ApiError(res.status, message, code);
+  return new ApiError(res.status, message, code, corpo);
 }
 
 /**
@@ -917,18 +931,6 @@ export async function avaliarAula(
     body: JSON.stringify(dados),
   });
   return (await res.json()) as MinhaAvaliacao;
-}
-
-/**
- * SPEC-025 — a media da TURMA, agregada das notas das aulas dela.
- *
- * A aula nao tem media propria (decisao do Israel). Esta resposta NAO traz
- * autoria nem comentario — INV-025a, e o servidor garante isso com um DTO
- * separado, nao com um filtro.
- */
-export async function getMediaDaTurma(turmaId: string): Promise<MediaDaTurma> {
-  const res = await authFetch(`/me/classes/${turmaId}/avaliacao`);
-  return (await res.json()) as MediaDaTurma;
 }
 
 export async function listTurmasDisponiveis(): Promise<TurmaDisponivel[]> {

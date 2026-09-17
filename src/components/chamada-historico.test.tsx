@@ -112,12 +112,13 @@ describe("ChamadaView — modo histórico da aula cancelada (AC-019b)", () => {
    * rascunho: rascunho é a metade do caminho para o `PUT`, e uma tela que
    * aceita a marcação está prometendo um salvamento que nunca virá.
    */
-  it("tocar Veio/Faltou/Justificou não marca nada e não chama a rede", async () => {
+  // SPEC-057/TASK-001/D7 — "Justificou" deixou de ser opção; sobram duas.
+  it("tocar Veio/Faltou não marca nada e não chama a rede", async () => {
     getChamadaMock.mockResolvedValue(chamadaCancelada(["Ana"]));
     render(<ChamadaView ocupacaoId="oc1" />);
     await screen.findByText("Ana");
 
-    for (const rotulo of [/Veio/, /Faltou/, /Justificou/]) {
+    for (const rotulo of [/Veio/, /Faltou/]) {
       const botao = screen.getByRole("button", { name: rotulo });
       fireEvent.click(botao);
       // Continua sem marca: o toque não virou rascunho.
