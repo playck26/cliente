@@ -75,9 +75,20 @@ export function NovaReserva({ tipo }: { tipo: string | null }) {
    * toca `localStorage`: fora do inicializador preguiçoso ela rodaria a cada
    * desenho, e no servidor nem existiria.
    */
-  const [nomes, setNomes] = useState<NomesDeTipo>(
-    () => nomesGuardados() ?? NOMES_PADRAO,
-  );
+  /**
+   * `null` = **ainda não se sabe o nome**, e é diferente de "é o padrão".
+   *
+   * A validação independente de 2026-09-18 derrubou a versão anterior: o
+   * aquecimento no login é `void`, então no **primeiro** acesso o
+   * armazenamento ainda está vazio quando esta tela desenha — e ela voltava a
+   * escrever "Quadra" para depois trocar. Era exatamente o defeito que o
+   * Israel tinha reclamado.
+   *
+   * Agora, sem nome conhecido, o cartão aparece **com o rótulo em suspenso**:
+   * o caminho continua clicável (que era a razão de não esperar), e nenhuma
+   * palavra errada é mostrada para ser trocada meio segundo depois.
+   */
+  const [nomes, setNomes] = useState<NomesDeTipo | null>(() => nomesGuardados());
 
   useEffect(() => {
     let vivo = true;
@@ -116,7 +127,8 @@ export function NovaReserva({ tipo }: { tipo: string | null }) {
           <AulaParticular />
         ) : (
           <ul className="space-y-3 px-5" aria-label="Tipos de reserva">
-            {tiposDeReserva(nomes).map(({ id, nome, descricao, Icon }) => (
+            {tiposDeReserva(nomes ?? NOMES_PADRAO).map(
+              ({ id, nome, descricao, Icon }) => (
               <li key={id}>
                 <Link
                   href={`/reservas/nova?tipo=${id}`}
@@ -126,7 +138,14 @@ export function NovaReserva({ tipo }: { tipo: string | null }) {
                     <Icon className="size-[26px]" strokeWidth={2.25} aria-hidden="true" />
                   </span>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-lg font-extrabold">{nome}</span>
+                    {nomes ? (
+                      <span className="block text-lg font-extrabold">{nome}</span>
+                    ) : (
+                      <span
+                        aria-hidden="true"
+                        className="block h-[1.4em] w-32 animate-pulse rounded-lg bg-[var(--color-surface-container)]"
+                      />
+                    )}
                     <span className="mt-0.5 block text-[13px] font-medium text-[var(--color-text-secondary)]">
                       {descricao}
                     </span>
@@ -137,7 +156,8 @@ export function NovaReserva({ tipo }: { tipo: string | null }) {
                   />
                 </Link>
               </li>
-            ))}
+              ),
+            )}
           </ul>
         )}
       </div>

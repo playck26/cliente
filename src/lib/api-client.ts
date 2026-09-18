@@ -138,6 +138,12 @@ export type Booking = components["schemas"]["OcupacaoResponseDto"];
 export type ItemDaListaDeReservas =
   components["schemas"]["ItemDaListaDeReservasDto"];
 
+/** O resultado da varredura de uma janela: os itens, e se o teto cortou. */
+export type ReservasDaJanela = {
+  itens: ItemDaListaDeReservas[];
+  truncou: boolean;
+};
+
 export type TurmaDoAlunoDetalhe =
   components["schemas"]["TurmaDoAlunoDetalheResponseDto"];
 export type ColegaDeTurma = components["schemas"]["ColegaDeTurmaResponseDto"];
@@ -1043,20 +1049,29 @@ export async function listMyBookingsPaginado(
  * Agora pagina até o fim da janela, com teto de segurança: um mês de agenda
  * cabe em uma ou duas voltas, e o laço nunca fica preso se o servidor
  * responder algo inesperado.
+ *
+ * **O teto é declarado, não escondido** (achado da validação independente de
+ * 2026-09-18): com 1.001 reservas na janela, as primeiras 1.000 vinham e a
+ * milésima primeira sumia **em silêncio**. Agora a função devolve
+ * `truncou: true` quando o teto fecha antes do fim, e quem desenha decide o
+ * que dizer. Para dar nisso hoje seria preciso um aluno com mil reservas em
+ * dois meses; o silêncio é que não podia ficar.
  */
 const PAGINAS_NO_MAXIMO = 10;
+const POR_PAGINA = 100;
 
 export async function listMyBookings(janela: {
   de: string;
   ate: string;
-}): Promise<ItemDaListaDeReservas[]> {
-  const tudo: ItemDaListaDeReservas[] = [];
+}): Promise<ReservasDaJanela> {
+  const itens: ItemDaListaDeReservas[] = [];
+  let truncou = false;
   for (let page = 1; page <= PAGINAS_NO_MAXIMO; page++) {
     const busca = new URLSearchParams({
       de: janela.de,
       ate: janela.ate,
       page: String(page),
-      pageSize: "100",
+      pageSize: String(POR_PAGINA),
     });
     const res = await authFetch(`/bookings?${busca.toString()}`);
     const corpo = (await res.json()) as {
@@ -1064,14 +1079,15 @@ export async function listMyBookings(janela: {
       total?: number;
     };
     const pagina = corpo.data ?? [];
-    tudo.push(...pagina);
-    // Para quando a página veio incompleta (última) ou quando já se tem tudo
-    // o que o servidor disse existir.
-    if (pagina.length < 100 || tudo.length >= (corpo.total ?? tudo.length)) {
-      break;
+    itens.push(...pagina);
+    // Acabou quando a página veio incompleta (é a última) ou quando já se tem
+    // tudo o que o servidor disse existir.
+    if (pagina.length < POR_PAGINA || itens.length >= (corpo.total ?? itens.length)) {
+      return { itens, truncou: false };
     }
+    truncou = page === PAGINAS_NO_MAXIMO;
   }
-  return tudo;
+  return { itens, truncou };
 }
 
 /**
