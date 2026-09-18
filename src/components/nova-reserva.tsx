@@ -9,7 +9,12 @@ import { CourtsList } from "@/components/courts-list";
 import { TennisBallIcon } from "@/components/icons/tennis-ball-icon";
 import { TennisCourtIcon } from "@/components/icons/tennis-court-icon";
 import { TopAppBar } from "@/components/top-app-bar";
-import { NOMES_PADRAO, lerNomesDeTipo, type NomesDeTipo } from "@/lib/nomes-de-tipo";
+import {
+  NOMES_PADRAO,
+  lerNomesDeTipo,
+  nomesGuardados,
+  type NomesDeTipo,
+} from "@/lib/nomes-de-tipo";
 
 /**
  * SPEC-053/D3 — **`/reservas/nova`: escolher o TIPO antes do horário.**
@@ -58,7 +63,21 @@ export function NovaReserva({ tipo }: { tipo: string | null }) {
   // Tipo desconhecido mostra os cartões, sem erro: um endereço editado à mão
   // ou um link velho não pode ser punido (a regra da SPEC-022).
   const escolhido = tipoValido(tipo);
-  const [nomes, setNomes] = useState<NomesDeTipo>(NOMES_PADRAO);
+  /**
+   * SPEC-059 — **começa pelo nome que o clube deu, se ele já for conhecido.**
+   *
+   * Antes começava sempre em `NOMES_PADRAO` e trocava a palavra quando a
+   * resposta chegava; o Israel viu isso em produção e é troca de texto na
+   * cara de quem lê. O que vale continua valendo — o cartão **não espera**
+   * pelo nome, porque ele é o caminho que a pessoa veio buscar.
+   *
+   * Função no `useState` (e não `nomesGuardados()` direto) porque a leitura
+   * toca `localStorage`: fora do inicializador preguiçoso ela rodaria a cada
+   * desenho, e no servidor nem existiria.
+   */
+  const [nomes, setNomes] = useState<NomesDeTipo>(
+    () => nomesGuardados() ?? NOMES_PADRAO,
+  );
 
   useEffect(() => {
     let vivo = true;

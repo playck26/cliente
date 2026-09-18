@@ -4,11 +4,30 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
-import { CalendarioDoAluno, janelaDoMes } from "@/components/calendario-do-aluno";
+import {
+  CalendarioDoAluno,
+  deAula,
+  deReserva,
+  janelaDoMes,
+  type Compromisso,
+} from "@/components/calendario-do-aluno";
 import { CartaoDaProximaAula } from "@/components/cartao-da-proxima-aula";
 import { TopAppBar } from "@/components/top-app-bar";
 import { hojeNoClube } from "@/lib/fuso";
-import { ApiError, getMe, listMyClasses, type MyClass, type Usuario } from "@/lib/api-client";
+import {
+  NOMES_PADRAO,
+  lerNomesDeTipo,
+  nomesGuardados,
+  type NomesDeTipo,
+} from "@/lib/nomes-de-tipo";
+import {
+  ApiError,
+  getMe,
+  listMyBookings,
+  listMyClasses,
+  type MyClass,
+  type Usuario,
+} from "@/lib/api-client";
 
 /**
  * SPEC-005/REQ-001 — a primeira tela do aluno.
@@ -58,8 +77,25 @@ export function HomeView() {
    * verdade, e não para a do mês que o aluno foi espiar.
    */
   const [aulasDoCartao, setAulasDoCartao] = useState<MyClass[]>([]);
-  const [aulasDoMes, setAulasDoMes] = useState<MyClass[]>([]);
+  /**
+   * SPEC-059 — **a agenda do mês passa a ter as três origens.**
+   *
+   * O cartão continua olhando só as AULAS (o insight que o Israel escolheu é
+   * "sua próxima aula", não "seu próximo compromisso"); a grade abaixo mistura
+   * aula de turma, aula particular e reserva de quadra, porque calendário que
+   * esconde compromisso não serve para se organizar.
+   */
+  const [compromissos, setCompromissos] = useState<Compromisso[]>([]);
   const [agendaIndisponivel, setAgendaIndisponivel] = useState(false);
+  const [reservasIndisponiveis, setReservasIndisponiveis] = useState(false);
+  /**
+   * SPEC-059/D3b — o termo do clube para cada tipo. Começa pelo que já está
+   * guardado (SPEC-059: memória de rótulo) para a agenda não trocar palavra
+   * na cara de quem lê, e confere com o servidor logo depois.
+   */
+  const [nomes, setNomes] = useState<NomesDeTipo>(
+    () => nomesGuardados() ?? NOMES_PADRAO,
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,6 +111,16 @@ export function HomeView() {
   //
   // A ordem aqui é deliberada: o `getMe()` decide o que mais vale a pena
   // pedir, e o que é secundário não pode derrubar o que é principal.
+  useEffect(() => {
+    let vivo = true;
+    void lerNomesDeTipo().then((lidos) => {
+      if (vivo) setNomes(lidos);
+    });
+    return () => {
+      vivo = false;
+    };
+  }, []);
+
   useEffect(() => {
     let ativo = true;
 
@@ -92,13 +138,30 @@ export function HomeView() {
           )
             .toISOString()
             .slice(0, 10);
-          const aulasData = await listMyClasses({
+          const janela = {
             de: janelaDoMes(hoje.ano, hoje.mes).de,
             ate: daqui60Dias,
-          });
+          };
+          const aulasData = await listMyClasses(janela);
           if (ativo) {
             setAulasDoCartao(aulasData);
-            setAulasDoMes(aulasData);
+            setCompromissos(aulasData.map(deAula));
+          }
+
+          // SPEC-059/D5 — **a falha de uma não derruba a outra.** Sem as
+          // reservas, a grade mostra as aulas e o aviso ocupa o lugar do que
+          // faltou. Meia agenda com aviso é melhor que tela vazia (AC-019 da
+          // SPEC-057, aplicada de novo).
+          try {
+            const reservas = await listMyBookings(janela);
+            if (ativo) {
+              setCompromissos([
+                ...aulasData.map(deAula),
+                ...reservas.map(deReserva),
+              ]);
+            }
+          } catch {
+            if (ativo) setReservasIndisponiveis(true);
           }
         } catch {
           // A agenda é dado secundário: sem ela a home fica de pé, e o
@@ -142,6 +205,15 @@ export function HomeView() {
         {/* **AC-019.** Fora do hero, porque o hero saiu — e este aviso é a
             única coisa que distingue "você não tem aula" de "não consegui
             carregar sua agenda". */}
+        {reservasIndisponiveis && !agendaIndisponivel ? (
+          <section className="rounded-3xl bg-surface p-4 shadow-[var(--shadow-low)] ring-1 ring-border">
+            <p role="status" className="text-[13px] font-semibold text-[var(--color-text-secondary)]">
+              Suas aulas estão aqui, mas não consegui carregar suas reservas
+              agora.
+            </p>
+          </section>
+        ) : null}
+
         {agendaIndisponivel ? (
           <section className="rounded-3xl bg-surface p-4 shadow-[var(--shadow-low)] ring-1 ring-border">
             <p role="status" className="text-[13px] font-semibold text-[var(--color-text-secondary)]">
@@ -175,11 +247,23 @@ export function HomeView() {
         */}
         {!loading && !error && ehAluno && !agendaIndisponivel ? (
           <CalendarioDoAluno
-            aulas={aulasDoMes}
+            compromissos={compromissos}
+            nomes={nomes}
             mostrarLinkDaTurma={false}
             onJanela={(janela) => {
-              listMyClasses(janela)
-                .then(setAulasDoMes)
+              Promise.all([
+                listMyClasses(janela),
+                listMyBookings(janela).catch(() => {
+                  setReservasIndisponiveis(true);
+                  return [];
+                }),
+              ])
+                .then(([aulas, reservas]) =>
+                  setCompromissos([
+                    ...aulas.map(deAula),
+                    ...reservas.map(deReserva),
+                  ]),
+                )
                 // Falha ao trocar de mês conserva a grade (AC-005): o aviso
                 // já tem lugar próprio nesta tela, e sumir com o calendário
                 // seria punir quem só quis espiar outubro.

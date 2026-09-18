@@ -21,7 +21,7 @@ import {
   cancelBooking,
   getPublicPaymentConfig,
   listCourts,
-  listMyBookings,
+  listMyBookingsPaginado,
   type Booking,
   type Court,
   type ItemDaListaDeReservas,
@@ -244,7 +244,7 @@ export function MyBookingsList({
     setError(null);
     try {
       const [bookingsResult, courtsResult] = await Promise.all([
-        listMyBookings(
+        listMyBookingsPaginado(
           pagina,
           20,
           quando,

@@ -21,6 +21,7 @@ vi.mock("next/navigation", () => ({
 
 const getMeMock = vi.fn();
 const listMyClassesMock = vi.fn();
+const listMyBookingsMock = vi.fn();
 
 class ApiErrorFalso extends Error {
   constructor(
@@ -35,6 +36,13 @@ vi.mock("@/lib/api-client", () => ({
   ApiError: ApiErrorFalso,
   getMe: (...a: unknown[]) => getMeMock(...a),
   listMyClasses: (...a: unknown[]) => listMyClassesMock(...a),
+  listMyBookings: (...a: unknown[]) => listMyBookingsMock(...a),
+  // SPEC-059: a home lê o termo que o clube deu aos tipos de reserva
+  // (`lerNomesDeTipo` → `getPrazosDoClube`). Sem o mock, o vitest levanta
+  // "No export is defined" como erro NÃO TRATADO: local a suíte fica verde e
+  // o CI cai. Foi assim que este ciclo descobriu — é a mesma família do
+  // `SUITE_EXIT` que o CLAUDE.md registra, ao contrário.
+  getPrazosDoClube: () => Promise.resolve({}),
   // SPEC-018/TASK-006: o `TopAppBar` passou a buscar a empresa para
   // desenhar a logo do clube. Não é o assunto desta suíte, mas sem o mock
   // ela quebra inteira — e o erro fala de módulo, não de home.
@@ -95,9 +103,30 @@ const AULA: MyClass = {
       faltaAvisada: false,
 };
 
+/** SPEC-059 — uma reserva de quadra do próprio aluno, no mesmo dia da aula. */
+const RESERVA = {
+  id: "r1",
+  companyId: "c1",
+  quadraId: "q1",
+  quadraNome: "Quadra 1",
+  data: "2026-09-02",
+  horaInicio: "07:00",
+  horaFim: "08:00",
+  origemTipo: "AVULSO",
+  alunoId: "al1",
+  alunoNome: "Ana",
+  statusPagamento: "pendente_pagamento",
+  valor: 120,
+  adicionais: [],
+  canceladaPorMim: null,
+  tipo: "quadra",
+  professorNome: null,
+} as unknown as import("@/lib/api-client").ItemDaListaDeReservas;
+
 describe("HomeView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    listMyBookingsMock.mockResolvedValue([]);
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(QUARTA);
   });
@@ -192,7 +221,7 @@ describe("HomeView", () => {
     render(<HomeView />);
 
     // O dia 02/09 é o de hoje na fixture, e abre selecionado.
-    const grade = await screen.findByRole("region", { name: "Minhas aulas por mês" });
+    const grade = await screen.findByRole("region", { name: "Minha agenda por mês" });
     expect(within(grade).getByText(/Turma Chuva/)).toBeInTheDocument();
     expect(within(grade).getByText("Aula não realizada")).toBeInTheDocument();
     expect(within(grade).getByText(/Turma B/)).toBeInTheDocument();
@@ -211,7 +240,7 @@ describe("HomeView", () => {
 
     render(<HomeView />);
 
-    const grade = await screen.findByRole("region", { name: "Minhas aulas por mês" });
+    const grade = await screen.findByRole("region", { name: "Minha agenda por mês" });
     expect(within(grade).getByText(/Turma B/)).toBeInTheDocument();
     expect(screen.queryByText("Aula não realizada")).not.toBeInTheDocument();
   });
@@ -226,7 +255,9 @@ describe("HomeView", () => {
 
     render(<HomeView />);
 
-    expect(await screen.findByText("Nenhuma aula neste mês.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Nenhum compromisso neste mês."),
+    ).toBeInTheDocument();
     // AC-007 — o cartão não some; ele convida.
     expect(screen.getByText("Nenhuma aula marcada")).toBeInTheDocument();
   });
@@ -250,6 +281,7 @@ describe("HomeView", () => {
 describe("SPEC-057/TASK-003 — a home abre na agenda", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    listMyBookingsMock.mockResolvedValue([]);
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(QUARTA);
     getMeMock.mockResolvedValue(ALUNO);
@@ -320,16 +352,35 @@ describe("SPEC-057/TASK-003 — a home abre na agenda", () => {
    * que a SPEC-053/AC-001 tirou daqui. A ocultação é por contexto, não por
    * edição destrutiva do componente — a TASK-002 também mexe nele.
    */
-  it("AC-021: a palavra `quadra` continua ausente, COM aula na tela", async () => {
-    render(<HomeView />);
-    await screen.findByRole("region", { name: "Minhas aulas por mês" });
+  /**
+   * **SPEC-059/D3b — esta regra mudou, e o registro fica aqui.**
+   *
+   * A SPEC-053/AC-001 (decisão 6 do Israel) tirou a palavra "quadra" da home,
+   * e esta prova garantia isso. Em 2026-09-18 ele pediu o oposto, olhando a
+   * agenda: *"nas reservas tem que estar especificado o que é aula, o que é
+   * reserva de quadra"* — e depois, sobre o nome: *"não importa o termo, se é
+   * quadra ou se é outro, ele tem que aparecer na agenda"*.
+   *
+   * O pedido novo vence. O que **continua** valendo é o resto da SPEC-053: a
+   * home não vira uma tela de quadras, e nenhum link aponta para `/quadras`
+   * (AC-009, provado logo acima).
+   */
+  it("SPEC-059/D3b: a agenda diz o que é reserva de quadra", async () => {
+    listMyBookingsMock.mockResolvedValue([RESERVA]);
 
-    expect(screen.queryByText(/quadra/i)).not.toBeInTheDocument();
+    render(<HomeView />);
+    await screen.findByRole("region", { name: "Minha agenda por mês" });
+
+    expect(await screen.findByText(/^Reserva · /)).toBeInTheDocument();
+    // Aparece duas vezes: na linha da reserva e na da aula de turma, que
+    // também acontece numa quadra. É o pedido dele — *"não importa o termo…
+    // ele tem que aparecer na agenda"* — e não um desenho duplicado.
+    expect(screen.getAllByText(/Quadra 1/).length).toBeGreaterThan(0);
   });
 
   it("AC-021: e o texto de reserva continua lá", async () => {
     render(<HomeView />);
-    await screen.findByRole("region", { name: "Minhas aulas por mês" });
+    await screen.findByRole("region", { name: "Minha agenda por mês" });
 
     expect(screen.getByText("Reservas PlayCK")).toBeInTheDocument();
     expect(
@@ -346,7 +397,7 @@ describe("SPEC-057/TASK-003 — a home abre na agenda", () => {
    */
   it("a lista do dia não vira link; o cartão sim", async () => {
     render(<HomeView />);
-    const grade = await screen.findByRole("region", { name: "Minhas aulas por mês" });
+    const grade = await screen.findByRole("region", { name: "Minha agenda por mês" });
     const naGrade = within(grade).getByText(/Turma A/);
 
     expect(naGrade.closest("a")).toBeNull();

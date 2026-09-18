@@ -28,7 +28,7 @@ vi.mock("@/lib/api-client", async () => {
     );
   return {
     ...real,
-    listMyBookings: (...a: unknown[]) => listMyBookingsMock(...a),
+    listMyBookingsPaginado: (...a: unknown[]) => listMyBookingsMock(...a),
     getPublicPaymentConfig: (...a: unknown[]) =>
       getPublicPaymentConfigMock(...a),
     listCourts: (...a: unknown[]) => listCourtsMock(...a),
