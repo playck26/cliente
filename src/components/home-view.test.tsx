@@ -37,6 +37,12 @@ vi.mock("@/lib/api-client", () => ({
   getMe: (...a: unknown[]) => getMeMock(...a),
   listMyClasses: (...a: unknown[]) => listMyClassesMock(...a),
   listMyBookings: (...a: unknown[]) => listMyBookingsMock(...a),
+  // SPEC-059: a home lê o termo que o clube deu aos tipos de reserva
+  // (`lerNomesDeTipo` → `getPrazosDoClube`). Sem o mock, o vitest levanta
+  // "No export is defined" como erro NÃO TRATADO: local a suíte fica verde e
+  // o CI cai. Foi assim que este ciclo descobriu — é a mesma família do
+  // `SUITE_EXIT` que o CLAUDE.md registra, ao contrário.
+  getPrazosDoClube: () => Promise.resolve({}),
   // SPEC-018/TASK-006: o `TopAppBar` passou a buscar a empresa para
   // desenhar a logo do clube. Não é o assunto desta suíte, mas sem o mock
   // ela quebra inteira — e o erro fala de módulo, não de home.
