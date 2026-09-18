@@ -1034,24 +1034,44 @@ export async function listMyBookingsPaginado(
  * metades. A rota passou a aceitar `de`/`ate` (SPEC-059/TASK-001), e aqui se
  * pede a janela inteira de uma vez.
  *
- * `pageSize: 200` porque a janela do calendário é de no máximo dois meses, e
- * paginar para desenhar uma grade seria travessia para nada. Se um dia um
- * clube tiver aluno com mais de 200 reservas em dois meses, o teto aparece
- * como aula faltando no fim do mês — e o lugar de consertar é aqui.
+ * **O teto de `pageSize` é 100, e ignorá-lo custou uma entrega.** A primeira
+ * versão pedia 200 de uma vez; o DTO tem `@Max(100)`, a rota respondeu **400**,
+ * e a agenda subiu em produção **sem reserva nenhuma** — calada, porque a tela
+ * trata falha de reserva como "mostro as aulas e aviso". Nenhum teste pegou:
+ * eles dublam esta função, e dublê não valida query string.
+ *
+ * Agora pagina até o fim da janela, com teto de segurança: um mês de agenda
+ * cabe em uma ou duas voltas, e o laço nunca fica preso se o servidor
+ * responder algo inesperado.
  */
+const PAGINAS_NO_MAXIMO = 10;
+
 export async function listMyBookings(janela: {
   de: string;
   ate: string;
 }): Promise<ItemDaListaDeReservas[]> {
-  const busca = new URLSearchParams({
-    de: janela.de,
-    ate: janela.ate,
-    page: "1",
-    pageSize: "200",
-  });
-  const res = await authFetch(`/bookings?${busca.toString()}`);
-  const corpo = (await res.json()) as { data?: ItemDaListaDeReservas[] };
-  return corpo.data ?? [];
+  const tudo: ItemDaListaDeReservas[] = [];
+  for (let page = 1; page <= PAGINAS_NO_MAXIMO; page++) {
+    const busca = new URLSearchParams({
+      de: janela.de,
+      ate: janela.ate,
+      page: String(page),
+      pageSize: "100",
+    });
+    const res = await authFetch(`/bookings?${busca.toString()}`);
+    const corpo = (await res.json()) as {
+      data?: ItemDaListaDeReservas[];
+      total?: number;
+    };
+    const pagina = corpo.data ?? [];
+    tudo.push(...pagina);
+    // Para quando a página veio incompleta (última) ou quando já se tem tudo
+    // o que o servidor disse existir.
+    if (pagina.length < 100 || tudo.length >= (corpo.total ?? tudo.length)) {
+      break;
+    }
+  }
+  return tudo;
 }
 
 /**
