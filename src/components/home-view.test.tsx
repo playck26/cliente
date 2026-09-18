@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MyClass } from "@/lib/api-client";
 
@@ -106,17 +106,28 @@ describe("HomeView", () => {
     vi.useRealTimers();
   });
 
-  it("AC-020: aluno — a home mostra a SEMANA, com uma busca só", async () => {
+  /**
+   * SPEC-058 — **a semana virou calendário, e o cartão voltou.** A busca
+   * continua sendo UMA: ela cobre do primeiro dia do mês até 60 dias à
+   * frente, e alimenta a grade e o cartão. Duas requisições no primeiro
+   * desenho seriam uma regressão do que a SPEC-057 tinha conquistado.
+   */
+  it("AC-001/REQ-003: a home mostra o calendário E o cartão, com uma busca só", async () => {
     getMeMock.mockResolvedValue(ALUNO);
     listMyClassesMock.mockResolvedValue([AULA]);
 
     render(<HomeView />);
 
-    // A semana renderiza `hora–hora · turma` numa linha só.
-    expect(await screen.findByText(/Turma A/)).toBeInTheDocument();
-    expect(screen.getByText("30/08 – 05/09")).toBeInTheDocument();
-    // **Sem rede nova**: a home já tinha as aulas no estado.
+    expect(
+      await screen.findByRole("grid", { name: /Calendário de setembro/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Sua próxima aula")).toBeInTheDocument();
     expect(listMyClassesMock).toHaveBeenCalledTimes(1);
+    // A janela pedida cobre o mês inteiro, não só o futuro: o calendário
+    // mostra os dias que já passaram.
+    expect(listMyClassesMock.mock.calls[0][0]).toMatchObject({
+      de: "2026-09-01",
+    });
   });
 
   it.each([["company_admin"], ["super_admin"], ["professor"]])(
@@ -180,9 +191,16 @@ describe("HomeView", () => {
 
     render(<HomeView />);
 
-    expect(await screen.findByText(/Turma Chuva/)).toBeInTheDocument();
-    expect(screen.getByText("Aula não realizada")).toBeInTheDocument();
-    expect(screen.getByText(/Turma B/)).toBeInTheDocument();
+    // O dia 02/09 é o de hoje na fixture, e abre selecionado.
+    const grade = await screen.findByRole("region", { name: "Minhas aulas por mês" });
+    expect(within(grade).getByText(/Turma Chuva/)).toBeInTheDocument();
+    expect(within(grade).getByText("Aula não realizada")).toBeInTheDocument();
+    expect(within(grade).getByText(/Turma B/)).toBeInTheDocument();
+    // E ela NÃO vira a próxima aula do cartão (SPEC-030, achado ALTA): o
+    // cartão aponta para a aula normal.
+    const cartao = screen.getByRole("region", { name: "Sua próxima aula" });
+    expect(within(cartao).getByText("Turma B")).toBeInTheDocument();
+    expect(within(cartao).queryByText("Turma Chuva")).not.toBeInTheDocument();
   });
 
   // O par: a aula NORMAL não pode sair marcada. Sem ele, marcar todas
@@ -193,7 +211,8 @@ describe("HomeView", () => {
 
     render(<HomeView />);
 
-    expect(await screen.findByText(/Turma B/)).toBeInTheDocument();
+    const grade = await screen.findByRole("region", { name: "Minhas aulas por mês" });
+    expect(within(grade).getByText(/Turma B/)).toBeInTheDocument();
     expect(screen.queryByText("Aula não realizada")).not.toBeInTheDocument();
   });
 
@@ -207,8 +226,9 @@ describe("HomeView", () => {
 
     render(<HomeView />);
 
-    expect(await screen.findByText("30/08 – 05/09")).toBeInTheDocument();
-    expect(screen.getAllByText("Sem aula").length).toBeGreaterThan(0);
+    expect(await screen.findByText("Nenhuma aula neste mês.")).toBeInTheDocument();
+    // AC-007 — o cartão não some; ele convida.
+    expect(screen.getByText("Nenhuma aula marcada")).toBeInTheDocument();
   });
 
   it("se o próprio `/auth/me` falhar com 403, a mensagem é humana", async () => {
@@ -252,14 +272,23 @@ describe("SPEC-057/TASK-003 — a home abre na agenda", () => {
    * item, que é decoração — o precedente do Admin (SPEC-052/D7) removeu a
    * faixa, não a encolheu.
    */
-  it("AC-018: não há faixa de atalhos, card `Sua agenda` nem hero", async () => {
+  /**
+   * **A faixa e o card "Sua agenda" continuam fora; o cartão VOLTOU.**
+   *
+   * A SPEC-057/D13 tirou os três, e o card 5353 só pedia os atalhos
+   * duplicados. O Israel reparou usando (*"o cartão tem que voltar, ele dá um
+   * tchã no app"*) e a SPEC-058 o devolve — **outro**: ele diz quanto falta,
+   * que é o que a grade não diz. Os atalhos duplicados seguem removidos,
+   * porque aquilo o card pedia mesmo.
+   */
+  it("SPEC-058: a faixa e o card `Sua agenda` seguem fora; o cartão voltou", async () => {
     render(<HomeView />);
-    await screen.findByText("30/08 – 05/09");
+    await screen.findByRole("grid", { name: /Calendário/i });
 
     expect(screen.queryByRole("region", { name: "Atalhos" })).toBeNull();
     expect(screen.queryByText("Abrir agenda")).toBeNull();
-    expect(screen.queryByText("Próxima aula")).toBeNull();
     expect(screen.queryByText("Pronto para jogar?")).toBeNull();
+    expect(screen.getByText("Sua próxima aula")).toBeInTheDocument();
   });
 
   it("AC-018: o que os atalhos levavam continua a um toque, no menu inferior", async () => {
@@ -269,7 +298,7 @@ describe("SPEC-057/TASK-003 — a home abre na agenda", () => {
     savePapel("aluno");
 
     render(<HomeView />);
-    await screen.findByText("30/08 – 05/09");
+    await screen.findByRole("grid", { name: /Calendário/i });
 
     const hrefs = screen.getAllByRole("link").map((a) => a.getAttribute("href"));
     expect(hrefs).toContain("/minhas-aulas");
@@ -279,7 +308,7 @@ describe("SPEC-057/TASK-003 — a home abre na agenda", () => {
 
   it("AC-009: nenhum link da Home aponta para /quadras", async () => {
     render(<HomeView />);
-    await screen.findByText("30/08 – 05/09");
+    await screen.findByRole("grid", { name: /Calendário/i });
 
     const hrefs = screen.getAllByRole("link").map((a) => a.getAttribute("href"));
     expect(hrefs.filter((h) => h?.startsWith("/quadras"))).toEqual([]);
@@ -291,16 +320,16 @@ describe("SPEC-057/TASK-003 — a home abre na agenda", () => {
    * que a SPEC-053/AC-001 tirou daqui. A ocultação é por contexto, não por
    * edição destrutiva do componente — a TASK-002 também mexe nele.
    */
-  it("AC-021: a palavra `quadra` continua ausente, COM aula na semana", async () => {
+  it("AC-021: a palavra `quadra` continua ausente, COM aula na tela", async () => {
     render(<HomeView />);
-    await screen.findByText(/Turma A/);
+    await screen.findByRole("region", { name: "Minhas aulas por mês" });
 
     expect(screen.queryByText(/quadra/i)).not.toBeInTheDocument();
   });
 
   it("AC-021: e o texto de reserva continua lá", async () => {
     render(<HomeView />);
-    await screen.findByText(/Turma A/);
+    await screen.findByRole("region", { name: "Minhas aulas por mês" });
 
     expect(screen.getByText("Reservas PlayCK")).toBeInTheDocument();
     expect(
@@ -309,13 +338,20 @@ describe("SPEC-057/TASK-003 — a home abre na agenda", () => {
   });
 
   /**
-   * **LIM-057h** — até a TASK-002, a semana da home não tem clique nem
-   * passado. A tela não pode fingir que tem.
+   * SPEC-058/D1 — **um caminho só para a turma, e é o cartão.**
+   *
+   * A lista do dia na home não liga (`mostrarLinkDaTurma={false}`); o cartão
+   * liga. Dois caminhos para o mesmo lugar na mesma tela foi exatamente o que
+   * a SPEC-057/D13 tirou daqui, e não vale reintroduzir com outro nome.
    */
-  it("LIM-057h: a semana da home não vira link de turma", async () => {
+  it("a lista do dia não vira link; o cartão sim", async () => {
     render(<HomeView />);
-    const aula = await screen.findByText(/Turma A/);
+    const grade = await screen.findByRole("region", { name: "Minhas aulas por mês" });
+    const naGrade = within(grade).getByText(/Turma A/);
 
-    expect(aula.closest("a")).toBeNull();
+    expect(naGrade.closest("a")).toBeNull();
+    expect(
+      screen.getByRole("link", { name: /Abrir Turma A/ }),
+    ).toHaveAttribute("href", "/minhas-aulas/turma/t1");
   });
 });

@@ -2,6 +2,7 @@
 
 import { AgendaDoProfessor } from "@/components/agenda-do-professor";
 import { BottomNav } from "@/components/bottom-nav";
+import { CartaoDoProfessor } from "@/components/cartao-do-professor";
 import { SuasTurmas } from "@/components/suas-turmas";
 import { TopAppBar } from "@/components/top-app-bar";
 
@@ -29,6 +30,11 @@ export function TelaDoProfessor() {
       {/* `pb-28` abre espaço para a barra fixa não cobrir a última turma. */}
       <main className="flex flex-1 flex-col gap-6 pt-2 pb-28">
         <h1 className="px-5 text-2xl font-extrabold">Agenda</h1>
+        {/*
+          SPEC-058/D4 — o resumo de hoje vem ANTES da grade: quem abre o app
+          de manhã quer saber o dia, não navegar o mês.
+        */}
+        <CartaoDoProfessor />
         <AgendaDoProfessor />
         <SuasTurmas />
       </main>
