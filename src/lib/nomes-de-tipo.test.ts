@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "./api-client";
-import { NOMES_PADRAO, lerNomesDeTipo } from "./nomes-de-tipo";
+import {
+  NOMES_PADRAO,
+  guardarNomes,
+  lerNomesDeTipo,
+  nomesGuardados,
+} from "./nomes-de-tipo";
 
 /**
  * SPEC-054/D1 e D12 — **o nome que o clube deu a cada tipo de reserva.**
@@ -47,5 +52,52 @@ describe("lerNomesDeTipo", () => {
 
   it("os padrões são os da spec", () => {
     expect(NOMES_PADRAO).toEqual({ quadra: "Quadra", aula: "Aula particular" });
+  });
+});
+
+/**
+ * SPEC-059 — **a memória de rótulo, que conserta o defeito que o Israel viu.**
+ *
+ * *"O termo ainda aparece como quadra quando eu vou fazer uma reserva, e
+ * rapidamente aparece o termo atualizado."* A tela abria no padrão e trocava a
+ * palavra quando a resposta chegava.
+ */
+describe("SPEC-059 — nomes guardados", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("sem nada guardado, devolve null — e a tela cai nos padrões", () => {
+    expect(nomesGuardados()).toBeNull();
+  });
+
+  it("ler do servidor guarda, e a leitura seguinte já sai certa", async () => {
+    await lerNomesDeTipo(async () => ({
+      nomeTipoQuadra: "Espaço",
+      nomeTipoAula: "Aula com professor",
+    }));
+
+    expect(nomesGuardados()).toEqual({
+      quadra: "Espaço",
+      aula: "Aula com professor",
+    });
+  });
+
+  // Conteúdo corrompido não pode derrubar a tela: cai no padrão, calado.
+  it("lixo no armazenamento vira null, sem lançar", () => {
+    localStorage.setItem("playck_cliente_nomes_de_tipo", "{não é json");
+    expect(nomesGuardados()).toBeNull();
+
+    localStorage.setItem("playck_cliente_nomes_de_tipo", '{"quadra":42}');
+    expect(nomesGuardados()).toBeNull();
+  });
+
+  it("guardar não lança quando o armazenamento recusa", () => {
+    const original = Storage.prototype.setItem;
+    Storage.prototype.setItem = () => {
+      throw new Error("aba anônima");
+    };
+    expect(() => guardarNomes({ quadra: "Q", aula: "A" })).not.toThrow();
+    Storage.prototype.setItem = original;
   });
 });

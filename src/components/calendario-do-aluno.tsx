@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Circle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Circle, Users } from "lucide-react";
 import { TennisCourtIcon } from "@/components/icons/tennis-court-icon";
 import { hojeNoClube, hojeNoClubeIso } from "@/lib/fuso";
-import type { MyClass } from "@/lib/api-client";
+import { NOMES_PADRAO, type NomesDeTipo } from "@/lib/nomes-de-tipo";
+import type { ItemDaListaDeReservas, MyClass } from "@/lib/api-client";
 
 /**
  * SPEC-058/D1 — **o calendário do aluno.**
@@ -64,25 +65,143 @@ export function janelaDoMes(ano: number, mes: number): { de: string; ate: string
 }
 
 /**
+ * SPEC-059/D1 — **o compromisso, seja ele qual for.**
+ *
+ * O calendário nasceu (SPEC-058) só com aula de turma, e o Israel viu o
+ * buraco em produção: quem reservou quadra na sexta abria o calendário e via
+ * sexta vazia. **Calendário que esconde compromisso é pior que calendário
+ * nenhum**, porque a pessoa confia nele para se organizar.
+ *
+ * As três origens viram uma lista só aqui, e cada linha **diz o que é**. O
+ * rótulo é palavra, não cor: quem não distingue cores tem de conseguir ler
+ * (mesma regra da SPEC-052/D3).
+ */
+export type Compromisso = {
+  id: string;
+  data: string;
+  horaInicio: string;
+  horaFim: string;
+  tipo: "turma" | "aula_particular" | "quadra";
+  titulo: string;
+  local: string | null;
+  professorNome: string | null;
+  materiais: { nome: string; quantidade: number }[];
+  valor: number | null;
+  pagamento: "pendente_pagamento" | "pago" | "cancelado" | null;
+  /** Só aula de turma: o aluno avisou que vai faltar (SPEC-031). */
+  faltaAvisada: boolean;
+  /** Só aula de turma: declarada como não realizada (SPEC-030). */
+  naoRealizada: boolean;
+  turmaId: string | null;
+};
+
+/**
+ * SPEC-059/D3b — **o rótulo usa o termo que o CLUBE deu ao tipo.**
+ *
+ * A primeira versão escrevia "Reserva de quadra" fixo, e duas coisas
+ * apareceram de uma vez: o gate de redação da SPEC-053 recusou a expressão, e
+ * o Israel disse o que ele queria de verdade — *"não importa o termo, se é
+ * quadra ou se é outro, ele tem que aparecer na agenda"*.
+ *
+ * Os dois apontam para o mesmo lugar: o nome vem de `nomes-de-tipo` (SPEC-054/
+ * D1), que é o que o clube configurou. Clube que chama de "Espaço" lê
+ * "Reserva · Espaço" na agenda, sem ninguém tocar em código.
+ */
+function rotuloDoTipo(tipo: Compromisso["tipo"], nomes: NomesDeTipo): string {
+  if (tipo === "turma") return "Aula de turma";
+  if (tipo === "aula_particular") return nomes.aula;
+  return `Reserva · ${nomes.quadra}`;
+}
+
+export function deAula(a: MyClass): Compromisso {
+  return {
+    id: a.ocupacaoId,
+    data: a.data,
+    horaInicio: a.horaInicio,
+    horaFim: a.horaFim,
+    tipo: "turma",
+    // `turmaNome` é anulável no contrato; sem turma, a linha ainda precisa
+    // dizer o que é.
+    titulo: a.turmaNome ?? "Aula",
+    local: a.quadraNome ?? null,
+    professorNome: null,
+    materiais: [],
+    valor: null,
+    // Aula de turma não tem cobrança por ocorrência (SPEC-011): mostrar
+    // "a pagar" nela seria inventar dívida.
+    pagamento: null,
+    faltaAvisada: a.faltaAvisada,
+    naoRealizada: a.naoRealizada,
+    turmaId: a.turmaId,
+  };
+}
+
+/**
+ * SPEC-059/AC-006 — **o Back antigo não manda `tipo` nem `professorNome`.**
+ *
+ * Durante o rollout o Cliente novo conversa com o Back velho, e a ausência
+ * cai em "Reserva de quadra" — o caso mais comum, e o que não inventa um
+ * professor que ninguém atribuiu. Mesma regra que a SPEC-052 aplicou em
+ * `turmas`/`particulares`.
+ */
+export function deReserva(r: ItemDaListaDeReservas): Compromisso {
+  const { tipo, professorNome, quadraNome } = r as Partial<
+    Pick<ItemDaListaDeReservas, "tipo" | "professorNome" | "quadraNome">
+  >;
+  const ehAula = tipo === "aula_particular";
+  return {
+    id: r.id,
+    data: r.data,
+    horaInicio: r.horaInicio,
+    horaFim: r.horaFim,
+    tipo: ehAula ? "aula_particular" : "quadra",
+    titulo: ehAula
+      ? (professorNome ?? "Aula particular")
+      : (quadraNome ?? "Reserva"),
+    local: quadraNome ?? null,
+    professorNome: professorNome ?? null,
+    materiais: (r.adicionais ?? []).map((i) => ({
+      nome: i.nome,
+      quantidade: i.quantidade,
+    })),
+    valor: r.valor ?? null,
+    pagamento: r.statusPagamento,
+    faltaAvisada: false,
+    naoRealizada: false,
+    turmaId: null,
+  };
+}
+
+/** "2× Raquete · 1× Toalha" — o que o Israel chamou de materiais alugados. */
+export function listarMateriais(
+  materiais: Compromisso["materiais"],
+): string {
+  return materiais.map((m) => `${m.quantidade}× ${m.nome}`).join(" · ");
+}
+
+/**
  * SPEC-058/D2 — o que o leitor de tela ouve. **Cor e forma nunca carregam a
  * informação sozinhas** (mesma regra da SPEC-052/D3): o que se vê no dia tem
  * de ser dito por extenso.
  */
-export function rotuloDoDia(dia: number, aulas: MyClass[]): string {
-  if (aulas.length === 0) return `${dia}, sem aula`;
-  const avisadas = aulas.filter((a) => a.faltaAvisada).length;
-  const quantas = `${aulas.length} ${aulas.length === 1 ? "aula" : "aulas"}`;
-  return avisadas > 0
-    ? `${dia}: ${quantas}, ${avisadas} com falta avisada`
-    : `${dia}: ${quantas}`;
+export function rotuloDoDia(dia: number, itens: Compromisso[]): string {
+  if (itens.length === 0) return `${dia}, sem compromisso`;
+  const quantas = `${itens.length} ${itens.length === 1 ? "compromisso" : "compromissos"}`;
+  const atencao = itens.filter(
+    (i) => i.faltaAvisada || i.pagamento === "cancelado",
+  ).length;
+  return atencao > 0 ? `${dia}: ${quantas}, ${atencao} com atenção` : `${dia}: ${quantas}`;
 }
 
 export function CalendarioDoAluno({
-  aulas,
+  compromissos,
+  nomes = NOMES_PADRAO,
   mostrarLinkDaTurma = true,
   onJanela,
 }: {
-  aulas: MyClass[];
+  compromissos: Compromisso[];
+  /** Os nomes que o clube deu aos tipos de reserva (SPEC-054/D1). */
+  nomes?: NomesDeTipo;
   /** A home não liga a turma (o cartão já leva); `/minhas-aulas` liga. */
   mostrarLinkDaTurma?: boolean;
   /** Avisado ao trocar de mês, para o pai pedir a janela nova. */
@@ -107,8 +226,8 @@ export function CalendarioDoAluno({
     onJanela?.(janelaDoMes(novoAno, novoMes));
   }
 
-  const porDia = new Map<string, MyClass[]>();
-  for (const a of aulas) {
+  const porDia = new Map<string, Compromisso[]>();
+  for (const a of compromissos) {
     const lista = porDia.get(a.data);
     if (lista) lista.push(a);
     else porDia.set(a.data, [a]);
@@ -119,11 +238,13 @@ export function CalendarioDoAluno({
 
   const primeiroDiaSemana = new Date(Date.UTC(ano, mes - 1, 1)).getUTCDay();
   const totalDeDias = new Date(Date.UTC(ano, mes, 0)).getUTCDate();
-  const doMes = aulas.filter((a) => a.data.startsWith(`${ano}-${doisDigitos(mes)}`));
+  const doMes = compromissos.filter((a) =>
+    a.data.startsWith(`${ano}-${doisDigitos(mes)}`),
+  );
   const aulasDoDiaAberto = diaAberto ? (porDia.get(diaAberto) ?? []) : [];
 
   return (
-    <section className="space-y-4" aria-label="Minhas aulas por mês">
+    <section className="space-y-4" aria-label="Minha agenda por mês">
       <header className="flex items-center justify-between">
         <button
           type="button"
@@ -171,7 +292,13 @@ export function CalendarioDoAluno({
             const data = chaveDoDia(ano, mes, dia);
             const doDia = porDia.get(data) ?? [];
             const temAula = doDia.length > 0;
-            const avisou = doDia.some((a) => a.faltaAvisada);
+            // SPEC-059/D6 — o segundo marcador passa a significar "atenção":
+            // falta avisada (aula) **ou** reserva cancelada. São coisas
+            // diferentes com a mesma consequência para quem lê a grade — vale
+            // a pena abrir o dia.
+            const avisou = doDia.some(
+              (a) => a.faltaAvisada || a.pagamento === "cancelado",
+            );
             const ehHoje = hoje.ano === ano && hoje.mes === mes && hoje.dia === dia;
             const selecionado = diaAberto === data;
 
@@ -224,7 +351,7 @@ export function CalendarioDoAluno({
       {/* AC-004 — mês vazio é informação, não erro. */}
       {doMes.length === 0 ? (
         <p className="px-1 text-[13px] font-semibold text-[var(--color-text-secondary)]">
-          Nenhuma aula neste mês.
+          Nenhum compromisso neste mês.
         </p>
       ) : (
         <div className="space-y-2">
@@ -233,42 +360,100 @@ export function CalendarioDoAluno({
           </h3>
           {aulasDoDiaAberto.length === 0 ? (
             <p className="px-1 text-[13px] font-semibold text-[var(--color-text-secondary)]">
-              Sem aula neste dia.
+              Sem compromisso neste dia.
             </p>
           ) : (
             <ul className="space-y-2">
               {aulasDoDiaAberto.map((a) => {
+                const cancelada = a.pagamento === "cancelado";
+                const materiais = listarMateriais(a.materiais);
                 const corpo = (
-                  <div className="flex items-center gap-3 rounded-2xl bg-surface p-3 shadow-[var(--shadow-low)] ring-1 ring-border">
+                  <div className="flex items-start gap-3 rounded-2xl bg-surface p-3 shadow-[var(--shadow-low)] ring-1 ring-border">
                     <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--color-secondary-container)] text-[var(--color-primary-strong)]">
-                      <TennisCourtIcon className="size-5" aria-hidden="true" />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block text-[15px] font-extrabold">
-                        {hora(a.horaInicio)}–{hora(a.horaFim)}
-                      </span>
-                      <span className="block truncate text-[13px] font-semibold text-[var(--color-text-secondary)]">
-                        {a.turmaNome}
-                        {a.faltaAvisada ? " · você avisou que vai faltar" : ""}
-                      </span>
-                      {/*
-                        SPEC-030 — **a aula que não aconteceu não pode parecer
-                        aula normal.** Foi achado ALTA na 3ª validação cruzada
-                        da SPEC-057, quando uma não realizada ocupava o
-                        destaque da home; a regra mudou de lugar junto com o
-                        desenho, e continua valendo aqui.
-                      */}
-                      {a.naoRealizada && (
-                        <span className="mt-0.5 block text-[12px] font-bold text-[var(--color-error)]">
-                          Aula não realizada
-                        </span>
+                      {a.tipo === "quadra" ? (
+                        <TennisCourtIcon className="size-5" aria-hidden="true" />
+                      ) : (
+                        <Users className="size-5" aria-hidden="true" />
                       )}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-baseline gap-2">
+                        <span
+                          className={`text-[15px] font-extrabold ${cancelada ? "line-through" : ""}`}
+                        >
+                          {hora(a.horaInicio)}–{hora(a.horaFim)}
+                        </span>
+                        {/*
+                          SPEC-059/D1 — **o tipo, em palavra.** Era o pedido
+                          literal do Israel: *"nas reservas tem que estar
+                          especificado o que é aula, o que é reserva de
+                          quadra"*. Cor sozinha não responde isso.
+                        */}
+                        <span className="rounded-full bg-[var(--color-secondary-container)] px-2 py-0.5 text-[11px] font-extrabold text-[var(--color-primary-strong)]">
+                          {rotuloDoTipo(a.tipo, nomes)}
+                        </span>
+                      </span>
+
+                      <span
+                        className={`block truncate text-[13px] font-semibold text-[var(--color-text-secondary)] ${cancelada ? "line-through" : ""}`}
+                      >
+                        {a.titulo}
+                        {a.local && a.local !== a.titulo ? ` · ${a.local}` : ""}
+                      </span>
+
+                      {/* Materiais alugados — o segundo pedido literal. */}
+                      {materiais ? (
+                        <span className="mt-0.5 block text-[12px] font-semibold text-[var(--color-text-secondary)]">
+                          {materiais}
+                        </span>
+                      ) : null}
+
+                      <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] font-bold">
+                        {a.valor != null && (
+                          <span className="text-[var(--color-text-secondary)]">
+                            {a.valor.toLocaleString("pt-BR", {
+                              style: "currency",
+                              currency: "BRL",
+                            })}
+                          </span>
+                        )}
+                        {/*
+                          SPEC-041/SPEC-056 — cancelada APARECE, riscada. Quem
+                          cancelou precisa ver que cancelou, senão reserva de
+                          novo achando que esqueceu.
+                        */}
+                        {cancelada && (
+                          <span className="text-[var(--color-error)]">Cancelada</span>
+                        )}
+                        {a.pagamento === "pendente_pagamento" && (
+                          <span className="text-[var(--color-error)]">A pagar</span>
+                        )}
+                        {a.pagamento === "pago" && (
+                          <span className="text-[var(--color-primary-strong)]">Pago</span>
+                        )}
+                        {a.faltaAvisada && (
+                          <span className="text-[var(--color-text-secondary)]">
+                            Você avisou que vai faltar
+                          </span>
+                        )}
+                        {/*
+                          SPEC-030 — a aula que não aconteceu não pode parecer
+                          aula normal. Achado ALTA da 3ª validação cruzada da
+                          SPEC-057; a regra mudou de lugar com o desenho e
+                          continua valendo.
+                        */}
+                        {a.naoRealizada && (
+                          <span className="text-[var(--color-error)]">
+                            Aula não realizada
+                          </span>
+                        )}
+                      </span>
                     </span>
                   </div>
                 );
                 return (
-                  <li key={a.ocupacaoId}>
-                    {mostrarLinkDaTurma ? (
+                  <li key={a.id}>
+                    {mostrarLinkDaTurma && a.turmaId ? (
                       <Link href={`/minhas-aulas/turma/${a.turmaId}`}>{corpo}</Link>
                     ) : (
                       corpo

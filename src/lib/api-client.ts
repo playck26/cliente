@@ -992,7 +992,7 @@ export async function createBooking(dto: {
  * filtro de canceladas passou para o servidor (`excluirCanceladas`) — a tela
  * filtrava depois de receber, e com paginação isso faria a contagem mentir.
  */
-export async function listMyBookings(
+export async function listMyBookingsPaginado(
   page = 1,
   pageSize = 20,
   quando: "futuras" | "anteriores" = "futuras",
@@ -1024,6 +1024,34 @@ export async function listMyBookings(
   if (referenciaTemporal) busca.set("referenciaTemporal", referenciaTemporal);
   const res = await authFetch(`/bookings?${busca.toString()}`);
   return (await res.json()) as PaginadoComReferencia<ItemDaListaDeReservas>;
+}
+
+/**
+ * SPEC-059/D5 — **as reservas de uma JANELA, para o calendário do aluno.**
+ *
+ * `listMyBookings` pagina por "futuras/anteriores", que é o vocabulário da
+ * tela de reservas; o calendário pensa em mês, e um mês atravessa as duas
+ * metades. A rota passou a aceitar `de`/`ate` (SPEC-059/TASK-001), e aqui se
+ * pede a janela inteira de uma vez.
+ *
+ * `pageSize: 200` porque a janela do calendário é de no máximo dois meses, e
+ * paginar para desenhar uma grade seria travessia para nada. Se um dia um
+ * clube tiver aluno com mais de 200 reservas em dois meses, o teto aparece
+ * como aula faltando no fim do mês — e o lugar de consertar é aqui.
+ */
+export async function listMyBookings(janela: {
+  de: string;
+  ate: string;
+}): Promise<ItemDaListaDeReservas[]> {
+  const busca = new URLSearchParams({
+    de: janela.de,
+    ate: janela.ate,
+    page: "1",
+    pageSize: "200",
+  });
+  const res = await authFetch(`/bookings?${busca.toString()}`);
+  const corpo = (await res.json()) as { data?: ItemDaListaDeReservas[] };
+  return corpo.data ?? [];
 }
 
 /**

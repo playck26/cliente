@@ -12,6 +12,7 @@ import { Label } from "@/components/ui/label";
 import { ApiError, login } from "@/lib/api-client";
 import { rotaInicial } from "@/lib/rota-inicial";
 import { saveAccessToken, savePapel } from "@/lib/auth-storage";
+import { lerNomesDeTipo } from "@/lib/nomes-de-tipo";
 
 export function LoginForm() {
   const router = useRouter();
@@ -32,6 +33,13 @@ export function LoginForm() {
       // O papel vai junto do token: é o que permite ao `BottomNav` acertar
       // a barra na PRIMEIRA pintura, sem esperar o `getMe()`.
       savePapel(result.usuario.role);
+      // SPEC-059 — **aquece o nome dos tipos de reserva no login.**
+      //
+      // Sem isto, a primeira visita a "Fazer reserva" ainda mostraria
+      // "Quadra" por um quadro antes de virar o nome do clube: o
+      // armazenamento só ajuda a partir da segunda. `void` porque nada nesta
+      // tela depende do resultado, e `lerNomesDeTipo` nunca lança.
+      void lerNomesDeTipo();
       router.push(result.usuario.senhaTemporaria ? "/primeiro-acesso" : rotaInicial(result.usuario.role));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Não foi possível entrar. Tente de novo.");
