@@ -4,14 +4,23 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
-import { SemanaDoAluno } from "@/components/semana-do-aluno";
+import { CalendarioDoAluno, janelaDoMes } from "@/components/calendario-do-aluno";
+import { CartaoDaProximaAula } from "@/components/cartao-da-proxima-aula";
 import { TopAppBar } from "@/components/top-app-bar";
+import { hojeNoClube } from "@/lib/fuso";
 import { ApiError, getMe, listMyClasses, type MyClass, type Usuario } from "@/lib/api-client";
 
 /**
  * SPEC-005/REQ-001 — a primeira tela do aluno.
  *
- * **SPEC-057/TASK-003 (card 5353) — a home abre na AGENDA.** O que saiu, e
+ * **SPEC-058 — o cartão voltou, e a semana virou calendário.** O Israel usou
+ * a home em produção e pediu as duas coisas: um calendário *"parecido com o
+ * do professor, só que mais atrativo"* e o cartão de volta, *"muito mais
+ * moderno… trazendo os insights mais importantes"*. O cartão novo não repete
+ * a agenda logo abaixo — ele diz **quanto falta** para a próxima aula, que é
+ * o que a grade não diz.
+ *
+ * **SPEC-057/TASK-003 (card 5353) — a home abriu na AGENDA.** O que saiu, e
  * por quê:
  *
  * - **A faixa de atalhos.** Dos três, dois eram duplicata literal do menu
@@ -35,7 +44,21 @@ import { ApiError, getMe, listMyClasses, type MyClass, type Usuario } from "@/li
  */
 export function HomeView() {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
-  const [aulas, setAulas] = useState<MyClass[]>([]);
+  /**
+   * SPEC-058 — **duas listas, uma requisição.**
+   *
+   * O cartão precisa da PRÓXIMA aula, que pode cair no mês que vem; o
+   * calendário precisa do MÊS, que inclui dias já passados. Uma lista só não
+   * serve para os dois: a do mês esconderia a próxima aula de quem está no
+   * fim de setembro, e a das próximas deixaria o mês sem o passado.
+   *
+   * A primeira busca cobre os dois — do primeiro dia do mês até 60 dias à
+   * frente — e alimenta as duas listas. Depois disso, trocar de mês troca só
+   * a do calendário: o cartão continua apontando para a próxima aula de
+   * verdade, e não para a do mês que o aluno foi espiar.
+   */
+  const [aulasDoCartao, setAulasDoCartao] = useState<MyClass[]>([]);
+  const [aulasDoMes, setAulasDoMes] = useState<MyClass[]>([]);
   const [agendaIndisponivel, setAgendaIndisponivel] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,8 +86,20 @@ export function HomeView() {
         if (usuarioData.role !== "aluno") return;
 
         try {
-          const aulasData = await listMyClasses();
-          if (ativo) setAulas(aulasData);
+          const hoje = hojeNoClube();
+          const daqui60Dias = new Date(
+            Date.UTC(hoje.ano, hoje.mes - 1, hoje.dia + 60),
+          )
+            .toISOString()
+            .slice(0, 10);
+          const aulasData = await listMyClasses({
+            de: janelaDoMes(hoje.ano, hoje.mes).de,
+            ate: daqui60Dias,
+          });
+          if (ativo) {
+            setAulasDoCartao(aulasData);
+            setAulasDoMes(aulasData);
+          }
         } catch {
           // A agenda é dado secundário: sem ela a home fica de pé, e o
           // aviso ocupa o lugar dela em vez do lugar da tela.
@@ -124,20 +159,32 @@ export function HomeView() {
         ) : null}
 
         {/*
-          **LIM-057h — até a TASK-002, esta semana não clica e não tem
-          passado.** O rodapé do próprio componente explica o "—" dos dias
-          que já passaram, e o menu inferior mantém `/minhas-aulas` a um
-          toque. A tela não finge o que ainda não faz.
-
-          `mostrarQuadra={false}`: a home não escreve a palavra "quadra"
-          (SPEC-053/AC-001, decisão 6 do Israel), e cada aula da semana traz
-          o nome da quadra.
+          SPEC-058/D3 — o cartão vem ANTES do calendário: ele responde "quanto
+          falta", que é a pergunta de quem abre o app com pressa. A grade, que
+          responde "quando são as outras", vem logo abaixo.
         */}
         {!loading && !error && ehAluno && !agendaIndisponivel ? (
-          <SemanaDoAluno
-            aulas={aulas}
-            mostrarQuadra={false}
+          <CartaoDaProximaAula aulas={aulasDoCartao} />
+        ) : null}
+
+        {/*
+          SPEC-058/D1 — a semana saiu daqui e **continua em `/minhas-aulas`**,
+          onde é uma das duas abas e o aluno escolhe. `mostrarLinkDaTurma`
+          falso: na home o cartão já leva à turma, e dois caminhos para o
+          mesmo lugar na mesma tela foi o que a SPEC-057/D13 tirou.
+        */}
+        {!loading && !error && ehAluno && !agendaIndisponivel ? (
+          <CalendarioDoAluno
+            aulas={aulasDoMes}
             mostrarLinkDaTurma={false}
+            onJanela={(janela) => {
+              listMyClasses(janela)
+                .then(setAulasDoMes)
+                // Falha ao trocar de mês conserva a grade (AC-005): o aviso
+                // já tem lugar próprio nesta tela, e sumir com o calendário
+                // seria punir quem só quis espiar outubro.
+                .catch(() => setAgendaIndisponivel(true));
+            }}
           />
         ) : null}
 
