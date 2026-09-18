@@ -40,6 +40,27 @@ export function contarBlocos(rotulos: readonly string[]): number {
  *   O `back` anterior à SPEC-054 cai no mesmo caminho (`404` → lista vazia).
  * - Informa os itens e a soma de UMA reserva; o total do pedido é de quem usa.
  */
+/**
+ * SPEC-059 — **os limites do contrato, espelhados aqui de propósito.**
+ *
+ * A validação independente de 2026-09-18 varreu o Cliente atrás da família do
+ * defeito do `pageSize` (mandar valor que o servidor recusa) e achou estes
+ * dois: o contador subia até o ESTOQUE, e o servidor recusa acima de 99
+ * (`@Max(99)`); e a lista podia levar quantos tipos houvesse, e o servidor
+ * recusa mais de 10 (`@ArrayMaxSize(10)`).
+ *
+ * Nenhum dos dois acontece na Smart Tennis hoje — exigem estoque de 100+ ou 11
+ * tipos de adicional. **Ainda assim são defeito**, porque o limite não está no
+ * lugar onde alguém o veria ao crescer: a pessoa montaria a reserva inteira e
+ * levaria um 400 no fim, sem entender por quê.
+ *
+ * Espelhar limite de contrato é dívida conhecida (ele pode mudar no servidor e
+ * envelhecer aqui). A alternativa — publicá-los no contrato para a tela ler —
+ * é spec própria, não remendo de hoje.
+ */
+const QUANTIDADE_MAXIMA_POR_ITEM = 99;
+const TIPOS_NO_MAXIMO = 10;
+
 export function PassoDeAdicionais({
   data,
   slots,
@@ -115,6 +136,8 @@ export function PassoDeAdicionais({
   }
   if (disponiveis.length === 0) return null;
 
+  const escolhidos = Object.values(quantidades).filter((q) => q > 0).length;
+
   const mudar = (id: string, delta: number, maximo: number) =>
     setQuantidades((atual) => ({
       ...atual,
@@ -130,6 +153,14 @@ export function PassoDeAdicionais({
       {slots.length > 1 && contarBlocos(slots) > 1 ? (
         <p className="mt-1 text-[13px] font-medium text-[var(--color-text-secondary)]">
           Vale para cada uma das {contarBlocos(slots)} reservas.
+        </p>
+      ) : null}
+      {escolhidos >= TIPOS_NO_MAXIMO ? (
+        <p
+          role="status"
+          className="mt-2 text-[12px] font-bold text-[var(--color-text-secondary)]"
+        >
+          Você já escolheu {TIPOS_NO_MAXIMO} tipos — o máximo por reserva.
         </p>
       ) : null}
       <ul className="mt-3 space-y-2">
@@ -165,7 +196,11 @@ export function PassoDeAdicionais({
                 <button
                   type="button"
                   aria-label={`Mais ${a.nome}`}
-                  disabled={desabilitado || q >= a.disponivel}
+                  disabled={
+                    desabilitado ||
+                    q >= Math.min(a.disponivel, QUANTIDADE_MAXIMA_POR_ITEM) ||
+                    (q === 0 && escolhidos >= TIPOS_NO_MAXIMO)
+                  }
                   onClick={() => mudar(a.id, 1, a.disponivel)}
                   className="flex size-10 items-center justify-center rounded-xl bg-surface ring-1 ring-border disabled:opacity-40"
                 >

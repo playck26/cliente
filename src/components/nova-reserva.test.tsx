@@ -35,10 +35,13 @@ beforeEach(() => {
 });
 
 describe("NovaReserva — SPEC-053/D3", () => {
-  it("AC-004: sem tipo, mostra os dois cartões, cada um com o seu endereço", () => {
+  // `find*` e não `get*`: o rótulo só aparece quando o nome do clube chega
+  // (SPEC-059). O que o teste afirma continua o mesmo — cada cartão com o seu
+  // endereço.
+  it("AC-004: sem tipo, mostra os dois cartões, cada um com o seu endereço", async () => {
     render(<NovaReserva tipo={null} />);
 
-    expect(screen.getByRole("link", { name: /Quadra/ })).toHaveAttribute(
+    expect(await screen.findByRole("link", { name: /Quadra/ })).toHaveAttribute(
       "href",
       "/reservas/nova?tipo=quadra",
     );
@@ -63,12 +66,12 @@ describe("NovaReserva — SPEC-053/D3", () => {
     expect(screen.queryByTestId("lista-de-quadras")).not.toBeInTheDocument();
   });
 
-  it("AC-005: tipo desconhecido mostra os cartões, e SEM mensagem de erro", () => {
+  it("AC-005: tipo desconhecido mostra os cartões, e SEM mensagem de erro", async () => {
     // Endereço editado à mão ou link velho: punir com erro um endereço que
     // NÓS mudamos seria o pior dos dois mundos (a regra da SPEC-022).
     render(<NovaReserva tipo="outro" />);
 
-    expect(screen.getByRole("link", { name: /Quadra/ })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: /Quadra/ })).toBeInTheDocument();
     expect(screen.queryByTestId("lista-de-quadras")).not.toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
@@ -103,11 +106,41 @@ describe("NovaReserva — SPEC-054: os nomes do clube", () => {
     expect(screen.queryByText("Aula particular")).not.toBeInTheDocument();
   });
 
-  it("enquanto os nomes não chegam, os cartões já estão lá com os padrões", () => {
+  /**
+   * **SPEC-059, depois da validação independente de 2026-09-18.**
+   *
+   * A regra antiga era "os cartões já estão lá com os PADRÕES", e ela produzia
+   * o defeito que o Israel reclamou: no primeiro acesso a tela escrevia
+   * "Quadra" e trocava a palavra meio segundo depois.
+   *
+   * A regra nova conserva o que importava — **o caminho não espera pelo
+   * nome** — e tira o que incomodava: sem nome conhecido, o rótulo fica em
+   * suspenso em vez de mostrar um palpite.
+   */
+  it("enquanto os nomes não chegam, os cartões estão lá SEM palavra para trocar", () => {
     lerNomesDeTipo.mockReturnValue(new Promise(() => undefined));
     render(<NovaReserva tipo={null} />);
-    // O nome é apresentação: o caminho que a pessoa veio buscar não espera por ele.
-    expect(screen.getByRole("link", { name: /Quadra/ })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Aula particular/ })).toBeInTheDocument();
+
+    // Os dois caminhos continuam clicáveis, pelo destino.
+    const links = screen.getAllByRole("link");
+    const destinos = links.map((l) => l.getAttribute("href"));
+    expect(destinos).toContain("/reservas/nova?tipo=quadra");
+    expect(destinos).toContain("/reservas/nova?tipo=aula");
+    // E nenhum palpite de nome na tela.
+    expect(screen.queryByText("Quadra")).not.toBeInTheDocument();
+    expect(screen.queryByText("Aula particular")).not.toBeInTheDocument();
+  });
+
+  it("com o nome já guardado, ele aparece no primeiro quadro", () => {
+    localStorage.setItem(
+      "playck_cliente_nomes_de_tipo",
+      JSON.stringify({ quadra: "Espaço", aula: "Aula com professor" }),
+    );
+    lerNomesDeTipo.mockReturnValue(new Promise(() => undefined));
+
+    render(<NovaReserva tipo={null} />);
+
+    expect(screen.getByText("Espaço")).toBeInTheDocument();
+    localStorage.clear();
   });
 });

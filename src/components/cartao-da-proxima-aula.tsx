@@ -48,7 +48,7 @@ export function contagem(
   agora: number = Date.now(),
   hojeIso: string = hojeNoClubeIso(),
 ): string {
-  const inicio = Date.parse(`${aula.data}T${aula.horaInicio}-03:00`);
+  const inicio = instante(aula.data, aula.horaInicio);
   const horas = Math.floor((inicio - agora) / 3_600_000);
   const dias = Math.round(
     (Date.parse(`${aula.data}T00:00:00.000Z`) -
@@ -64,13 +64,28 @@ export function contagem(
   return `em ${dias} dias`;
 }
 
-/** A primeira aula que ainda não começou, no fuso do clube. */
+/** O instante de um horário do clube. Brasil sem horário de verão: `-03:00`. */
+const instante = (data: string, hora: string) =>
+  Date.parse(`${data}T${hora}-03:00`);
+
+/**
+ * A primeira aula que ainda **não terminou**.
+ *
+ * **Isto era `a.data >= hoje`, e estava errado** — achado da validação
+ * independente de 2026-09-18. Comparar só a DATA mantinha no cartão a aula
+ * que terminou às 8h da manhã: às 20h ela ainda era "hoje", e o cartão dizia
+ * "agora" para uma aula encerrada havia doze horas. Quem confia no cartão
+ * para se organizar era mandado para o passado.
+ *
+ * O corte é o **fim** da aula, não o início: aula em andamento continua sendo
+ * a próxima, que é o que a pessoa espera ler enquanto está na quadra.
+ */
 export function proximaAula(
   aulas: MyClass[],
-  hojeIso: string = hojeNoClubeIso(),
+  agora: number = Date.now(),
 ): MyClass | null {
   const futuras = aulas
-    .filter((a) => a.data >= hojeIso && !a.naoRealizada)
+    .filter((a) => !a.naoRealizada && instante(a.data, a.horaFim) > agora)
     .sort((x, y) =>
       x.data === y.data
         ? x.horaInicio.localeCompare(y.horaInicio)

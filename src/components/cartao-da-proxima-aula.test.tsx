@@ -73,22 +73,53 @@ describe("contagem", () => {
 });
 
 describe("proximaAula", () => {
+  /** 18/09/2026, 20h no clube. */
+  const VINTE_HORAS = Date.parse("2026-09-18T20:00:00-03:00");
+
   it("pega a mais cedo do dia mais próximo, e ignora o passado", () => {
     const escolhida = proximaAula(
       [
-        aula({ ocupacaoId: "tarde", data: "2026-09-20", horaInicio: "20:00:00" }),
+        aula({ ocupacaoId: "tarde", data: "2026-09-20", horaInicio: "20:00:00", horaFim: "21:00:00" }),
         aula({ ocupacaoId: "passado", data: "2026-09-10" }),
-        aula({ ocupacaoId: "cedo", data: "2026-09-20", horaInicio: "08:00:00" }),
+        aula({ ocupacaoId: "cedo", data: "2026-09-20", horaInicio: "08:00:00", horaFim: "09:00:00" }),
       ],
-      "2026-09-18",
+      VINTE_HORAS,
     );
     expect(escolhida?.ocupacaoId).toBe("cedo");
   });
 
+  /**
+   * **O achado da validação independente de 2026-09-18.**
+   *
+   * O filtro era `a.data >= hoje`: às 20h, a aula que terminou às 9h ainda era
+   * "hoje", e o cartão dizia "agora" para ela. Quem confia no cartão era
+   * mandado para o passado.
+   */
+  it("aula que JÁ TERMINOU hoje não é a próxima", () => {
+    const escolhida = proximaAula(
+      [
+        aula({ ocupacaoId: "manha", horaInicio: "08:00:00", horaFim: "09:00:00" }),
+        aula({ ocupacaoId: "amanha", data: "2026-09-19", horaInicio: "08:00:00", horaFim: "09:00:00" }),
+      ],
+      VINTE_HORAS,
+    );
+    expect(escolhida?.ocupacaoId).toBe("amanha");
+  });
+
+  // O par: aula EM ANDAMENTO continua sendo a próxima. Cortar pelo início
+  // consertaria o defeito acima e criaria este.
+  it("aula em andamento continua sendo a próxima", () => {
+    const escolhida = proximaAula(
+      [aula({ ocupacaoId: "agora", horaInicio: "19:00:00", horaFim: "21:00:00" })],
+      VINTE_HORAS,
+    );
+    expect(escolhida?.ocupacaoId).toBe("agora");
+  });
+
   it("aula que não aconteceu não é próxima aula", () => {
     const escolhida = proximaAula(
-      [aula({ ocupacaoId: "cancelada", naoRealizada: true })],
-      "2026-09-18",
+      [aula({ ocupacaoId: "cancelada", naoRealizada: true, data: "2099-01-01" })],
+      VINTE_HORAS,
     );
     expect(escolhida).toBeNull();
   });

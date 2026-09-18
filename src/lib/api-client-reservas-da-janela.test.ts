@@ -59,9 +59,13 @@ describe("listMyBookings — a janela do calendário", () => {
       resposta({ data: [reserva("r1"), reserva("r2")], total: 2 }),
     );
 
-    const itens = await listMyBookings({ de: "2026-09-01", ate: "2026-09-30" });
+    const { itens, truncou } = await listMyBookings({
+      de: "2026-09-01",
+      ate: "2026-09-30",
+    });
 
     expect(itens).toHaveLength(2);
+    expect(truncou).toBe(false);
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -73,21 +77,35 @@ describe("listMyBookings — a janela do calendário", () => {
         resposta({ data: [reserva("p2-1"), reserva("p2-2")], total: 130 }),
       );
 
-    const itens = await listMyBookings({ de: "2026-09-01", ate: "2026-10-31" });
+    const { itens, truncou } = await listMyBookings({
+      de: "2026-09-01",
+      ate: "2026-10-31",
+    });
 
     expect(itens).toHaveLength(102);
+    expect(truncou).toBe(false);
     expect(urlDaChamada(1).searchParams.get("page")).toBe("2");
   });
 
   // O laço não pode ficar presto se o servidor responder sempre cheio: sem
   // teto, uma resposta inesperada viraria requisição infinita no celular de
   // alguém.
-  it("para no teto de páginas mesmo se o servidor nunca disser que acabou", async () => {
+  /**
+   * Achado da validação independente: o teto existia e **cortava em silêncio**
+   * — com 1.001 reservas, a milésima primeira sumia sem ninguém saber. Agora
+   * ele é declarado, e a tela avisa.
+   */
+  it("o teto de páginas corta, e DIZ que cortou", async () => {
     const cheia = Array.from({ length: 100 }, (_, i) => reserva(`x-${i}`));
     fetchMock.mockResolvedValue(resposta({ data: cheia, total: 99999 }));
 
-    await listMyBookings({ de: "2026-09-01", ate: "2026-10-31" });
+    const { itens, truncou } = await listMyBookings({
+      de: "2026-09-01",
+      ate: "2026-10-31",
+    });
 
     expect(fetchMock.mock.calls.length).toBeLessThanOrEqual(10);
+    expect(itens).toHaveLength(1000);
+    expect(truncou).toBe(true);
   });
 });

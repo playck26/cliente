@@ -115,3 +115,52 @@ describe("PassoDeAdicionais", () => {
     expect(disponiveis).toHaveBeenCalledTimes(2);
   });
 });
+
+/**
+ * SPEC-059, depois da validação independente de 2026-09-18 — **os limites do
+ * contrato valem NA TELA**.
+ *
+ * A varredura achou dois payloads que o Cliente deixava montar e o servidor
+ * recusa: `quantidade` acima de 99 (`@Max(99)`) e mais de 10 tipos
+ * (`@ArrayMaxSize(10)`). Nenhum dos dois acontece na Smart Tennis hoje — e é
+ * por isso mesmo que eles precisam de teste: ninguém os veria crescer.
+ */
+describe("SPEC-059 — os limites do contrato na tela", () => {
+  const muitos = (n: number) =>
+    Array.from({ length: n }, (_, i) => ({
+      ...RAQUETE,
+      id: `a${i}`,
+      nome: `Item ${i}`,
+      disponivel: 500,
+    }));
+
+  const montar = (lista: unknown[]) => {
+    disponiveis.mockResolvedValue(lista);
+    render(
+      <PassoDeAdicionais data="2035-06-07" slots={["09:00-10:00"]} onChange={vi.fn()} />,
+    );
+  };
+
+  it("o contador para em 99, mesmo com estoque de 500", async () => {
+    montar(muitos(1));
+    const mais = await screen.findByRole("button", { name: "Mais Item 0" });
+
+    for (let i = 0; i < 105; i++) fireEvent.click(mais);
+
+    expect(screen.getByText("99")).toBeInTheDocument();
+    expect(mais).toBeDisabled();
+  });
+
+  it("o 11º tipo não entra, e a tela diz por quê", async () => {
+    montar(muitos(11));
+    for (let i = 0; i < 10; i++) {
+      fireEvent.click(await screen.findByRole("button", { name: `Mais Item ${i}` }));
+    }
+
+    const decimoPrimeiro = screen.getByRole("button", { name: "Mais Item 10" });
+    expect(decimoPrimeiro).toBeDisabled();
+    expect(
+      screen.getByText(/já escolheu 10 tipos/i),
+    ).toBeInTheDocument();
+  });
+});

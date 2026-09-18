@@ -94,8 +94,11 @@ const AULA: MyClass = {
   ocupacaoId: "oc1",
   turmaId: "t1",
   data: "2026-09-02",
-  horaInicio: "08:00",
-  horaFim: "09:00",
+  // 16:00, e não 08:00: o relógio do teste marca 12h, e desde a correção do
+  // corte (validação independente de 2026-09-18) uma aula encerrada não é
+  // "próxima aula". A fixture dizia 08:00 e passava por causa do defeito.
+  horaInicio: "16:00",
+  horaFim: "17:00",
   quadraId: "q1",
   quadraNome: "Quadra 1",
   turmaNome: "Turma A",
@@ -126,7 +129,7 @@ const RESERVA = {
 describe("HomeView", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    listMyBookingsMock.mockResolvedValue([]);
+    listMyBookingsMock.mockResolvedValue({ itens: [], truncou: false });
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(QUARTA);
   });
@@ -281,7 +284,7 @@ describe("HomeView", () => {
 describe("SPEC-057/TASK-003 — a home abre na agenda", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    listMyBookingsMock.mockResolvedValue([]);
+    listMyBookingsMock.mockResolvedValue({ itens: [], truncou: false });
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(QUARTA);
     getMeMock.mockResolvedValue(ALUNO);
@@ -366,7 +369,7 @@ describe("SPEC-057/TASK-003 — a home abre na agenda", () => {
    * (AC-009, provado logo acima).
    */
   it("SPEC-059/D3b: a agenda diz o que é reserva de quadra", async () => {
-    listMyBookingsMock.mockResolvedValue([RESERVA]);
+    listMyBookingsMock.mockResolvedValue({ itens: [RESERVA], truncou: false });
 
     render(<HomeView />);
     await screen.findByRole("region", { name: "Minha agenda por mês" });

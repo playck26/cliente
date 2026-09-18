@@ -157,8 +157,12 @@ export function HomeView() {
             if (ativo) {
               setCompromissos([
                 ...aulasData.map(deAula),
-                ...reservas.map(deReserva),
+                ...reservas.itens.map(deReserva),
               ]);
+              // O teto da varredura é declarado, não escondido: se ele cortou,
+              // a tela avisa em vez de mostrar meia agenda como se fosse
+              // inteira (achado da validação independente).
+              if (reservas.truncou) setReservasIndisponiveis(true);
             }
           } catch {
             if (ativo) setReservasIndisponiveis(true);
@@ -255,15 +259,16 @@ export function HomeView() {
                 listMyClasses(janela),
                 listMyBookings(janela).catch(() => {
                   setReservasIndisponiveis(true);
-                  return [];
+                  return { itens: [], truncou: false };
                 }),
               ])
-                .then(([aulas, reservas]) =>
+                .then(([aulas, reservas]) => {
                   setCompromissos([
                     ...aulas.map(deAula),
-                    ...reservas.map(deReserva),
-                  ]),
-                )
+                    ...reservas.itens.map(deReserva),
+                  ]);
+                  if (reservas.truncou) setReservasIndisponiveis(true);
+                })
                 // Falha ao trocar de mês conserva a grade (AC-005): o aviso
                 // já tem lugar próprio nesta tela, e sumir com o calendário
                 // seria punir quem só quis espiar outubro.
