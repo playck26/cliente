@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { ApiError } from "./api-client";
 import {
   NOMES_PADRAO,
