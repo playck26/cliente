@@ -4,7 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { LogoDaEmpresa } from "@/components/logo-da-empresa";
-import { getMinhaEmpresa, logout, type MinhaEmpresa } from "@/lib/api-client";
+import { getMinhaEmpresa, type MinhaEmpresa } from "@/lib/api-client";
+import { sairDaConta } from "@/lib/sair";
 
 // Cabeçalho compartilhado (SPEC-007) — repete em Home/Minhas Aulas/
 // Quadras/Minhas Reservas na referência "Performance Court". `iniciais`
@@ -87,7 +88,7 @@ export function TopAppBar({ saudacao, iniciais }: { saudacao?: string; iniciais?
           // `.catch` antes de navegar, e o mesmo padrão do `perfil-view`:
           // botão "Sair" que não sai porque a rede caiu é pior que não ter
           // botão. A sessão local é encerrada de qualquer forma.
-          void logout()
+          void sairDaConta()
             .catch(() => undefined)
             .finally(() => router.replace("/login"));
         }}
