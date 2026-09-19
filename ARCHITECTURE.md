@@ -207,7 +207,8 @@ em silêncio. Ver Gaps.
 ## 7. Requisitos de plataforma
 
 Web responsivo, português do Brasil, tema claro. Sem offline (o service
-worker do `cliente` registra, mas não há estratégia de cache de dados).
+worker do `cliente` registra, mas não há estratégia de cache de dados) —
+**ele recebe push desde a SPEC-062**, ver a seção 11.
 Deploy: Netlify (plano Personal desde 2026-08-22, ADR-014).
 
 **Build pulado quando o commit não muda o site (2026-09-15).** Cada deploy de
@@ -644,7 +645,58 @@ chamada. Não há React Query nem estado global neste projeto, e um store por
 causa de um avatar seria a decisão errada. O cache é limpo em
 `encerrarSessao()`: a próxima pessoa nesta aba pode ser de outro clube.
 
-## 10. Gaps e pontos de atenção
+## 10. Avisos do clube — push (SPEC-062/TASK-004)
+
+**O que existe:** `public/sw.js` (antes com três linhas, só para instalabilidade)
+trata `push`, `notificationclick` e `pushsubscriptionchange`;
+`src/lib/push-reconciliacao.ts` (decisão, sem navegador),
+`src/lib/push-do-navegador.ts` (`PushManager` + API), `src/lib/sair.ts` e a
+seção `AvisosDoClube` no perfil.
+
+**A fronteira, e por que ela existe.** A decisão — quando desinscrever, quando
+desistir — mora num módulo que não conhece navegador nem rede, atrás de uma
+interface de quatro métodos (`PortaDoNavegador`). É o que torna a posse do
+aparelho **provável sem um aparelho**: um teste contra `PushManager` real
+provaria o navegador, não a nossa regra.
+
+**Três coisas que não são preferência:**
+
+| Regra | Por quê |
+|---|---|
+| `showNotification()` em **todo** push, inclusive no `catch` do corpo quebrado | o WebKit **revoga a assinatura** de quem recebe e não mostra. Push silencioso não existe; existe push que custa a assinatura |
+| `requestPermission()` **só dentro de um gesto** | pedir na abertura leva "bloquear", e bloqueio não se desfaz sem ir às configurações do sistema — caminho sem volta criado por um pedido que a pessoa não esperava |
+| o interruptor tem **quatro** estados, e `erro` é um deles | ele é a única coisa que a pessoa tem para saber se vai receber aviso. Nunca `ligado` por otimismo |
+
+**Como se pergunta "de quem é esta assinatura?":** não há rota de consulta, e
+não precisa haver — **o próprio `POST /push/assinatura` é a pergunta.** `204`
+responde "é sua"; `409 ENDPOINT_EM_USO` responde "é de outra conta", e aí o app
+desinscreve, assina de novo e registra. Uma tentativa só: se o serviço devolver
+o mesmo `endpoint`, para (LIM-062j). Uma rota que dissesse de quem é um
+`endpoint` seria oráculo de assinaturas alheias.
+
+**Três gatilhos de reconciliação**, e o terceiro fecha um buraco que a
+validação independente achou: montagem, evento `online`, e `BroadcastChannel`.
+A assinatura é **uma por service worker**, então o logout numa aba tira o push
+de todas — e a aba que continua **visível** nunca recebe `visibilitychange`.
+
+**`sairDaConta()` existe para não separar duas metades de uma decisão.**
+Desinscrever e sair andam juntos; espalhados pelos dois lugares que fazem
+logout, é questão de tempo até alguém aplicar um sem o outro. Não fica dentro
+do `logout()` porque fecharia ciclo de import com `push-do-navegador`.
+
+| Regra de camada | Gate |
+|---|---|
+| credencial de assinatura (`endpoint`, `p256dh`, `auth`) **nunca** em log ou resposta | revisão; no `back` há teste de serialização |
+| a decisão de push não importa `PushManager` | `push-reconciliacao.ts` não tem `navigator` — **busca no CI seria o gate, hoje não existe** |
+| `requestPermission()` só em manipulador de evento | **prova de tela**: `avisos-do-clube.test.tsx`, "montar a tela NÃO chama requestPermission" |
+
+**LIM-062c — no iPhone, push exige o app instalado** na tela de início (iOS
+16.4+). A tela detecta e **explica**, em vez de mostrar um interruptor que
+nunca liga. A detecção reusa `ehIOS()` de `instalacao-pwa.ts`, que trata o iPad
+anunciando-se como `Macintosh` desde o iPadOS 13 — uma segunda detecção aqui
+divergiria, e a que diverge é sempre a mais nova.
+
+## 11. Gaps e pontos de atenção
 
 | # | Gap | Severidade |
 |---|---|---|

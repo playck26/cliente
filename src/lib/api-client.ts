@@ -1433,3 +1433,89 @@ export async function adicionaisDisponiveis(
     throw erro;
   }
 }
+
+// ---------------------------------------------------------------------------
+// SPEC-062 — push
+// ---------------------------------------------------------------------------
+
+export interface ChavePublicaDePush {
+  chave: string;
+  /**
+   * `sha256` do texto da chave privada. **Não é segredo** — é o insumo do gate
+   * que procura a chave nos bundles publicados sem nunca receber a chave. O
+   * app não usa; fica no tipo porque a rota devolve, e tipo que esconde campo
+   * publicado mente para quem lê.
+   */
+  impressaoDaPrivada: string;
+}
+
+/**
+ * SPEC-062/D1b — a chave pública, **sem autenticação e sem cache**.
+ *
+ * Rota pública de propósito: o navegador assina antes de haver sessão em
+ * alguns caminhos, e a chave pública é pública por definição. O que ela não
+ * pode é ficar velha — depois de uma rotação do par, assinar com a chave
+ * antiga só falharia no envio, longe da causa. Por isso `no-store` no
+ * servidor e `cache: "no-store"` aqui.
+ *
+ * **Não passa por `authFetch`**: não há token a mandar, e o desvio de refresh
+ * dele não faz sentido numa rota que nunca responde 401.
+ */
+export async function getChavePublicaDePush(): Promise<ChavePublicaDePush> {
+  const res = await fetch(`${API_URL}/api/v1/push/chave-publica`, {
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw await parseError(res, "Os avisos do clube não estão disponíveis");
+  }
+  return (await res.json()) as ChavePublicaDePush;
+}
+
+export interface AssinaturaParaRegistrar {
+  endpoint: string;
+  p256dh: string;
+  auth: string;
+}
+
+/**
+ * SPEC-062/D2a — registrar o aparelho, que **também é a pergunta** "de quem é
+ * esta assinatura?".
+ *
+ * `204` responde "é sua"; `409 ENDPOINT_EM_USO` responde "é de outra conta", e
+ * quem trata isso é a reconciliação (`push-reconciliacao.ts`). Não existe rota
+ * de consulta, e não precisa: uma rota que dissesse de quem é um `endpoint`
+ * seria um oráculo de assinaturas alheias.
+ */
+export async function registrarAssinaturaDePush(
+  assinatura: AssinaturaParaRegistrar,
+): Promise<void> {
+  await authFetch("/push/assinatura", {
+    method: "POST",
+    body: JSON.stringify(assinatura),
+  });
+}
+
+/**
+ * SPEC-062/D2a-2 — remover **a minha** assinatura deste aparelho.
+ *
+ * O `endpoint` vai no CORPO, não na query: em URL ele apareceria no log de
+ * acesso de qualquer proxy no caminho, e ele é credencial (INV-062f). O
+ * servidor responde `204` tenha apagado ou não.
+ */
+export async function removerAssinaturaDePush(endpoint: string): Promise<void> {
+  await authFetch("/push/assinatura", {
+    method: "DELETE",
+    body: JSON.stringify({ endpoint }),
+  });
+}
+
+/**
+ * SPEC-062/D6 — pedir um aviso de teste para si mesmo.
+ *
+ * É o que torna o cano verificável sem esperar um gesto do clube. Os erros que
+ * a tela precisa distinguir vêm por `code`: `TESTE_JA_ENFILEIRADO` (já há um a
+ * caminho) e `TESTE_ACIMA_DO_TETO` (três na última hora).
+ */
+export async function pedirAvisoDeTeste(): Promise<void> {
+  await authFetch("/push/teste", { method: "POST" });
+}

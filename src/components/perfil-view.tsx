@@ -7,10 +7,12 @@ import { BottomNav } from "@/components/bottom-nav";
 import { FotoDePerfil } from "@/components/foto-de-perfil";
 import { MinhaCarteira } from "@/components/minha-carteira";
 import { CompleteSeuCadastro } from "@/components/complete-seu-cadastro";
+import { AvisosDoClube } from "@/components/avisos-do-clube";
 import { MinhasReposicoes } from "@/components/minhas-reposicoes";
 import { MeuPlano } from "@/components/meu-plano";
 import { TopAppBar } from "@/components/top-app-bar";
-import { getMe, logout, type Usuario } from "@/lib/api-client";
+import { getMe, type Usuario } from "@/lib/api-client";
+import { sairDaConta } from "@/lib/sair";
 
 /**
  * SPEC-018/TASK-003 — a página que hospeda a foto de perfil.
@@ -141,6 +143,14 @@ export function PerfilView() {
         {usuario && usuario.role !== "aluno" ? null : <MinhasReposicoes />}
 
         {/*
+          SPEC-062 — os avisos valem para TODO papel, e por isso este bloco não
+          tem a guarda de `role !== "aluno"` que os de cima têm: o professor
+          também é avisado de aula alterada (SPEC-063/D1), e o aparelho dele é
+          tão dele quanto o do aluno.
+        */}
+        <AvisosDoClube />
+
+        {/*
           O "Sair" fica no fim, separado, e é a única ação destrutiva desta
           tela. Perto dos botões da foto, o dedo erraria.
 
@@ -157,7 +167,7 @@ export function PerfilView() {
               // engole o erro, mas depender disso deixaria uma rejeição não
               // tratada no dia em que ele parar de engolir. O redirecionamento
               // acontece nos dois caminhos.
-              void logout()
+              void sairDaConta()
                 .catch(() => undefined)
                 .finally(() => router.replace("/login"));
             }}
