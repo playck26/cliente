@@ -38,7 +38,18 @@ self.addEventListener("push", (evento) => {
     // `/icons/...` de memoria e o caminho quebrado so apareceria no primeiro
     // push real, como icone faltando na bandeja.
     icon: "/icon-192.png",
-    badge: "/icon-maskable-192.png",
+    // **O badge NAO e o icone.** No Android ele e renderizado como SILHUETA:
+    // so o canal alfa sobrevive, e cor nenhuma. Apontar para o
+    // `icon-maskable-192.png` -- que e opaco de ponta a ponta, como todo
+    // maskable tem de ser -- produzia um circulo VAZIO na bandeja, e foi
+    // exatamente o que apareceu no primeiro push real (2026-09-20).
+    //
+    // No iPhone nada disso acontece: o WebKit ignora `badge` e usa o icone do
+    // app instalado. Por isso o defeito so existia num dos dois aparelhos.
+    //
+    // `badge-96.png` e branco puro com fundo transparente -- a forma mora no
+    // alfa. **Trocar por um PNG colorido quebra de novo, em silencio.**
+    badge: "/badge-96.png",
     // O destino da abertura viaja aqui, não na URL da notificação: é o
     // `notificationclick` quem decide para onde ir.
     data: { destinoUrl: dados.destinoUrl || "/" },
