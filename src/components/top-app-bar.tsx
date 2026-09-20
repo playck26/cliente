@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { SinoDeAvisos } from "./sino-de-avisos";
 import { useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
 import { LogoDaEmpresa } from "@/components/logo-da-empresa";
@@ -62,11 +63,16 @@ export function TopAppBar({ saudacao, iniciais }: { saudacao?: string; iniciais?
 
         Saíram dois botões, cada um por um motivo diferente:
 
-        - **o sino**, porque não existe sistema de notificação no backend.
+        - **o sino**, porque não existia sistema de notificação no backend.
           Ele estava aqui desde a SPEC-007, documentado como "inerte", por
           identidade visual. Ícone que ignora o toque ensina a pessoa a não
           tocar nos outros — e o Israel decidiu tirá-lo até haver o que
-          notificar;
+          notificar.
+
+          **Ele VOLTOU na SPEC-065, e a regra é a mesma — o que mudou foi a
+          premissa.** Desde 2026-09-20 os treze gestos da SPEC-063 avisam de
+          verdade, e existe `/avisos` para onde ir. O ícone não ignora mais o
+          toque;
         - **o ícone de perfil**, porque `/perfil` foi para a barra de baixo.
           O argumento de ele morar aqui era que a barra era `grid-cols-5`
           com botão central saliente e um sexto item quebraria o desenho.
@@ -75,6 +81,7 @@ export function TopAppBar({ saudacao, iniciais }: { saudacao?: string; iniciais?
         A logo e o nome do clube FICAM (SPEC-018/TASK-006): eles não são
         botão, são a marca da escola do aluno.
       */}
+      <SinoDeAvisos />
       <button
         type="button"
         aria-label={confirmando ? "Confirmar saída" : "Sair da conta"}

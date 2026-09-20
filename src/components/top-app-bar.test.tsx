@@ -47,13 +47,30 @@ beforeEach(() => {
   });
 });
 
-describe("o que saiu do cabeçalho", () => {
-  it("não tem mais o sino de notificações", () => {
-    // Ele estava aqui desde a SPEC-007, sem ação nenhuma. Ícone que ignora o
-    // toque ensina a pessoa a não tocar nos outros.
+describe("o sino, que saiu e voltou", () => {
+  /**
+   * **Este teste afirmava o contrário, e a troca é parte do escopo da
+   * SPEC-065 — não efeito colateral.**
+   *
+   * Ele dizia *"não tem mais o sino de notificações"*, e a razão era boa: o
+   * ícone estava aqui desde a SPEC-007 sem ação nenhuma, e **ícone que ignora
+   * o toque ensina a pessoa a não tocar nos outros**. O Israel mandou tirá-lo
+   * *"até haver o que notificar"*.
+   *
+   * **A regra não mudou; a premissa caiu.** Desde 2026-09-20 os treze gestos
+   * da SPEC-063 avisam de verdade, e existe `/avisos` para onde ir. O teste
+   * velho encodava um estado do mundo, não um princípio — e um teste assim
+   * tem de mudar quando o mundo muda, em vez de congelá-lo.
+   *
+   * O precedente é a engrenagem do `admin-top-bar`, que deixou de ser inerte
+   * na SPEC-010 pelo mesmo caminho.
+   */
+  it("tem o sino, e ele LEVA a algum lugar", () => {
     render(<TopAppBar />);
 
-    expect(screen.queryByLabelText("Notificações")).not.toBeInTheDocument();
+    const sino = screen.getByLabelText("Avisos");
+    expect(sino).toBeInTheDocument();
+    expect(sino).toHaveAttribute("href", "/avisos");
   });
 
   it("não tem mais o atalho de perfil — ele desceu para a barra", () => {
