@@ -47,7 +47,36 @@ self.addEventListener("push", (evento) => {
     tag: dados.tipo === "teste" ? "playck-teste" : undefined,
   };
 
-  evento.waitUntil(self.registration.showNotification(titulo, opcoes));
+  // SPEC-065/D5 — **avisa as abas abertas, para o sino subir.**
+  //
+  // Este gancho nao existia: o `sw.js` mostrava a notificacao e as abas so
+  // descobriam na proxima abertura. A aba que receber isto faz UM
+  // `GET /me/avisos/nao-lidos`, com debounce e single-flight (AC-020).
+  //
+  // **Push de teste NAO mexe no contador** (AC-018): ele e diagnostico do
+  // canal, nao recado do clube, e a caixa nao o mostra. Sem este `if`, o
+  // numero subiria por um aviso que a pessoa nao encontraria ao abrir.
+  const avisarAbas =
+    dados.tipo === "teste"
+      ? Promise.resolve()
+      : self.clients
+          .matchAll({ type: "window", includeUncontrolled: true })
+          .then((janelas) => {
+            for (const janela of janelas) {
+              janela.postMessage({ tipo: "playck:aviso-novo" });
+            }
+          })
+          .catch(() => {
+            // Avisar aba e conveniencia: falhar aqui nao pode impedir a
+            // notificacao de aparecer, que e a obrigacao do WebKit.
+          });
+
+  evento.waitUntil(
+    Promise.all([
+      self.registration.showNotification(titulo, opcoes),
+      avisarAbas,
+    ]),
+  );
 });
 
 /**

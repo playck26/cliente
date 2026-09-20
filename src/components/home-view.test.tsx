@@ -43,6 +43,11 @@ vi.mock("@/lib/api-client", () => ({
   // o CI cai. Foi assim que este ciclo descobriu — é a mesma família do
   // `SUITE_EXIT` que o CLAUDE.md registra, ao contrário.
   getPrazosDoClube: () => Promise.resolve({}),
+  // SPEC-065: o `TopAppBar` ganhou o sino, e o sino conta os nao lidos. Mesma
+  // familia do `getPrazosDoClube` acima -- sem o mock o vitest levanta "No
+  // export is defined" e esta suite inteira cai por uma barra que nao e o
+  // assunto dela. Zero: home sem aviso nenhum e o estado neutro.
+  getAvisosNaoLidos: () => Promise.resolve(0),
   // SPEC-018/TASK-006: o `TopAppBar` passou a buscar a empresa para
   // desenhar a logo do clube. Não é o assunto desta suíte, mas sem o mock
   // ela quebra inteira — e o erro fala de módulo, não de home.

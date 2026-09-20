@@ -1519,3 +1519,75 @@ export async function removerAssinaturaDePush(endpoint: string): Promise<void> {
 export async function pedirAvisoDeTeste(): Promise<void> {
   await authFetch("/push/teste", { method: "POST" });
 }
+
+
+// ---------------------------------------------------------------------------
+// SPEC-065 — a caixa de avisos
+// ---------------------------------------------------------------------------
+
+/**
+ * Um aviso como a caixa o entrega. **Seis campos, e nenhum de fila.**
+ *
+ * O `back` recorta por `select` explícito: `estado`, `tentativas`,
+ * `ultimo_erro`, `reivindicada_por` e — o mais perigoso — `origem_id` ficam de
+ * fora. Aquele último aponta para a ação administrativa, que tem o autor do
+ * gesto (SPEC-065/AC-003).
+ */
+export interface AvisoDaCaixa {
+  id: string;
+  titulo: string;
+  corpo: string;
+  destinoUrl: string | null;
+  criadaEm: string;
+  lidaEm: string | null;
+}
+
+/** O envelope de paginação do projeto, mais o contador. */
+export interface CaixaDeAvisos extends Paginated<AvisoDaCaixa> {
+  naoLidos: number;
+}
+
+/**
+ * A caixa, paginada.
+ *
+ * **Ela não obedece a `expira_em`** (SPEC-065/D7): aquela coluna diz até quando
+ * vale a pena TENTAR enviar, e quem abre a caixa amanhã está perguntando outra
+ * coisa. Avisos em qualquer estado aparecem, inclusive os que o push não
+ * conseguiu entregar — é para isso que a caixa existe.
+ */
+export async function getCaixaDeAvisos(
+  page = 1,
+  pageSize = 20,
+): Promise<CaixaDeAvisos> {
+  const res = await authFetch(`/me/avisos?page=${page}&pageSize=${pageSize}`);
+  if (!res.ok)
+    throw await parseError(res, "Não foi possível carregar seus avisos.");
+  return (await res.json()) as CaixaDeAvisos;
+}
+
+/**
+ * Só o inteiro que o sino precisa.
+ *
+ * Rota própria, e não `?pageSize=1` na listagem: pedir uma página para ler o
+ * rodapé dela seria trazer linha de banco para descartar.
+ */
+export async function getAvisosNaoLidos(): Promise<number> {
+  const res = await authFetch("/me/avisos/nao-lidos");
+  if (!res.ok)
+    throw await parseError(res, "Não foi possível contar seus avisos.");
+  return ((await res.json()) as { naoLidos: number }).naoLidos;
+}
+
+/**
+ * Marca **todas** como lidas, e devolve quantas foram.
+ *
+ * Idempotente por construção no servidor (`WHERE lida_em IS NULL`): chamar de
+ * novo devolve `0` e não reescreve o `lida_em` já gravado. Duas abas chamando
+ * ao mesmo tempo não brigam.
+ */
+export async function marcarAvisosComoLidos(): Promise<number> {
+  const res = await authFetch("/me/avisos/lidas", { method: "POST" });
+  if (!res.ok)
+    throw await parseError(res, "Não foi possível marcar seus avisos.");
+  return ((await res.json()) as { marcadas: number }).marcadas;
+}
