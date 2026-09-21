@@ -7,12 +7,14 @@ import { CalendarDays, CalendarRange, Clock, List } from "lucide-react";
 import { TennisCourtIcon } from "@/components/icons/tennis-court-icon";
 import { CourtLines } from "@/components/court-lines";
 import { TennisBallIcon } from "@/components/icons/tennis-ball-icon";
+import { Paginacao } from "@/components/paginacao";
 import { SemanaDoAluno } from "@/components/semana-do-aluno";
 import { hojeNoClubeIso } from "@/lib/fuso";
 import {
   ApiError,
   avisarFalta,
   listMyClasses,
+  listProximasAulas,
   retirarAvisoDeFalta,
   type MyClass,
 } from "@/lib/api-client";
@@ -85,9 +87,38 @@ function useVista(): { vista: Vista; irPara: (v: Vista) => void } {
  */
 const avisou = (aula: MyClass) => aula.faltaAvisada === true;
 
+/**
+ * SPEC-066 — **dez por pagina.** E o numero que o usuario pediu, com todas as
+ * letras. O servidor tem teto de 50 (`@Max(50)` no DTO); este e o padrao, e o
+ * servidor usaria 10 mesmo se a tela nao mandasse.
+ */
+const AULAS_POR_PAGINA = 10;
+
 // REQ-002 (SPEC-005): aluno lista as próprias próximas aulas.
 export function MyClassesList() {
   const [aulas, setAulas] = useState<MyClass[]>([]);
+  /**
+   * SPEC-066/TASK-002 — **a pagina atual, e o total do servidor.**
+   *
+   * O pedido do usuario: *"as aulas estao apresentando mais de 40 itens e
+   * deixando a pagina enorme, precisamos apresentar apenas 10 aulas por
+   * pagina"*.
+   *
+   * **A pagina mora em `useState`, e nao no endereco.** A `vista` mora na
+   * URL de proposito (link compartilhavel, "voltar" que desfaz) -- ver o
+   * `useVista` acima. A pagina nao: ninguem compartilha "pagina 3 das minhas
+   * aulas", e por o numero na URL faria o `router.push` correr a cada clique
+   * do paginador. **A AC-003 exige trocar de pagina sem remontar a tela.**
+   */
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  /**
+   * **Trocar de pagina nao mostra o esqueleto.** O `loading` governa a
+   * primeira pintura, e reusa-lo aqui faria a lista sumir e voltar a cada
+   * clique do paginador -- pior que a espera que ele esconde. Este estado so
+   * desabilita os botoes enquanto a pagina esta em voo.
+   */
+  const [trocandoPagina, setTrocandoPagina] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   /** SPEC-031: qual ocorrência está com ação em voo. Um por vez basta. */
@@ -110,8 +141,11 @@ export function MyClassesList() {
 
   const carregar = useCallback(
     () =>
-      listMyClasses()
-        .then(setAulas)
+      listProximasAulas({ page, pageSize: AULAS_POR_PAGINA })
+        .then((pagina) => {
+          setAulas(pagina.data);
+          setTotal(pagina.total);
+        })
         .catch((err: unknown) => {
           setError(
             err instanceof ApiError
@@ -119,11 +153,15 @@ export function MyClassesList() {
               : "Não foi possível carregar suas aulas.",
           );
         }),
-    [],
+    [page],
   );
 
   useEffect(() => {
-    void carregar().finally(() => setLoading(false));
+    setTrocandoPagina(true);
+    void carregar().finally(() => {
+      setLoading(false);
+      setTrocandoPagina(false);
+    });
   }, [carregar]);
 
   /**
@@ -422,6 +460,22 @@ export function MyClassesList() {
                 </div>
               </article>
             ))}
+            {/*
+              SPEC-066/AC-003 — o paginador. `Paginacao` ja existe desde a
+              SPEC-027 e se esconde sozinho quando ha uma pagina so, entao
+              aluno com poucas aulas nao ve nada de novo.
+
+              `ocupado={loading}` impede o clique duplo enquanto a proxima
+              pagina esta em voo.
+            */}
+            <Paginacao
+              page={page}
+              pageSize={AULAS_POR_PAGINA}
+              total={total}
+              onMudar={setPage}
+              ocupado={trocandoPagina}
+              rotulo="proximas aulas"
+            />
           </section>
         )}
       </div>
