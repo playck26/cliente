@@ -9,11 +9,9 @@ import { CourtLines } from "@/components/court-lines";
 import { TennisBallIcon } from "@/components/icons/tennis-ball-icon";
 import { Paginacao } from "@/components/paginacao";
 import { SemanaDoAluno } from "@/components/semana-do-aluno";
-import { hojeNoClubeIso } from "@/lib/fuso";
 import {
   ApiError,
   avisarFalta,
-  listMyClasses,
   listProximasAulas,
   retirarAvisoDeFalta,
   type MyClass,
@@ -115,10 +113,17 @@ export function MyClassesList() {
   /**
    * **Trocar de pagina nao mostra o esqueleto.** O `loading` governa a
    * primeira pintura, e reusa-lo aqui faria a lista sumir e voltar a cada
-   * clique do paginador -- pior que a espera que ele esconde. Este estado so
-   * desabilita os botoes enquanto a pagina esta em voo.
+   * clique do paginador -- pior que a espera que ele esconde.
+   *
+   * **E DERIVADO, nao guardado.** A primeira versao fazia
+   * `setTrocandoPagina(true)` dentro do efeito, e o lint do React reprovou:
+   * *"Calling setState synchronously within an effect can trigger cascading
+   * renders"*. Guardar "estou trocando" e guardar o que ja da para calcular
+   * — **qual pagina foi respondida por ultimo**. E o mesmo conserto do
+   * DEF-037, onde um booleano de carregamento tambem virou derivacao.
    */
-  const [trocandoPagina, setTrocandoPagina] = useState(false);
+  const [respondido, setRespondido] = useState<number | null>(null);
+  const trocandoPagina = respondido !== page;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   /** SPEC-031: qual ocorrência está com ação em voo. Um por vez basta. */
@@ -150,12 +155,11 @@ export function MyClassesList() {
   );
 
   useEffect(() => {
-    setTrocandoPagina(true);
     void carregar().finally(() => {
       setLoading(false);
-      setTrocandoPagina(false);
+      setRespondido(page);
     });
-  }, [carregar]);
+  }, [carregar, page]);
 
   /**
    * SPEC-031/REQ-006 — avisar que vai faltar, e desfazer.

@@ -1,11 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { TennisCourtIcon } from "@/components/icons/tennis-court-icon";
 import { hojeNoClubeIso } from "@/lib/fuso";
 import { listMyClasses, type MyClass } from "@/lib/api-client";
+import { agruparPorDia } from "@/lib/agrupar-por-dia";
 
 /**
  * SPEC-029 — **as próximas aulas do aluno, vistas como semana.**
@@ -147,7 +148,18 @@ export function SemanaDoAluno({
     buscar(domingo, somarDias(domingo, 6));
   }, [buscar, domingo]);
 
-  const aulas = Array.from(porJanela.values()).flat();
+  /**
+   * SPEC-066/TASK-004 — **memorizado porque a identidade importa.**
+   *
+   * Sem o `useMemo`, este `flat()` devolve um array NOVO a cada render, e um
+   * array novo invalida qualquer `useMemo` que dependa dele — inclusive o do
+   * agrupamento logo abaixo. **Era esse o defeito que a spec descreve no pai,
+   * e ele se mudou para ca junto com o cache.**
+   */
+  const aulas = useMemo(
+    () => Array.from(porJanela.values()).flat(),
+    [porJanela],
+  );
 
   const dias = Array.from({ length: 7 }, (_, i) => somarDias(domingo, i));
   const sabado = dias[6];
@@ -155,11 +167,15 @@ export function SemanaDoAluno({
   /** Trocar a semana e so mudar o estado: o efeito acima busca o que faltar. */
   const irParaSemana = (novoDomingo: string) => setDomingo(novoDomingo);
 
-  // Agrupa uma vez, em vez de filtrar sete vezes dentro do render.
-  const porDia = new Map<string, MyClass[]>();
-  for (const aula of aulas) {
-    porDia.set(aula.data, [...(porDia.get(aula.data) ?? []), aula]);
-  }
+  /**
+   * **AC-007 — o agrupamento roda uma vez por conjunto de aulas.**
+   *
+   * Ele morava aqui dentro, refeito a cada render, com *spread* no laco. Agora
+   * mora em `@/lib/agrupar-por-dia` — modulo proprio, porque e o que permite
+   * ao teste interceptar com `vi.mock` e CONTAR. Exportar do proprio arquivo
+   * nao serviria: chamada lexical nao passa pelo binding exportado.
+   */
+  const porDia = useMemo(() => agruparPorDia(aulas), [aulas]);
 
   const naSemana = dias.reduce(
     (total, dia) => total + (porDia.get(dia)?.length ?? 0),
