@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { TennisCourtIcon } from "@/components/icons/tennis-court-icon";
 import { hojeNoClubeIso } from "@/lib/fuso";
-import type { MyClass } from "@/lib/api-client";
+import { listMyClasses, type MyClass } from "@/lib/api-client";
 
 /**
  * SPEC-029 — **as próximas aulas do aluno, vistas como semana.**
@@ -71,52 +71,89 @@ function rotuloCurto(iso: string): string {
  * `/minhas-aulas`, onde ela é útil e permitida. O contexto decide.
  */
 export function SemanaDoAluno({
-  aulas,
   mostrarQuadra = true,
   mostrarLinkDaTurma = true,
-  onJanela,
 }: {
-  aulas: MyClass[];
   mostrarQuadra?: boolean;
   /**
-   * SPEC-057/TASK-002/D10 — a HOME monta esta vista sem destino para o
-   * clique (LIM-057h). Falso lá, verdadeiro em `/minhas-aulas`.
+   * Falso esconde o link para a ficha da turma.
+   *
+   * **A frase anterior aqui estava velha e foi corrigida na SPEC-066:** ela
+   * dizia que *"a HOME monta esta vista"*, e a home monta o
+   * `CalendarioDoAluno`, nao esta. Conferido por varredura — o unico
+   * consumidor de producao e `my-classes-list.tsx`. Comentario que descreve
+   * um arranjo que nao existe mais envelhece como verdade.
    */
   mostrarLinkDaTurma?: boolean;
-  /**
-   * SPEC-057/TASK-002/D11 — **avisa quando a semana muda, com a janela.**
-   *
-   * Este componente continua sem buscar nada: quem busca é quem o monta. A
-   * mudança é que agora ele **diz qual janela está olhando**, e o pai decide
-   * se pede ao servidor.
-   *
-   * Sem isto, navegar para trás mostrava sete travessões para sempre — o
-   * `GET /me/classes` devolvia só o futuro, e a tela não tinha como pedir
-   * outra coisa. É o que o card chama de *"clicar para semanas anteriores e
-   * ver as aulas que se passaram"*.
-   *
-   * **A home não passa este callback** (LIM-057h): lá a semana é só a
-   * corrente.
-   */
-  onJanela?: (janela: { de: string; ate: string }) => void;
 }) {
   const hoje = hojeNoClubeIso();
   const [domingo, setDomingo] = useState(() => domingoDaSemana(hoje));
 
+  /**
+   * SPEC-066/TASK-003 — **esta vista busca a propria janela** (INV-066d).
+   *
+   * Antes ela recebia `aulas` do pai, e o pai as tinha porque
+   * `GET /me/classes` devolvia o futuro inteiro. Com a lista paginada isso
+   * deixou de funcionar -- e e bom que tenha deixado: era esse acoplamento
+   * que fazia o calendario filtrar a lista inteira para mostrar sete dias.
+   *
+   * ## O cache vive na MONTAGEM, e isso e normativo (AC-012)
+   *
+   * Uma busca por janela por montagem. Voltar a uma semana ja vista **nao
+   * busca de novo** (AC-005); um `F5` remonta e **busca de novo**, que e o
+   * correto -- guardar cache atraves de `F5` exigiria nomear armazenamento,
+   * invalidacao e escopo para economizar uma busca que a pessoa pediu ao
+   * recarregar.
+   *
+   * A v3 da spec dizia so *"repetir a entrada na mesma janela nao busca de
+   * novo"*, **sem dizer dentro de que** -- lido ao pe da letra, aquilo pedia
+   * persistencia. A 3a rodada de validacao pegou.
+   */
+  const [porJanela, setPorJanela] = useState<Map<string, MyClass[]>>(
+    () => new Map(),
+  );
+  const pedidas = useRef<Set<string>>(new Set());
+
+  const buscar = useCallback((de: string, ate: string) => {
+    const chave = `${de}:${ate}`;
+    if (pedidas.current.has(chave)) return;
+    pedidas.current.add(chave);
+    void listMyClasses({ de, ate })
+      .then((lista) => {
+        setPorJanela((atual) => new Map(atual).set(chave, lista));
+      })
+      .catch(() => {
+        // Falha nao derruba a tela: a semana volta a mostrar "—", que e o
+        // que ela mostrava antes da SPEC-057. E libera a chave, para a
+        // proxima navegacao poder tentar de novo.
+        pedidas.current.delete(chave);
+      });
+  }, []);
+
+  /**
+   * **Um mecanismo, os dois gatilhos da D5.**
+   *
+   * A spec lista duas entradas -- o clique em "Semana" e a entrada direta
+   * por link, `F5` ou *voltar*. Um efeito com `domingo` na dependencia cobre
+   * as duas: ele roda na montagem (que e a entrada direta) e roda de novo
+   * quando a seta muda a semana.
+   *
+   * **A regra da SPEC-057 nao e contradita.** O que ela proibia era efeito
+   * que reage a DADO, disparando busca que ninguem pediu a cada pintura --
+   * e na epoca o pai ja tinha as aulas, entao a busca era mesmo desnecessaria.
+   * Aqui o pai nao tem mais nada, e abrir a vista **e** o pedido.
+   */
+  useEffect(() => {
+    buscar(domingo, somarDias(domingo, 6));
+  }, [buscar, domingo]);
+
+  const aulas = Array.from(porJanela.values()).flat();
+
   const dias = Array.from({ length: 7 }, (_, i) => somarDias(domingo, i));
   const sabado = dias[6];
 
-  /**
-   * **Avisa no evento, não em `useEffect`.** Quem muda a semana é o toque na
-   * seta; reagir por efeito faria a primeira pintura disparar uma busca que
-   * ninguém pediu — e o pai já tem as aulas futuras.
-   */
-  const irParaSemana = (novoDomingo: string) => {
-    setDomingo(novoDomingo);
-    if (onJanela) {
-      onJanela({ de: novoDomingo, ate: somarDias(novoDomingo, 6) });
-    }
-  };
+  /** Trocar a semana e so mudar o estado: o efeito acima busca o que faltar. */
+  const irParaSemana = (novoDomingo: string) => setDomingo(novoDomingo);
 
   // Agrupa uma vez, em vez de filtrar sete vezes dentro do render.
   const porDia = new Map<string, MyClass[]>();
@@ -286,22 +323,17 @@ export function SemanaDoAluno({
       </ul>
 
       {/*
-        **SPEC-057/TASK-002/D11 — o rodapé mudou porque a aba sumiu.** Ele
-        mandava para "Anteriores", que deixou de existir. Sem `onJanela` (a
-        home), o "—" continua querendo dizer "não sei"; com ele, a semana
-        passada é buscada de verdade e o travessão vira ausência de aula.
+        **SPEC-066/TASK-003 — o rodape saiu, porque a duvida que ele
+        explicava acabou.**
+
+        Ele so aparecia quando NAO havia `onJanela` — ou seja, quando ninguem
+        buscava a semana passada e o "—" podia querer dizer *"nao sei"*. Agora
+        esta vista busca a propria janela sempre, entao travessao quer dizer
+        uma coisa so: **nao houve aula nesse dia**.
+
+        Aviso que explica uma ambiguidade removida vira ruido, e depois vira
+        mentira.
       */}
-      {jaPassouAlgumDia(dias, hoje) && !onJanela && (
-        <p className="px-1 text-[11px] font-semibold text-[var(--color-text-secondary)]">
-          Os dias com “—” já passaram. Para ver as aulas que aconteceram, abra
-          <strong className="font-extrabold"> Aulas</strong>.
-        </p>
-      )}
     </section>
   );
-}
-
-/** Só explica o “—” quando ele está na tela. Nota de rodapé sem rodapé é ruído. */
-function jaPassouAlgumDia(dias: string[], hoje: string): boolean {
-  return dias.some((d) => d < hoje);
 }

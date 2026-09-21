@@ -14,6 +14,18 @@ import { MyClassesList } from "./my-classes-list";
 const push = vi.hoisted(() => vi.fn());
 const params = vi.hoisted(() => ({ valor: null as string | null }));
 const listMyClasses = vi.hoisted(() => vi.fn());
+/**
+ * SPEC-066/TASK-002 — **a lista trocou de rota.**
+ *
+ * Ela pedia `listMyClasses()` sem janela, que devolvia o futuro inteiro — a
+ * origem das 40+ aulas que o usuario relatou. Agora pede
+ * `listProximasAulas({page, pageSize: 10})`, que devolve
+ * `{data, page, pageSize, total}`.
+ *
+ * `listMyClasses` continua mockada porque a vista de SEMANA a usa: ela busca
+ * a propria janela desde a TASK-003.
+ */
+const listProximasAulas = vi.hoisted(() => vi.fn());
 const avisarFalta = vi.hoisted(() => vi.fn());
 const retirarAvisoDeFalta = vi.hoisted(() => vi.fn());
 
@@ -28,7 +40,13 @@ vi.mock("@/lib/api-client", async () => {
     await vi.importActual<typeof import("@/lib/api-client")>(
       "@/lib/api-client",
     );
-  return { ...real, listMyClasses, avisarFalta, retirarAvisoDeFalta };
+  return {
+    ...real,
+    listMyClasses,
+    listProximasAulas,
+    avisarFalta,
+    retirarAvisoDeFalta,
+  };
 });
 
 const aula = {
@@ -44,10 +62,24 @@ const aula = {
   faltaAvisada: false,
 };
 
+/** A lista le uma pagina. Este auxiliar evita repetir a forma em cada caso. */
+const pagina = (data: unknown[]) => ({
+  data,
+  page: 1,
+  pageSize: 10,
+  total: data.length,
+});
+
 beforeEach(() => {
   push.mockReset();
   params.valor = null;
   listMyClasses.mockReset().mockResolvedValue([aula]);
+  listProximasAulas.mockReset().mockResolvedValue({
+    data: [aula],
+    page: 1,
+    pageSize: 10,
+    total: 1,
+  });
 });
 
 describe("quando o alternador aparece", () => {
@@ -63,7 +95,7 @@ describe("quando o alternador aparece", () => {
   it("sem aula nenhuma, não aparece", async () => {
     // Alternar entre duas telas vazias não é escolha — é um controle que
     // ocupa espaço e não faz nada.
-    listMyClasses.mockResolvedValue([]);
+    listProximasAulas.mockResolvedValue(pagina([]));
     render(<MyClassesList />);
 
     expect(
@@ -158,7 +190,9 @@ describe("qual vista é mostrada", () => {
 // pode ter ido até o clube, e o produto nunca lhe dizia o que houve.
 describe("SPEC-030 — a aula não realizada, na vista do aluno", () => {
   it("mostra 'Não realizada' no lugar de 'Agendada'", async () => {
-    listMyClasses.mockResolvedValue([{ ...aula, naoRealizada: true }]);
+    listProximasAulas.mockResolvedValue(
+      pagina([{ ...aula, naoRealizada: true }]),
+    );
 
     render(<MyClassesList />);
 
@@ -169,7 +203,7 @@ describe("SPEC-030 — a aula não realizada, na vista do aluno", () => {
   it("a aula normal continua dizendo 'Agendada'", async () => {
     // O par negativo: sem ele, um selo que dissesse "Não realizada" sempre
     // passaria na prova acima.
-    listMyClasses.mockResolvedValue([aula]);
+    listProximasAulas.mockResolvedValue(pagina([aula]));
 
     render(<MyClassesList />);
 
@@ -191,7 +225,7 @@ describe("SPEC-030 — a aula não realizada, na vista do aluno", () => {
  */
 describe("MyClassesList — avisar falta (REQ-006)", () => {
   const comAulas = (...as: (typeof aula)[]) => {
-    listMyClasses.mockResolvedValue(as);
+    listProximasAulas.mockResolvedValue(pagina(as));
   };
   const botao = () => screen.getByRole("button", { name: /falta/i });
 
@@ -277,7 +311,12 @@ describe("MyClassesList — avisar falta (REQ-006)", () => {
       "exige 2h de antecedência",
     );
     // duas: a carga inicial e a releitura depois do erro.
-    await vi.waitFor(() => expect(listMyClasses).toHaveBeenCalledTimes(2));
+    //
+    // **A rota mudou na SPEC-066/TASK-002**, e com ela o dublê que conta: a
+    // lista le `listProximasAulas`. O que esta prova guarda continua sendo o
+    // mesmo, e e o que importa — **recarregar mesmo quando da erro**, porque o
+    // prazo envelhece entre a pintura e o toque.
+    await vi.waitFor(() => expect(listProximasAulas).toHaveBeenCalledTimes(2));
   });
 
   /**
