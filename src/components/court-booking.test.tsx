@@ -99,8 +99,23 @@ beforeEach(() => {
 async function reservarNaTela() {
   render(<CourtBooking id={QUADRA} />);
   fireEvent.click(await screen.findByRole("button", { name: /10:00/ }));
-  fireEvent.click(await screen.findByText("Confirmar reserva"));
+  await confirmarReserva();
   await screen.findByText("Reserva confirmada!");
+}
+
+/**
+ * DEF-037 — **espera o catálogo de adicionais antes de clicar.**
+ *
+ * Estes casos clicavam em "Confirmar reserva" enquanto o passo de adicionais
+ * ainda buscava, e passavam: era o mesmo defeito que o Israel relatou na aula
+ * avulsa. **A suíte exercitava o caminho quebrado e dava verde.**
+ */
+async function confirmarReserva() {
+  const botao = (await screen.findByText("Confirmar reserva")).closest(
+    "button",
+  ) as HTMLButtonElement;
+  await waitFor(() => expect(botao).toBeEnabled());
+  fireEvent.click(botao);
 }
 
 describe("CourtBooking — a confirmação", () => {
@@ -166,7 +181,7 @@ describe("CourtBooking — a confirmação", () => {
     reservar.mockRejectedValue(new ApiError(409, "Horario ja ocupado."));
     render(<CourtBooking id={QUADRA} />);
     fireEvent.click(await screen.findByRole("button", { name: /10:00/ }));
-    fireEvent.click(await screen.findByText("Confirmar reserva"));
+    await confirmarReserva();
     expect(await screen.findByText("Horario ja ocupado.")).toBeInTheDocument();
 
     // A data e uma FILA DE BOTOES de dia, nao um `input[type=date]` -- a
@@ -229,7 +244,13 @@ describe("SPEC-048 — o saldo aparece ANTES", () => {
     expect(await screen.findByText(/faltam/i)).toHaveTextContent("R$ 80,00");
     // Travar prenderia quem acabou de receber crédito: o saldo foi lido na
     // montagem, e quem julga é o servidor. É a D2, e a LIM-047f antes dela.
-    expect(screen.getByText("Confirmar reserva").closest("button")).toBeEnabled();
+    // DEF-037 — o botão espera o catálogo; o que este caso afirma é que o
+    // saldo baixo **não trava**, e isso continua valendo depois da espera.
+    await waitFor(() =>
+      expect(
+        screen.getByText("Confirmar reserva").closest("button"),
+      ).toBeEnabled(),
+    );
   });
 
   it("AC-004: carteira indisponível NÃO derruba a tela", async () => {
@@ -293,7 +314,7 @@ describe("SPEC-054 — adicionais na reserva de quadra", () => {
     expect(await screen.findByText(/Ficam R\$\s*350,00/)).toBeInTheDocument();
     expect(screen.getByText("R$ 150,00")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByText("Confirmar reserva"));
+    await confirmarReserva();
     await waitFor(() => expect(reservar).toHaveBeenCalled());
     const [dto] = reservar.mock.calls[0] as [{ adicionais?: unknown }];
     expect(dto.adicionais).toEqual([{ adicionalId: "ad-1", quantidade: 2 }]);
@@ -323,7 +344,7 @@ describe("SPEC-054 — adicionais na reserva de quadra", () => {
     render(<CourtBooking id={QUADRA} />);
     fireEvent.click(await screen.findByRole("button", { name: /10:00/ }));
     await screen.findByRole("button", { name: "Mais Raquete" });
-    fireEvent.click(screen.getByText("Confirmar reserva"));
+    await confirmarReserva();
     await waitFor(() => expect(reservar).toHaveBeenCalled());
     const [dto] = reservar.mock.calls[0] as [Record<string, unknown>];
     expect("adicionais" in dto).toBe(false);
@@ -345,7 +366,7 @@ describe("SPEC-054 — adicionais na reserva de quadra", () => {
     fireEvent.click(await screen.findByRole("button", { name: /10:00/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Mais Raquete" }));
     const antes = disponiveis.mock.calls.length;
-    fireEvent.click(screen.getByText("Confirmar reserva"));
+    await confirmarReserva();
 
     expect(await screen.findByText("Raquete esgotou neste horário.")).toBeInTheDocument();
     await waitFor(() => expect(disponiveis.mock.calls.length).toBeGreaterThan(antes));

@@ -106,6 +106,11 @@ export function CourtBooking({ id }: { id: string }) {
   const [adicionais, setAdicionais] = useState<ItemDoPedido[]>([]);
   const [somaDosAdicionais, setSomaDosAdicionais] = useState(0);
   const [chaveDosAdicionais, setChaveDosAdicionais] = useState(0);
+  /**
+   * DEF-037 — enquanto o catálogo de adicionais está sendo buscado, confirmar
+   * reservaria sem a pessoa ter visto a lista. O seletor avisa; o botão espera.
+   */
+  const [adicionaisCarregando, setAdicionaisCarregando] = useState(false);
 
   useEffect(() => {
     listCourts()
@@ -491,6 +496,7 @@ export function CourtBooking({ id }: { id: string }) {
 
             {slotsSelecionados.length > 0 ? (
               <PassoDeAdicionais
+                onCarregando={setAdicionaisCarregando}
                 data={data}
                 slots={slotsSelecionados}
                 chave={chaveDosAdicionais}
@@ -580,7 +586,8 @@ export function CourtBooking({ id }: { id: string }) {
                 ) : null}
                 <Button
                   type="button"
-                  disabled={bookingLoading}
+                  // DEF-037 — esperar o catálogo antes de aceitar o clique.
+                  disabled={bookingLoading || adicionaisCarregando}
                   onClick={() => void handleConfirmar()}
                   className="mt-4 h-12 w-full rounded-2xl bg-white text-[14px] font-extrabold text-[var(--color-court-dark)] hover:bg-white/90"
                 >

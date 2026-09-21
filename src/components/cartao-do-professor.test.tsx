@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import {
   CartaoDoProfessor,
@@ -40,6 +40,11 @@ const aula = (over: Partial<AulaDoDiaDoProfessor> = {}): AulaDoDiaDoProfessor =>
     quemAvisou: [],
     ...over,
   }) as AulaDoDiaDoProfessor;
+
+afterEach(() => {
+  // Só o caso do relógio congela o tempo; os outros continuam no relógio real.
+  vi.useRealTimers();
+});
 
 beforeEach(() => {
   vi.mocked(getAulasDoDia).mockReset();
@@ -90,7 +95,32 @@ describe("frase", () => {
 });
 
 describe("CartaoDoProfessor", () => {
+  /**
+   * **DEF-038 — este caso só passava entre 08:00 e 23:30.**
+   *
+   * O cartão mostra os avisos da **próxima** aula (`proximaDoDia(aulas,
+   * agora)`), e `agora` é o relógio de parede. Com uma aula às 08:00 e outra às
+   * 23:30, quem tem os avisos é a segunda — então:
+   *
+   * | hora de rodar | `proxima` | resultado |
+   * |---|---|---|
+   * | antes das 08:00 | a das 08:00, sem avisos | **vermelho** |
+   * | entre 08:00 e 23:30 | a das 23:30 | verde |
+   * | depois das 23:30 | nenhuma | **vermelho** |
+   *
+   * Ele estava vermelho na `main` quando rodei à meia-noite, e verde no
+   * horário comercial — que é exatamente quando o CI costuma rodar. **É a
+   * mesma família do `emDias` que a SPEC-046 documenta:** defeito latente,
+   * invisível na hora em que todo mundo olha.
+   *
+   * O relógio passa a ser fixo. O que o caso julga é a CONTA dos avisos, não a
+   * hora em que alguém executa a suíte.
+   */
   it("conta as aulas de hoje e mostra quem avisou", async () => {
+    // Meio-dia em São Paulo: depois das 08:00 e antes das 23:30.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-09-21T15:00:00.000Z"));
+
     vi.mocked(getAulasDoDia).mockResolvedValue([
       aula({ horaInicio: "08:00", horaFim: "09:00" }),
       aula({

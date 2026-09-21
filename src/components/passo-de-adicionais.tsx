@@ -65,12 +65,18 @@ export function PassoDeAdicionais({
   data,
   slots,
   onChange,
+  onCarregando,
   desabilitado = false,
   chave = 0,
 }: {
   data: string;
   slots: readonly string[];
   onChange: (itens: ItemDoPedido[], somaPorReserva: number) => void;
+  /**
+   * DEF-037 — avisa quem usa enquanto a disponibilidade está sendo buscada,
+   * para o botão de confirmar não aceitar clique antes de a lista existir.
+   */
+  onCarregando?: (carregando: boolean) => void;
   desabilitado?: boolean;
   /** Troque para reler a disponibilidade (depois de um `409`). */
   chave?: number;
@@ -78,8 +84,33 @@ export function PassoDeAdicionais({
   const [disponiveis, setDisponiveis] = useState<AdicionalDisponivel[]>([]);
   const [quantidades, setQuantidades] = useState<Record<string, number>>({});
   const [erro, setErro] = useState<string | null>(null);
+  /**
+   * DEF-037 — **para QUAL pedido o `disponiveis`/`erro` acima valem.**
+   *
+   * Antes, `disponiveis = []` respondia a duas perguntas diferentes — *"o clube
+   * não tem adicional"* e *"ainda estou buscando"* — e as duas desenhavam a
+   * mesma coisa: **nada**. Quem escolhia o horário e clicava em confirmar sem
+   * esperar marcava a aula sem nunca ver a lista.
+   *
+   * E a janela não era canto raro: este componente só MONTA depois do horário
+   * escolhido, então a busca começa exatamente no instante em que a pessoa vai
+   * clicar.
+   */
+  const [respondido, setRespondido] = useState<string | null>(null);
 
   const slotsChave = [...slots].sort().join(",");
+  const pedido = `${data}|${slotsChave}|${chave}`;
+
+  /**
+   * **DERIVADO, e não estado** — e isso não é estilo, é o lint do React:
+   * *"Calling setState synchronously within an effect can trigger cascading
+   * renders"*. A primeira versão desta correção guardava `carregando` num
+   * `useState` e o ligava no corpo do efeito; o portão reprovou, com razão.
+   *
+   * Comparar o pedido atual com o último respondido dá a mesma resposta sem
+   * escrever estado nenhum na ida.
+   */
+  const carregando = data !== "" && slotsChave !== "" && respondido !== pedido;
 
   useEffect(() => {
     if (!data || slotsChave === "") return;
@@ -102,11 +133,28 @@ export function PassoDeAdicionais({
         // Sem a lista, a pessoa perde o adicional, não a reserva: o aviso é
         // discreto e o botão de confirmar continua lá.
         if (vivo) setErro("Não foi possível carregar os adicionais.");
+      })
+      // `finally` e não `await` com `try`: o compilador do React não prova que
+      // um `try/finally` é assíncrono, e a suíte já reprovou esse arranjo antes.
+      // `finally` e não `await` com `try`: o compilador do React não prova que
+      // um `try/finally` é assíncrono, e a suíte já reprovou esse arranjo antes.
+      .finally(() => {
+        if (vivo) setRespondido(pedido);
       });
     return () => {
       vivo = false;
     };
-  }, [data, slotsChave, chave]);
+  }, [data, slotsChave, chave, pedido]);
+
+  /**
+   * Avisa quem usa. **Num efeito próprio, e não no de cima**: quem chama passa
+   * função nova a cada render, e ela fica fora das dependências pela mesma
+   * razão que o `onChange`.
+   */
+  useEffect(() => {
+    onCarregando?.(carregando);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carregando]);
 
   const precoPorId = useMemo(
     () => new Map(disponiveis.map((a) => [a.id, a.preco])),
@@ -127,6 +175,19 @@ export function PassoDeAdicionais({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [quantidades, precoPorId]);
 
+  // DEF-037 — **carregando tem cara própria.** Sem isto, esperar e "o clube
+  // não tem adicional" eram a mesma tela vazia, e quem clicava rápido marcava
+  // a aula sem nunca ver a lista.
+  if (carregando) {
+    return (
+      <p
+        role="status"
+        className="rounded-2xl bg-surface p-3 text-[13px] font-semibold text-[var(--color-text-secondary)] ring-1 ring-border"
+      >
+        Carregando adicionais…
+      </p>
+    );
+  }
   if (erro) {
     return (
       <p className="rounded-2xl bg-surface p-3 text-[13px] font-semibold text-[var(--color-text-secondary)] ring-1 ring-border">
