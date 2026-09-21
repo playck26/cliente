@@ -100,6 +100,12 @@ export function AulaParticular() {
   const [adicionais, setAdicionais] = useState<ItemDoPedido[]>([]);
   const [somaDosAdicionais, setSomaDosAdicionais] = useState(0);
   const [chaveDosAdicionais, setChaveDosAdicionais] = useState(0);
+  /**
+   * DEF-037 — enquanto o catálogo de adicionais está sendo buscado, confirmar
+   * marcaria sem a pessoa ter visto a lista. O seletor avisa; o botão espera.
+   */
+  const [adicionaisCarregando, setAdicionaisCarregando] = useState(false);
+
 
   useEffect(() => {
     listarProfessoresParaAula()
@@ -504,6 +510,7 @@ export function AulaParticular() {
           slots={[`${slot.horaInicio}-${slot.horaFim}`]}
           chave={chaveDosAdicionais}
           desabilitado={marcando}
+          onCarregando={setAdicionaisCarregando}
           onChange={(itens, soma) => {
             setAdicionais(itens);
             setSomaDosAdicionais(soma);
@@ -547,7 +554,9 @@ export function AulaParticular() {
 
           <Button
             type="button"
-            disabled={marcando}
+            // DEF-037 — a aula era marcada ANTES de a lista de adicionais
+            // aparecer: escolher o horário e clicar era mais rápido que a rede.
+            disabled={marcando || adicionaisCarregando}
             onClick={() => void confirmar()}
             className="h-12 w-full rounded-2xl text-[15px] font-bold"
           >

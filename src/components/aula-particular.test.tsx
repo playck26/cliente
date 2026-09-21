@@ -164,11 +164,25 @@ describe("SPEC-047 — a grade de horários", () => {
   });
 });
 
+/**
+ * DEF-037 — **espera o catálogo de adicionais antes de clicar.**
+ *
+ * Antes desta correção estes casos clicavam em "Confirmar aula" enquanto o
+ * passo de adicionais ainda buscava, e passavam: era exatamente o defeito que
+ * o Israel relatou — *"a aula é marcada antes mesmo de eu poder escolher os
+ * itens adicionais"*. **A suíte exercitava o caminho quebrado e dava verde.**
+ */
+async function confirmarAula() {
+  const botao = screen.getByRole("button", { name: "Confirmar aula" });
+  await waitFor(() => expect(botao).toBeEnabled());
+  fireEvent.click(botao);
+}
+
 describe("SPEC-047 — confirmar", () => {
   it("**manda quadra, dia, hora e professor — e NENHUM `valor`** (D3)", async () => {
     await abrirGrade();
     fireEvent.click(screen.getByRole("button", { name: /09:00/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Confirmar aula" }));
+    await confirmarAula();
 
     await waitFor(() => expect(marcarAulaParticular).toHaveBeenCalled());
     const enviado = marcarAulaParticular.mock.calls[0][0] as Record<
@@ -199,7 +213,7 @@ describe("SPEC-047 — confirmar", () => {
   it("depois de marcar, confirma e oferece ver as reservas", async () => {
     await abrirGrade();
     fireEvent.click(screen.getByRole("button", { name: /09:00/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Confirmar aula" }));
+    await confirmarAula();
     expect(await screen.findByText("Aula marcada")).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Ver minhas reservas" }),
@@ -212,7 +226,7 @@ describe("SPEC-047 — confirmar", () => {
     );
     await abrirGrade();
     fireEvent.click(screen.getByRole("button", { name: /09:00/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Confirmar aula" }));
+    await confirmarAula();
     expect(await screen.findByRole("alert")).toHaveTextContent(
       /já tem compromisso/i,
     );
@@ -233,9 +247,14 @@ describe("SPEC-047/LIM-047f — a carteira", () => {
     // Travar aqui prenderia quem acabou de receber crédito: o saldo desta
     // tela foi lido há um minuto, e quem decide é o servidor.
     fireEvent.click(screen.getByRole("button", { name: /09:00/ }));
-    expect(
-      screen.getByRole("button", { name: "Confirmar aula" }),
-    ).toBeEnabled();
+    // DEF-037 — o botão espera o catálogo de adicionais; o que este caso
+    // afirma é que **o saldo baixo não trava**, e isso continua valendo
+    // depois da espera.
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Confirmar aula" }),
+      ).toBeEnabled(),
+    );
   });
 
   it("com saldo suficiente, nenhum aviso aparece", async () => {
@@ -283,7 +302,7 @@ describe("SPEC-054 — adicionais na aula particular", () => {
 
     expect(await screen.findByText("R$ 180,00")).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Confirmar aula" }));
+    await confirmarAula();
     await waitFor(() => expect(marcarAulaParticular).toHaveBeenCalled());
     const enviado = marcarAulaParticular.mock.calls[0][0] as Record<string, unknown>;
     expect(enviado.adicionais).toEqual([{ adicionalId: "ad-1", quantidade: 2 }]);
@@ -307,7 +326,7 @@ describe("SPEC-054 — adicionais na aula particular", () => {
     await abrirGrade();
     fireEvent.click(screen.getByRole("button", { name: /09:00/ }));
     await screen.findByRole("button", { name: "Mais Raquete" });
-    fireEvent.click(screen.getByRole("button", { name: "Confirmar aula" }));
+    await confirmarAula();
     await waitFor(() => expect(marcarAulaParticular).toHaveBeenCalled());
     const enviado = marcarAulaParticular.mock.calls[0][0] as Record<string, unknown>;
     expect("adicionais" in enviado).toBe(false);
@@ -322,7 +341,7 @@ describe("SPEC-054 — adicionais na aula particular", () => {
     fireEvent.click(screen.getByRole("button", { name: /09:00/ }));
     fireEvent.click(await screen.findByRole("button", { name: "Mais Raquete" }));
     const antes = adicionaisDisponiveis.mock.calls.length;
-    fireEvent.click(screen.getByRole("button", { name: "Confirmar aula" }));
+    await confirmarAula();
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/esgotou/);
     await waitFor(() =>
