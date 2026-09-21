@@ -127,10 +127,18 @@ describe("AC-007 — o calendário da home agrupa uma vez", () => {
     // `diaAberto` muda com o toque no dia e não mexe em compromisso nenhum.
     // Antes desta task, cada toque refazia o mapa inteiro e reordenava todos
     // os dias do mês.
-    const dia = screen.getByRole("button", { name: /^2: 1 compromisso$/ });
-    fireEvent.click(dia);
-    fireEvent.click(dia);
-    fireEvent.click(dia);
+    //
+    // **Três dias DIFERENTES, e isso não é detalhe.** A primeira versão desta
+    // prova clicava três vezes no mesmo dia — o dia 2, que é "hoje" no relógio
+    // fixado e já nasce aberto. `onClick` faz `setDiaAberto(data)`, uma
+    // atribuição e não uma alternância: o React descarta `setState` com valor
+    // igual e **não repinta**. Os três cliques não faziam nada, e a prova
+    // passava até com o `useMemo` removido.
+    //
+    // Descoberto rodando o contra-teste, que é para isso que ele existe.
+    fireEvent.click(screen.getByRole("button", { name: "3, sem compromisso" }));
+    fireEvent.click(screen.getByRole("button", { name: "4, sem compromisso" }));
+    fireEvent.click(screen.getByRole("button", { name: "5, sem compromisso" }));
 
     expect(agruparPorDia.mock.calls.length).toBe(antes);
   });
