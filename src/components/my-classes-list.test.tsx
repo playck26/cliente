@@ -367,3 +367,90 @@ describe("MyClassesList — avisar falta (REQ-006)", () => {
     liberar();
   });
 });
+
+/**
+ * **SPEC-066/AC-003 — dez cartões, o paginador, e a tela que NÃO remonta.**
+ *
+ * A sentinela pedida pela AC é a **identidade do nó do DOM**: um valor posto
+ * na montagem que só some se a montagem recomeçar. Se a página virasse
+ * parâmetro de URL, ou se o `loading` voltasse a `true` a cada clique, a
+ * `<section>` seria recriada e o `isConnected` do nó antigo cairia.
+ *
+ * É a razão de a página morar em `useState` e não no endereço — ao contrário
+ * da `vista`, que mora na URL de propósito.
+ */
+describe("SPEC-066/AC-003 — a paginação da lista", () => {
+  const dez = Array.from({ length: 10 }, (_, i) => ({
+    ...aula,
+    ocupacaoId: `o${i + 1}`,
+  }));
+
+  it("mostra dez cartões e o paginador quando há mais de uma página", async () => {
+    listProximasAulas.mockResolvedValue({
+      data: dez,
+      page: 1,
+      pageSize: 10,
+      total: 43,
+    });
+    render(<MyClassesList />);
+
+    await screen.findByLabelText("Próximas aulas");
+    expect(screen.getAllByRole("article")).toHaveLength(10);
+    expect(
+      screen.getByLabelText("Paginação de próximas aulas"),
+    ).toBeInTheDocument();
+  });
+
+  it("com uma página só, o paginador não aparece", async () => {
+    listProximasAulas.mockResolvedValue(pagina([aula]));
+    render(<MyClassesList />);
+
+    await screen.findByLabelText("Próximas aulas");
+    // `Paginacao` se esconde sozinho desde a SPEC-027: aluno com poucas aulas
+    // não vê nada de novo na tela.
+    expect(
+      screen.queryByLabelText("Paginação de próximas aulas"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("trocar de página pede a página NOVA ao servidor", async () => {
+    listProximasAulas.mockResolvedValue({
+      data: dez,
+      page: 1,
+      pageSize: 10,
+      total: 43,
+    });
+    render(<MyClassesList />);
+    await screen.findByLabelText("Próximas aulas");
+
+    fireEvent.click(screen.getByLabelText("Próxima página de próximas aulas"));
+
+    await vi.waitFor(() =>
+      expect(listProximasAulas).toHaveBeenLastCalledWith({
+        page: 2,
+        pageSize: 10,
+      }),
+    );
+  });
+
+  it("e NÃO remonta a tela: a sentinela sobrevive", async () => {
+    listProximasAulas.mockResolvedValue({
+      data: dez,
+      page: 1,
+      pageSize: 10,
+      total: 43,
+    });
+    render(<MyClassesList />);
+
+    const sentinela = await screen.findByLabelText("Próximas aulas");
+
+    fireEvent.click(screen.getByLabelText("Próxima página de próximas aulas"));
+    await vi.waitFor(() => expect(listProximasAulas).toHaveBeenCalledTimes(2));
+
+    // O MESMO nó, ainda no documento. Remontar criaria outro.
+    expect(sentinela.isConnected).toBe(true);
+    expect(screen.getByLabelText("Próximas aulas")).toBe(sentinela);
+    // E o esqueleto não volta: ele é da primeira pintura, não da troca.
+    expect(screen.queryByLabelText("Carregando aulas")).not.toBeInTheDocument();
+  });
+});

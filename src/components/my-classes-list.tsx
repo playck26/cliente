@@ -444,7 +444,7 @@ export function MyClassesList() {
               total={total}
               onMudar={setPage}
               ocupado={trocandoPagina}
-              rotulo="proximas aulas"
+              rotulo="próximas aulas"
             />
           </section>
         )}
