@@ -7,12 +7,12 @@ import { CalendarDays, CalendarRange, Clock, List } from "lucide-react";
 import { TennisCourtIcon } from "@/components/icons/tennis-court-icon";
 import { CourtLines } from "@/components/court-lines";
 import { TennisBallIcon } from "@/components/icons/tennis-ball-icon";
+import { Paginacao } from "@/components/paginacao";
 import { SemanaDoAluno } from "@/components/semana-do-aluno";
-import { hojeNoClubeIso } from "@/lib/fuso";
 import {
   ApiError,
   avisarFalta,
-  listMyClasses,
+  listProximasAulas,
   retirarAvisoDeFalta,
   type MyClass,
 } from "@/lib/api-client";
@@ -85,33 +85,65 @@ function useVista(): { vista: Vista; irPara: (v: Vista) => void } {
  */
 const avisou = (aula: MyClass) => aula.faltaAvisada === true;
 
+/**
+ * SPEC-066 — **dez por pagina.** E o numero que o usuario pediu, com todas as
+ * letras. O servidor tem teto de 50 (`@Max(50)` no DTO); este e o padrao, e o
+ * servidor usaria 10 mesmo se a tela nao mandasse.
+ */
+const AULAS_POR_PAGINA = 10;
+
 // REQ-002 (SPEC-005): aluno lista as próprias próximas aulas.
 export function MyClassesList() {
   const [aulas, setAulas] = useState<MyClass[]>([]);
+  /**
+   * SPEC-066/TASK-002 — **a pagina atual, e o total do servidor.**
+   *
+   * O pedido do usuario: *"as aulas estao apresentando mais de 40 itens e
+   * deixando a pagina enorme, precisamos apresentar apenas 10 aulas por
+   * pagina"*.
+   *
+   * **A pagina mora em `useState`, e nao no endereco.** A `vista` mora na
+   * URL de proposito (link compartilhavel, "voltar" que desfaz) -- ver o
+   * `useVista` acima. A pagina nao: ninguem compartilha "pagina 3 das minhas
+   * aulas", e por o numero na URL faria o `router.push` correr a cada clique
+   * do paginador. **A AC-003 exige trocar de pagina sem remontar a tela.**
+   */
+  const [page, setPage] = useState(1);
+  const [total, setTotal] = useState(0);
+  /**
+   * **Trocar de pagina nao mostra o esqueleto.** O `loading` governa a
+   * primeira pintura, e reusa-lo aqui faria a lista sumir e voltar a cada
+   * clique do paginador -- pior que a espera que ele esconde.
+   *
+   * **E DERIVADO, nao guardado.** A primeira versao fazia
+   * `setTrocandoPagina(true)` dentro do efeito, e o lint do React reprovou:
+   * *"Calling setState synchronously within an effect can trigger cascading
+   * renders"*. Guardar "estou trocando" e guardar o que ja da para calcular
+   * — **qual pagina foi respondida por ultimo**. E o mesmo conserto do
+   * DEF-037, onde um booleano de carregamento tambem virou derivacao.
+   */
+  const [respondido, setRespondido] = useState<number | null>(null);
+  const trocandoPagina = respondido !== page;
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   /** SPEC-031: qual ocorrência está com ação em voo. Um por vez basta. */
   const [agindoEm, setAgindoEm] = useState<string | null>(null);
   /**
-   * SPEC-057/TASK-002/D11 — **as aulas de semanas passadas, buscadas sob
-   * demanda.**
+   * SPEC-066/TASK-003 — **o `doPassado` e o `pedirJanela` sairam daqui.**
    *
-   * `GET /me/classes` sem janela devolve o futuro, que é o que a LISTA
-   * mostra. Quando o aluno navega a semana para trás, a vista de semana pede
-   * a janela daquele intervalo — e o resultado **soma**, em vez de
-   * substituir: trocar apagaria as próximas aulas da lista ao lado.
-   *
-   * `Map` por `ocupacaoId` porque janelas vizinhas se sobrepõem, e a mesma
-   * aula não pode aparecer duas vezes no dia.
+   * Eles existiam porque a vista de semana recebia as aulas deste componente
+   * e nao sabia buscar. Agora ela busca a propria janela (INV-066d), e este
+   * componente voltou a ter uma responsabilidade so: a LISTA.
    */
-  const [doPassado, setDoPassado] = useState<Map<string, MyClass>>(new Map());
-  const [janelasPedidas] = useState<Set<string>>(() => new Set());
   const { vista, irPara } = useVista();
 
   const carregar = useCallback(
     () =>
-      listMyClasses()
-        .then(setAulas)
+      listProximasAulas({ page, pageSize: AULAS_POR_PAGINA })
+        .then((pagina) => {
+          setAulas(pagina.data);
+          setTotal(pagina.total);
+        })
         .catch((err: unknown) => {
           setError(
             err instanceof ApiError
@@ -119,36 +151,15 @@ export function MyClassesList() {
               : "Não foi possível carregar suas aulas.",
           );
         }),
-    [],
+    [page],
   );
 
   useEffect(() => {
-    void carregar().finally(() => setLoading(false));
-  }, [carregar]);
-
-  /**
-   * **Só busca o que ainda não tem, e só para trás.** A janela do futuro já
-   * está em `aulas`; pedir de novo seria uma ida à rede para o mesmo dado.
-   */
-  const pedirJanela = useCallback(
-    (janela: { de: string; ate: string }) => {
-      const chave = `${janela.de}:${janela.ate}`;
-      if (janela.ate >= hojeNoClubeIso() || janelasPedidas.has(chave)) return;
-      janelasPedidas.add(chave);
-      void listMyClasses(janela)
-        .then((lista) => {
-          setDoPassado((atual) => {
-            const proximo = new Map(atual);
-            for (const aula of lista) proximo.set(aula.ocupacaoId, aula);
-            return proximo;
-          });
-        })
-        // Falha aqui não derruba a tela: a semana volta a mostrar "—", que é
-        // o que ela mostrava antes desta task.
-        .catch(() => undefined);
-    },
-    [janelasPedidas],
-  );
+    void carregar().finally(() => {
+      setLoading(false);
+      setRespondido(page);
+    });
+  }, [carregar, page]);
 
   /**
    * SPEC-031/REQ-006 — avisar que vai faltar, e desfazer.
@@ -307,10 +318,7 @@ export function MyClassesList() {
             </p>
           </section>
         ) : vista === "semana" ? (
-          <SemanaDoAluno
-            aulas={[...aulas, ...doPassado.values()]}
-            onJanela={pedirJanela}
-          />
+          <SemanaDoAluno />
         ) : (
           <section className="space-y-3" aria-label="Próximas aulas">
             {aulas.map((aula, index) => (
@@ -422,6 +430,22 @@ export function MyClassesList() {
                 </div>
               </article>
             ))}
+            {/*
+              SPEC-066/AC-003 — o paginador. `Paginacao` ja existe desde a
+              SPEC-027 e se esconde sozinho quando ha uma pagina so, entao
+              aluno com poucas aulas nao ve nada de novo.
+
+              `ocupado={loading}` impede o clique duplo enquanto a proxima
+              pagina esta em voo.
+            */}
+            <Paginacao
+              page={page}
+              pageSize={AULAS_POR_PAGINA}
+              total={total}
+              onMudar={setPage}
+              ocupado={trocandoPagina}
+              rotulo="próximas aulas"
+            />
           </section>
         )}
       </div>

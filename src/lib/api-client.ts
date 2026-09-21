@@ -800,8 +800,7 @@ export async function retirarAvisoDeFalta(
  */
 export type CreditoDeReposicao =
   components["schemas"]["CreditoDeReposicaoResponseDto"];
-export type FaltaParaRepor =
-  components["schemas"]["FaltaParaReporResponseDto"];
+export type FaltaParaRepor = components["schemas"]["FaltaParaReporResponseDto"];
 export type OportunidadeDeReposicao =
   components["schemas"]["OportunidadeDeReposicaoResponseDto"];
 
@@ -854,6 +853,49 @@ export async function listMyClasses(janela?: {
   const q = janela ? `?de=${janela.de}&ate=${janela.ate}` : "";
   const res = await authFetch(`/me/classes${q}`);
   return (await res.json()) as MyClass[];
+}
+
+/**
+ * SPEC-066/TASK-002 — **a pagina da lista de proximas aulas.**
+ *
+ * ## Por que nao e `listMyClasses` com um parametro
+ *
+ * Porque sao duas perguntas com garantias opostas. `listMyClasses` traz a
+ * **janela inteira** e nao pode truncar -- a home desenha um mes e precisa de
+ * todas as aulas dele. Esta traz **uma pagina** e nunca mais que isso.
+ *
+ * As duas convivem de proposito: a home e os dois calendarios continuam na de
+ * cima, sem mudar uma linha. So a lista de `/minhas-aulas` migra.
+ *
+ * ## O tipo de retorno e a prova (AC-010)
+ *
+ * `PaginaDeAulas`, e nao `MyClass[]`. Trocar de volta faz o `typecheck`
+ * falhar em `my-classes-list.tsx`, que le `.data` e `.total` -- e **essa e a
+ * prova**, porque o `as` daqui nao muda valor nenhum em runtime e nenhum
+ * teste de execucao ficaria vermelho sozinho.
+ *
+ * A prova de runtime e outra, e mora em `api-client-proximas.test.ts`: ela
+ * mantem esta funcao REAL e mocka o `fetch`. Sao dois defeitos diferentes com
+ * o mesmo sintoma, e por isso duas provas.
+ */
+export type PaginaDeAulas = {
+  data: MyClass[];
+  page: number;
+  pageSize: number;
+  total: number;
+};
+
+export async function listProximasAulas(pagina?: {
+  page?: number;
+  pageSize?: number;
+}): Promise<PaginaDeAulas> {
+  const params = new URLSearchParams();
+  if (pagina?.page !== undefined) params.set("page", String(pagina.page));
+  if (pagina?.pageSize !== undefined)
+    params.set("pageSize", String(pagina.pageSize));
+  const q = params.toString() ? `?${params.toString()}` : "";
+  const res = await authFetch(`/me/classes/proximas${q}`);
+  return (await res.json()) as PaginaDeAulas;
 }
 
 /**
@@ -1082,7 +1124,10 @@ export async function listMyBookings(janela: {
     itens.push(...pagina);
     // Acabou quando a página veio incompleta (é a última) ou quando já se tem
     // tudo o que o servidor disse existir.
-    if (pagina.length < POR_PAGINA || itens.length >= (corpo.total ?? itens.length)) {
+    if (
+      pagina.length < POR_PAGINA ||
+      itens.length >= (corpo.total ?? itens.length)
+    ) {
       return { itens, truncou: false };
     }
     truncou = page === PAGINAS_NO_MAXIMO;
@@ -1315,8 +1360,7 @@ export function limparCacheDaEmpresa(): void {
 
 export type ProfessorParaAula =
   components["schemas"]["ProfessorParaAlunoResponseDto"];
-export type HorariosDeAula =
-  components["schemas"]["HorariosDeAulaResponseDto"];
+export type HorariosDeAula = components["schemas"]["HorariosDeAulaResponseDto"];
 export type HorarioDeAula = components["schemas"]["HorarioDeAulaDto"];
 
 /**
@@ -1519,7 +1563,6 @@ export async function removerAssinaturaDePush(endpoint: string): Promise<void> {
 export async function pedirAvisoDeTeste(): Promise<void> {
   await authFetch("/push/teste", { method: "POST" });
 }
-
 
 // ---------------------------------------------------------------------------
 // SPEC-065 — a caixa de avisos

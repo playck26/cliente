@@ -14,6 +14,18 @@ import { MyClassesList } from "./my-classes-list";
 const push = vi.hoisted(() => vi.fn());
 const params = vi.hoisted(() => ({ valor: null as string | null }));
 const listMyClasses = vi.hoisted(() => vi.fn());
+/**
+ * SPEC-066/TASK-002 — **a lista trocou de rota.**
+ *
+ * Ela pedia `listMyClasses()` sem janela, que devolvia o futuro inteiro — a
+ * origem das 40+ aulas que o usuario relatou. Agora pede
+ * `listProximasAulas({page, pageSize: 10})`, que devolve
+ * `{data, page, pageSize, total}`.
+ *
+ * `listMyClasses` continua mockada porque a vista de SEMANA a usa: ela busca
+ * a propria janela desde a TASK-003.
+ */
+const listProximasAulas = vi.hoisted(() => vi.fn());
 const avisarFalta = vi.hoisted(() => vi.fn());
 const retirarAvisoDeFalta = vi.hoisted(() => vi.fn());
 
@@ -28,7 +40,13 @@ vi.mock("@/lib/api-client", async () => {
     await vi.importActual<typeof import("@/lib/api-client")>(
       "@/lib/api-client",
     );
-  return { ...real, listMyClasses, avisarFalta, retirarAvisoDeFalta };
+  return {
+    ...real,
+    listMyClasses,
+    listProximasAulas,
+    avisarFalta,
+    retirarAvisoDeFalta,
+  };
 });
 
 const aula = {
@@ -44,10 +62,24 @@ const aula = {
   faltaAvisada: false,
 };
 
+/** A lista le uma pagina. Este auxiliar evita repetir a forma em cada caso. */
+const pagina = (data: unknown[]) => ({
+  data,
+  page: 1,
+  pageSize: 10,
+  total: data.length,
+});
+
 beforeEach(() => {
   push.mockReset();
   params.valor = null;
   listMyClasses.mockReset().mockResolvedValue([aula]);
+  listProximasAulas.mockReset().mockResolvedValue({
+    data: [aula],
+    page: 1,
+    pageSize: 10,
+    total: 1,
+  });
 });
 
 describe("quando o alternador aparece", () => {
@@ -63,7 +95,7 @@ describe("quando o alternador aparece", () => {
   it("sem aula nenhuma, não aparece", async () => {
     // Alternar entre duas telas vazias não é escolha — é um controle que
     // ocupa espaço e não faz nada.
-    listMyClasses.mockResolvedValue([]);
+    listProximasAulas.mockResolvedValue(pagina([]));
     render(<MyClassesList />);
 
     expect(
@@ -158,7 +190,9 @@ describe("qual vista é mostrada", () => {
 // pode ter ido até o clube, e o produto nunca lhe dizia o que houve.
 describe("SPEC-030 — a aula não realizada, na vista do aluno", () => {
   it("mostra 'Não realizada' no lugar de 'Agendada'", async () => {
-    listMyClasses.mockResolvedValue([{ ...aula, naoRealizada: true }]);
+    listProximasAulas.mockResolvedValue(
+      pagina([{ ...aula, naoRealizada: true }]),
+    );
 
     render(<MyClassesList />);
 
@@ -169,7 +203,7 @@ describe("SPEC-030 — a aula não realizada, na vista do aluno", () => {
   it("a aula normal continua dizendo 'Agendada'", async () => {
     // O par negativo: sem ele, um selo que dissesse "Não realizada" sempre
     // passaria na prova acima.
-    listMyClasses.mockResolvedValue([aula]);
+    listProximasAulas.mockResolvedValue(pagina([aula]));
 
     render(<MyClassesList />);
 
@@ -191,7 +225,7 @@ describe("SPEC-030 — a aula não realizada, na vista do aluno", () => {
  */
 describe("MyClassesList — avisar falta (REQ-006)", () => {
   const comAulas = (...as: (typeof aula)[]) => {
-    listMyClasses.mockResolvedValue(as);
+    listProximasAulas.mockResolvedValue(pagina(as));
   };
   const botao = () => screen.getByRole("button", { name: /falta/i });
 
@@ -277,7 +311,12 @@ describe("MyClassesList — avisar falta (REQ-006)", () => {
       "exige 2h de antecedência",
     );
     // duas: a carga inicial e a releitura depois do erro.
-    await vi.waitFor(() => expect(listMyClasses).toHaveBeenCalledTimes(2));
+    //
+    // **A rota mudou na SPEC-066/TASK-002**, e com ela o dublê que conta: a
+    // lista le `listProximasAulas`. O que esta prova guarda continua sendo o
+    // mesmo, e e o que importa — **recarregar mesmo quando da erro**, porque o
+    // prazo envelhece entre a pintura e o toque.
+    await vi.waitFor(() => expect(listProximasAulas).toHaveBeenCalledTimes(2));
   });
 
   /**
@@ -326,5 +365,92 @@ describe("MyClassesList — avisar falta (REQ-006)", () => {
 
     await vi.waitFor(() => expect(botao()).toBeDisabled());
     liberar();
+  });
+});
+
+/**
+ * **SPEC-066/AC-003 — dez cartões, o paginador, e a tela que NÃO remonta.**
+ *
+ * A sentinela pedida pela AC é a **identidade do nó do DOM**: um valor posto
+ * na montagem que só some se a montagem recomeçar. Se a página virasse
+ * parâmetro de URL, ou se o `loading` voltasse a `true` a cada clique, a
+ * `<section>` seria recriada e o `isConnected` do nó antigo cairia.
+ *
+ * É a razão de a página morar em `useState` e não no endereço — ao contrário
+ * da `vista`, que mora na URL de propósito.
+ */
+describe("SPEC-066/AC-003 — a paginação da lista", () => {
+  const dez = Array.from({ length: 10 }, (_, i) => ({
+    ...aula,
+    ocupacaoId: `o${i + 1}`,
+  }));
+
+  it("mostra dez cartões e o paginador quando há mais de uma página", async () => {
+    listProximasAulas.mockResolvedValue({
+      data: dez,
+      page: 1,
+      pageSize: 10,
+      total: 43,
+    });
+    render(<MyClassesList />);
+
+    await screen.findByLabelText("Próximas aulas");
+    expect(screen.getAllByRole("article")).toHaveLength(10);
+    expect(
+      screen.getByLabelText("Paginação de próximas aulas"),
+    ).toBeInTheDocument();
+  });
+
+  it("com uma página só, o paginador não aparece", async () => {
+    listProximasAulas.mockResolvedValue(pagina([aula]));
+    render(<MyClassesList />);
+
+    await screen.findByLabelText("Próximas aulas");
+    // `Paginacao` se esconde sozinho desde a SPEC-027: aluno com poucas aulas
+    // não vê nada de novo na tela.
+    expect(
+      screen.queryByLabelText("Paginação de próximas aulas"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("trocar de página pede a página NOVA ao servidor", async () => {
+    listProximasAulas.mockResolvedValue({
+      data: dez,
+      page: 1,
+      pageSize: 10,
+      total: 43,
+    });
+    render(<MyClassesList />);
+    await screen.findByLabelText("Próximas aulas");
+
+    fireEvent.click(screen.getByLabelText("Próxima página de próximas aulas"));
+
+    await vi.waitFor(() =>
+      expect(listProximasAulas).toHaveBeenLastCalledWith({
+        page: 2,
+        pageSize: 10,
+      }),
+    );
+  });
+
+  it("e NÃO remonta a tela: a sentinela sobrevive", async () => {
+    listProximasAulas.mockResolvedValue({
+      data: dez,
+      page: 1,
+      pageSize: 10,
+      total: 43,
+    });
+    render(<MyClassesList />);
+
+    const sentinela = await screen.findByLabelText("Próximas aulas");
+
+    fireEvent.click(screen.getByLabelText("Próxima página de próximas aulas"));
+    await vi.waitFor(() => expect(listProximasAulas).toHaveBeenCalledTimes(2));
+
+    // O MESMO nó, ainda no documento. Remontar criaria outro.
+    expect(sentinela.isConnected).toBe(true);
+    expect(screen.getByLabelText("Próximas aulas")).toBe(sentinela);
+    // E o esqueleto não volta: ele é da primeira pintura, não da troca.
+    expect(screen.queryByLabelText("Carregando aulas")).not.toBeInTheDocument();
   });
 });

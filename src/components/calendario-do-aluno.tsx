@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Circle, Users } from "lucide-react";
+import { agruparPorDia } from "@/lib/agrupar-por-dia";
 import { TennisCourtIcon } from "@/components/icons/tennis-court-icon";
 import { hojeNoClube, hojeNoClubeIso } from "@/lib/fuso";
 import { NOMES_PADRAO, type NomesDeTipo } from "@/lib/nomes-de-tipo";
@@ -59,7 +60,10 @@ const hora = (h: string) => h.slice(0, 5);
  * já resolvida** — misturar `getDate()` local com `toISOString()` foi
  * exatamente o DEF-020, e este arquivo não vai repeti-lo.
  */
-export function janelaDoMes(ano: number, mes: number): { de: string; ate: string } {
+export function janelaDoMes(
+  ano: number,
+  mes: number,
+): { de: string; ate: string } {
   const ultimo = new Date(Date.UTC(ano, mes, 0)).getUTCDate();
   return { de: chaveDoDia(ano, mes, 1), ate: chaveDoDia(ano, mes, ultimo) };
 }
@@ -173,9 +177,7 @@ export function deReserva(r: ItemDaListaDeReservas): Compromisso {
 }
 
 /** "2× Raquete · 1× Toalha" — o que o Israel chamou de materiais alugados. */
-export function listarMateriais(
-  materiais: Compromisso["materiais"],
-): string {
+export function listarMateriais(materiais: Compromisso["materiais"]): string {
   return materiais.map((m) => `${m.quantidade}× ${m.nome}`).join(" · ");
 }
 
@@ -190,7 +192,9 @@ export function rotuloDoDia(dia: number, itens: Compromisso[]): string {
   const atencao = itens.filter(
     (i) => i.faltaAvisada || i.pagamento === "cancelado",
   ).length;
-  return atencao > 0 ? `${dia}: ${quantas}, ${atencao} com atenção` : `${dia}: ${quantas}`;
+  return atencao > 0
+    ? `${dia}: ${quantas}, ${atencao} com atenção`
+    : `${dia}: ${quantas}`;
 }
 
 export function CalendarioDoAluno({
@@ -226,20 +230,34 @@ export function CalendarioDoAluno({
     onJanela?.(janelaDoMes(novoAno, novoMes));
   }
 
-  const porDia = new Map<string, Compromisso[]>();
-  for (const a of compromissos) {
-    const lista = porDia.get(a.data);
-    if (lista) lista.push(a);
-    else porDia.set(a.data, [a]);
-  }
-  for (const lista of porDia.values()) {
-    lista.sort((x, y) => x.horaInicio.localeCompare(y.horaInicio));
-  }
+  /**
+   * SPEC-066/TASK-004 — **agrupar e ordenar uma vez, nao a cada render.**
+   *
+   * Este calendario ja usava `push` (e nao *spread*), entao aqui nao havia
+   * copia quadratica. O desperdicio era outro e mais simples: ele **refazia o
+   * mapa inteiro, e reordenava os sete a vinte e poucos dias, em toda
+   * pintura** — inclusive quando quem mudou foi o dia aberto pelo toque, que
+   * nao mexe em compromisso nenhum.
+   *
+   * A ordenacao mora dentro do mesmo `useMemo` de proposito: separar as duas
+   * criaria um segundo mapa e um segundo motivo para invalidar.
+   */
+  const porDia = useMemo(() => {
+    const mapa = agruparPorDia(compromissos);
+    for (const lista of mapa.values()) {
+      lista.sort((x, y) => x.horaInicio.localeCompare(y.horaInicio));
+    }
+    return mapa;
+  }, [compromissos]);
 
   const primeiroDiaSemana = new Date(Date.UTC(ano, mes - 1, 1)).getUTCDay();
   const totalDeDias = new Date(Date.UTC(ano, mes, 0)).getUTCDate();
-  const doMes = compromissos.filter((a) =>
-    a.data.startsWith(`${ano}-${doisDigitos(mes)}`),
+  const doMes = useMemo(
+    () =>
+      compromissos.filter((a) =>
+        a.data.startsWith(`${ano}-${doisDigitos(mes)}`),
+      ),
+    [compromissos, ano, mes],
   );
   const aulasDoDiaAberto = diaAberto ? (porDia.get(diaAberto) ?? []) : [];
 
@@ -299,7 +317,8 @@ export function CalendarioDoAluno({
             const avisou = doDia.some(
               (a) => a.faltaAvisada || a.pagamento === "cancelado",
             );
-            const ehHoje = hoje.ano === ano && hoje.mes === mes && hoje.dia === dia;
+            const ehHoje =
+              hoje.ano === ano && hoje.mes === mes && hoje.dia === dia;
             const selecionado = diaAberto === data;
 
             return (
@@ -329,7 +348,9 @@ export function CalendarioDoAluno({
                     data-marca-de-aula=""
                     aria-hidden="true"
                     className={`absolute bottom-1.5 size-1.5 rounded-full ${
-                      selecionado ? "bg-white" : "bg-[var(--color-primary-strong)]"
+                      selecionado
+                        ? "bg-white"
+                        : "bg-[var(--color-primary-strong)]"
                     }`}
                   />
                 )}
@@ -356,7 +377,9 @@ export function CalendarioDoAluno({
       ) : (
         <div className="space-y-2">
           <h3 className="px-1 text-[12px] font-extrabold tracking-[0.08em] text-[var(--color-text-secondary)] uppercase">
-            {diaAberto ? diaAberto.split("-").reverse().slice(0, 2).join("/") : ""}
+            {diaAberto
+              ? diaAberto.split("-").reverse().slice(0, 2).join("/")
+              : ""}
           </h3>
           {aulasDoDiaAberto.length === 0 ? (
             <p className="px-1 text-[13px] font-semibold text-[var(--color-text-secondary)]">
@@ -371,7 +394,10 @@ export function CalendarioDoAluno({
                   <div className="flex items-start gap-3 rounded-2xl bg-surface p-3 shadow-[var(--shadow-low)] ring-1 ring-border">
                     <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-[var(--color-secondary-container)] text-[var(--color-primary-strong)]">
                       {a.tipo === "quadra" ? (
-                        <TennisCourtIcon className="size-5" aria-hidden="true" />
+                        <TennisCourtIcon
+                          className="size-5"
+                          aria-hidden="true"
+                        />
                       ) : (
                         <Users className="size-5" aria-hidden="true" />
                       )}
@@ -423,13 +449,19 @@ export function CalendarioDoAluno({
                           novo achando que esqueceu.
                         */}
                         {cancelada && (
-                          <span className="text-[var(--color-error)]">Cancelada</span>
+                          <span className="text-[var(--color-error)]">
+                            Cancelada
+                          </span>
                         )}
                         {a.pagamento === "pendente_pagamento" && (
-                          <span className="text-[var(--color-error)]">A pagar</span>
+                          <span className="text-[var(--color-error)]">
+                            A pagar
+                          </span>
                         )}
                         {a.pagamento === "pago" && (
-                          <span className="text-[var(--color-primary-strong)]">Pago</span>
+                          <span className="text-[var(--color-primary-strong)]">
+                            Pago
+                          </span>
                         )}
                         {a.faltaAvisada && (
                           <span className="text-[var(--color-text-secondary)]">
@@ -454,7 +486,9 @@ export function CalendarioDoAluno({
                 return (
                   <li key={a.id}>
                     {mostrarLinkDaTurma && a.turmaId ? (
-                      <Link href={`/minhas-aulas/turma/${a.turmaId}`}>{corpo}</Link>
+                      <Link href={`/minhas-aulas/turma/${a.turmaId}`}>
+                        {corpo}
+                      </Link>
                     ) : (
                       corpo
                     )}
