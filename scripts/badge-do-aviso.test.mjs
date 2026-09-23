@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { inflateSync } from "node:zlib";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -22,9 +23,17 @@ import { describe, expect, it } from "vitest";
  * apontar o `badge` para um logo colorido — e a falha é **silenciosa**: o
  * build passa, o deploy passa, e só quem tem Android vê.
  *
- * O gate é o **tipo de cor do PNG**, que fica no byte 25 do arquivo. Tipo 4 é
- * *escala de cinza + alfa*, e um PNG colorido **não consegue** ser desse tipo.
- * A regra "o badge não tem cor" deixa de ser conselho e passa a ser estrutura.
+ * ## O que este arquivo passou a conferir, e por quê
+ *
+ * A primeira versão parava no **tipo de cor** do PNG (byte 25; tipo 4 é
+ * *escala de cinza + alfa*, e um PNG colorido não consegue ser desse tipo) e
+ * no tamanho. Isso é necessário e **não é suficiente**: um **disco 100%
+ * opaco** é tipo 4, é 96×96, e passa — sendo exatamente o defeito que a
+ * SPEC-062 viu na bandeja.
+ *
+ * Então o teste passou a **decodificar o alfa** e a julgar a FORMA. Os três
+ * critérios abaixo vieram de medição, não de gosto — os números medidos estão
+ * ao lado de cada um.
  */
 
 /**
@@ -65,6 +74,102 @@ function bytesDoBadge() {
   return readFileSync(arquivo(caminho.slice(1)));
 }
 
+const paeth = (a, b, c) => {
+  const p = a + b - c;
+  const pa = Math.abs(p - a);
+  const pb = Math.abs(p - b);
+  const pc = Math.abs(p - c);
+  return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+};
+
+/**
+ * O canal ALFA do badge, decodificado.
+ *
+ * **Sem dependência nova**, e isso é de propósito: um teste que precisa de
+ * biblioteca de imagem para rodar é um teste que alguém desativa no dia em que
+ * a biblioteca quebra o build. PNG tipo 4 com 8 bits são dois bytes por pixel
+ * (cinza, alfa), mais um byte de filtro por linha; o `zlib` já vem no Node.
+ */
+function alfaDoBadge() {
+  const bytes = bytesDoBadge();
+  const { largura, altura, profundidade, tipoDeCor } = cabecalhoPng(bytes);
+  expect([profundidade, tipoDeCor]).toEqual([8, 4]);
+
+  const pedacos = [];
+  let i = 8;
+  while (i < bytes.length) {
+    const tamanho = bytes.readUInt32BE(i);
+    if (bytes.toString("ascii", i + 4, i + 8) === "IDAT") {
+      pedacos.push(bytes.subarray(i + 8, i + 8 + tamanho));
+    }
+    i += 12 + tamanho;
+  }
+  const cru = inflateSync(Buffer.concat(pedacos));
+
+  const bpp = 2;
+  const linha = largura * bpp;
+  const saida = Buffer.alloc(altura * linha);
+  for (let y = 0; y < altura; y++) {
+    const filtro = cru[y * (linha + 1)];
+    const entrada = cru.subarray(y * (linha + 1) + 1, (y + 1) * (linha + 1));
+    for (let x = 0; x < linha; x++) {
+      const a = x >= bpp ? saida[y * linha + x - bpp] : 0;
+      const b = y > 0 ? saida[(y - 1) * linha + x] : 0;
+      const c = x >= bpp && y > 0 ? saida[(y - 1) * linha + x - bpp] : 0;
+      let v = entrada[x];
+      if (filtro === 1) v += a;
+      else if (filtro === 2) v += b;
+      else if (filtro === 3) v += (a + b) >> 1;
+      else if (filtro === 4) v += paeth(a, b, c);
+      saida[y * linha + x] = v & 0xff;
+    }
+  }
+
+  const alfa = new Uint8Array(largura * altura);
+  for (let p = 0; p < largura * altura; p++) alfa[p] = saida[p * 2 + 1];
+  return { largura, altura, alfa };
+}
+
+/** O que o Android acende. Meio-tom conta como marca. */
+const OPACO = 128;
+
+/** Cobertura, caixa da marca, margens e traços por linha — tudo de uma vez. */
+function formaDaMarca() {
+  const { largura, altura, alfa } = alfaDoBadge();
+  let opacos = 0;
+  let minX = largura;
+  let maxX = -1;
+  let minY = altura;
+  let maxY = -1;
+  let linhasComDoisTracos = 0;
+
+  for (let y = 0; y < altura; y++) {
+    let tracos = 0;
+    let dentro = false;
+    for (let x = 0; x < largura; x++) {
+      const aceso = alfa[y * largura + x] >= OPACO;
+      if (aceso) {
+        opacos++;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+      if (aceso && !dentro) tracos++;
+      dentro = aceso;
+    }
+    if (tracos >= 2) linhasComDoisTracos++;
+  }
+
+  const caixa = { largura: maxX - minX + 1, altura: maxY - minY + 1 };
+  return {
+    cobertura: opacos / (largura * altura),
+    preenchimentoDaCaixa: opacos / (caixa.largura * caixa.altura),
+    margem: Math.min(minX, largura - 1 - maxX, minY, altura - 1 - maxY),
+    linhasComDoisTracos,
+  };
+}
+
 describe("o badge da notificação", () => {
   it("é declarado no sw.js e o arquivo existe", () => {
     expect(bytesDoBadge().length).toBeGreaterThan(0);
@@ -87,6 +192,41 @@ describe("o badge da notificação", () => {
   it("tem 96×96", () => {
     const { largura, altura } = cabecalhoPng(bytesDoBadge());
     expect([largura, altura]).toEqual([96, 96]);
+  });
+
+  /**
+   * **A marca tem de OCUPAR o quadro, sem encostar nele.** Medido no badge
+   * atual: **24,0%** de cobertura e margem de **10px**. Abaixo de 20% o ícone
+   * some na bandeja; acima de 45% vira borrão no tamanho em que ele aparece.
+   */
+  it("cobre entre 20% e 45% do quadro, com margem de pelo menos 8px", () => {
+    const { cobertura, margem } = formaDaMarca();
+    expect(cobertura).toBeGreaterThanOrEqual(0.2);
+    expect(cobertura).toBeLessThanOrEqual(0.45);
+    expect(margem).toBeGreaterThanOrEqual(8);
+  });
+
+  /**
+   * **O caso que existe para reprovar um DISCO, e é o motivo deste arquivo ter
+   * crescido.**
+   *
+   * Um disco — ou qualquer mancha convexa — tem **exatamente um traço aceso
+   * por linha**, sempre. A marca CK tem duas letras separadas, então muitas
+   * linhas têm dois ou três. Medido no badge atual: **47 linhas** com dois ou
+   * mais traços, e um máximo de três.
+   *
+   * O limiar é 10 porque 47 é o medido e zero é o de um disco: qualquer valor
+   * no meio separa os dois casos com folga, sem fingir precisão que a medição
+   * não tem.
+   *
+   * O preenchimento da caixa é o segundo discriminador, independente do
+   * primeiro: um disco inscrito enche **π/4 ≈ 78,5%** da própria caixa; o CK
+   * enche **61,1%**.
+   */
+  it("NÃO é um disco: a marca tem traços separados", () => {
+    const { linhasComDoisTracos, preenchimentoDaCaixa } = formaDaMarca();
+    expect(linhasComDoisTracos).toBeGreaterThanOrEqual(10);
+    expect(preenchimentoDaCaixa).toBeLessThan(0.7);
   });
 
   /**
