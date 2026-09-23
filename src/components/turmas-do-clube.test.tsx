@@ -15,6 +15,9 @@ const listTurmasDisponiveis = vi.hoisted(() => vi.fn());
 const getMeuCadastro = vi.hoisted(() => vi.fn());
 const entrarNaTurma = vi.hoisted(() => vi.fn());
 const sairDaTurma = vi.hoisted(() => vi.fn());
+const listarMinhaFila = vi.hoisted(() => vi.fn());
+const entrarNaFilaDeTurma = vi.hoisted(() => vi.fn());
+const sairDaFila = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/api-client", async () => {
   const real =
@@ -27,6 +30,9 @@ vi.mock("@/lib/api-client", async () => {
     getMeuCadastro,
     entrarNaTurma,
     sairDaTurma,
+    listarMinhaFila,
+    entrarNaFilaDeTurma,
+    sairDaFila,
   };
 });
 
@@ -59,6 +65,60 @@ beforeEach(() => {
   getMeuCadastro.mockResolvedValue({ nivelId: null });
   entrarNaTurma.mockResolvedValue(undefined);
   sairDaTurma.mockResolvedValue(undefined);
+  // SPEC-064/TASK-005 — sem fila por padrão: as provas antigas continuam
+  // medindo o que mediam.
+  listarMinhaFila.mockResolvedValue([]);
+  entrarNaFilaDeTurma.mockResolvedValue(undefined);
+  sairDaFila.mockResolvedValue(undefined);
+});
+
+describe("SPEC-064 — a fila nasce onde a recusa aparece", () => {
+  it("TURMA_CHEIA oferece entrar na fila, e o toque chama a rota", async () => {
+    listTurmasDisponiveis.mockResolvedValue([
+      turma({ matriculados: 8, podeEntrar: false, motivo: "TURMA_CHEIA" }),
+    ]);
+
+    render(<TurmasDoClube />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Entrar na fila de espera" }),
+    );
+
+    await waitFor(() => expect(entrarNaFilaDeTurma).toHaveBeenCalledWith("t1"));
+  });
+
+  it("OUTRO motivo NÃO oferece fila — esperar não resolve", async () => {
+    // **O caso que discrimina.** Cadastro não aprovado, limite de turmas e
+    // turma inativa não viram vaga com o tempo; oferecer fila neles seria
+    // convite que nunca se cumpre.
+    listTurmasDisponiveis.mockResolvedValue([
+      turma({ podeEntrar: false, motivo: "LIMITE_DE_TURMAS" }),
+    ]);
+
+    render(<TurmasDoClube />);
+
+    expect(
+      await screen.findByText("Você atingiu o limite de turmas deste clube"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Entrar na fila de espera" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("já na fila, o botão vira SAIR e usa o id da linha", async () => {
+    listTurmasDisponiveis.mockResolvedValue([
+      turma({ matriculados: 8, podeEntrar: false, motivo: "TURMA_CHEIA" }),
+    ]);
+    listarMinhaFila.mockResolvedValue([
+      { id: "linha-1", fila: "turma", turmaId: "t1", vezAberta: false },
+    ]);
+
+    render(<TurmasDoClube />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Você está na fila — sair" }),
+    );
+
+    await waitFor(() => expect(sairDaFila).toHaveBeenCalledWith("linha-1"));
+  });
 });
 
 describe("a ocupação à vista (pedido do Israel)", () => {
