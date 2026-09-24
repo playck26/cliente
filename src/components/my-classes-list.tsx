@@ -12,10 +12,16 @@ import { SemanaDoAluno } from "@/components/semana-do-aluno";
 import {
   ApiError,
   avisarFalta,
+  getMeuCreditoDeReposicao,
+  listarOportunidadesDeReposicao,
   listProximasAulas,
+  marcarReposicao,
   retirarAvisoDeFalta,
+  type CreditoDeReposicao,
   type MyClass,
+  type OportunidadeDeReposicao,
 } from "@/lib/api-client";
+import { creditoUtilizavel, EXPLICACAO } from "@/lib/credito-utilizavel";
 
 const DIAS_SEMANA = [
   "Domingo",
@@ -129,6 +135,41 @@ export function MyClassesList() {
   /** SPEC-031: qual ocorrência está com ação em voo. Um por vez basta. */
   const [agindoEm, setAgindoEm] = useState<string | null>(null);
   /**
+   * SPEC-072/REQ-004 — **o crédito de reposição, aqui.**
+   *
+   * O pedido do Matheus é *"remarcar também na tela de Aulas"*, e para isso
+   * esta tela precisa saber se a falta daquela aula virou crédito
+   * **utilizável** — cinco motivos, no `credito-utilizavel.ts`.
+   *
+   * **Falha tolerada, e a oferta fecha.** Professor e gestor levam `403`
+   * nesta rota, e um erro aqui não pode derrubar a lista de aulas: sem
+   * crédito carregado, nenhum "Remarcar" aparece. Errar escondendo o botão é
+   * recuperável; errar oferecendo leva o aluno a um `409`.
+   */
+  const [credito, setCredito] = useState<CreditoDeReposicao | null>(null);
+  /**
+   * **Qual aula está sendo remarcada, e com qual falta.**
+   *
+   * O `faltaId` é guardado junto **de propósito** (`AC-008`): é o crédito
+   * daquela ocorrência, casado por `ocupacaoId`, e é ele que sobe no `POST`.
+   * Reconstruí-lo na hora do clique abriria espaço para casar pela aula
+   * errada quando há duas faltas de turmas homônimas (`INV-072c`).
+   */
+  const [remarcando, setRemarcando] = useState<{
+    ocupacaoId: string;
+    faltaId: string;
+  } | null>(null);
+  const [opcoes, setOpcoes] = useState<OportunidadeDeReposicao[] | null>(null);
+  /**
+   * **Erro próprio da reposição, e não o `error` da tela.**
+   *
+   * O `error` da lista SUBSTITUI a lista inteira; usá-lo aqui faria a recusa
+   * de uma reposição apagar as aulas. A `AC-009` exige que a recusa
+   * **apareça** — não que a tela desapareça.
+   */
+  const [erroDaReposicao, setErroDaReposicao] = useState<string | null>(null);
+  const [marcando, setMarcando] = useState(false);
+  /**
    * SPEC-066/TASK-003 — **o `doPassado` e o `pedirJanela` sairam daqui.**
    *
    * Eles existiam porque a vista de semana recebia as aulas deste componente
@@ -154,12 +195,30 @@ export function MyClassesList() {
     [page],
   );
 
+  /**
+   * **Buscado à parte, e com falha tolerada** — mesmo idioma do nível em
+   * `turmas-do-clube.tsx`. O crédito é informação de OFERTA, não o conteúdo
+   * da tela: se cair, a lista de aulas continua inteira e o botão não
+   * aparece.
+   */
+  const carregarCredito = useCallback(
+    () =>
+      getMeuCreditoDeReposicao()
+        .then(setCredito)
+        .catch(() => setCredito(null)),
+    [],
+  );
+
   useEffect(() => {
     void carregar().finally(() => {
       setLoading(false);
       setRespondido(page);
     });
   }, [carregar, page]);
+
+  useEffect(() => {
+    void carregarCredito();
+  }, [carregarCredito]);
 
   /**
    * SPEC-031/REQ-006 — avisar que vai faltar, e desfazer.
@@ -190,6 +249,56 @@ export function MyClassesList() {
     } finally {
       await carregar();
       setAgindoEm(null);
+    }
+  };
+
+  /**
+   * **A mensagem do SERVIDOR, sempre que houver uma** (`AC-009`).
+   *
+   * O `authFetch` já lança `ApiError` para toda resposta não bem-sucedida, e
+   * o `parseError` usa o texto do corpo quando existe. O padrão daqui só
+   * entra quando **não** existe: resposta sem `message`, sem corpo, ou com
+   * código que esta tela nunca viu.
+   *
+   * **É por isso que o mecanismo é por CLASSE e não por lista.** Uma lista de
+   * códigos conhecidos não alcança resposta sem `code`, sem corpo, nem o que
+   * o back acrescentar depois — e são seis cenários em cinco códigos, mais as
+   * `NotFoundException` sem código (`LIM-072f`).
+   */
+  const mensagemDoServidor = (e: unknown, padrao: string): string =>
+    e instanceof ApiError && e.message.trim().length > 0 ? e.message : padrao;
+
+  const abrirRemarcacao = async (ocupacaoId: string, faltaId: string) => {
+    setRemarcando({ ocupacaoId, faltaId });
+    setOpcoes(null);
+    setErroDaReposicao(null);
+    try {
+      setOpcoes(await listarOportunidadesDeReposicao());
+    } catch (e: unknown) {
+      setOpcoes([]);
+      setErroDaReposicao(
+        mensagemDoServidor(e, "Não foi possível carregar os horários."),
+      );
+    }
+  };
+
+  const confirmarRemarcacao = async (destinoId: string) => {
+    if (!remarcando) return;
+    setMarcando(true);
+    setErroDaReposicao(null);
+    try {
+      await marcarReposicao(remarcando.faltaId, destinoId);
+      setRemarcando(null);
+      setOpcoes(null);
+      await Promise.all([carregar(), carregarCredito()]);
+    } catch (e: unknown) {
+      // **O painel NÃO fecha na recusa** (`AC-009`): fechar é o gesto que diz
+      // "pronto, marcado". A recusa aparece e o aluno continua na escolha.
+      setErroDaReposicao(
+        mensagemDoServidor(e, "Não foi possível marcar a reposição."),
+      );
+    } finally {
+      setMarcando(false);
     }
   };
 
@@ -321,7 +430,10 @@ export function MyClassesList() {
           <SemanaDoAluno />
         ) : (
           <section className="space-y-3" aria-label="Próximas aulas">
-            {aulas.map((aula, index) => (
+            {aulas.map((aula, index) => {
+              const veredicto = creditoUtilizavel(credito, aula.ocupacaoId);
+              const emRemarcacao = remarcando?.ocupacaoId === aula.ocupacaoId;
+              return (
               <article
                 key={aula.ocupacaoId}
                 className="rounded-3xl bg-surface p-4 shadow-[var(--shadow-low)] ring-1 ring-border"
@@ -425,11 +537,123 @@ export function MyClassesList() {
                               : "Vou faltar"}
                         </button>
                       ) : null}
+                      {/*
+                        **SPEC-072/AC-007 — o "Remarcar" só existe quando o
+                        crédito é utilizável**, e são cinco motivos para não
+                        ser: sem falta casada por `ocupacaoId`, já reposta,
+                        aula cancelada pelo clube, expirada, e o teto do mês.
+                        O quinto foi o achado B06 — falta válida com teto
+                        estourado levava o aluno a um `409` que ele não
+                        entende.
+
+                        **A fronteira, declarada (`LIM-072f`):** isto prova
+                        que há crédito, não que a vaga será aceita. As recusas
+                        que dependem da ocupação ESCOLHIDA não existem aqui, e
+                        quem as cobre é a `AC-009` — por classe.
+                      */}
+                      {veredicto.utilizavel ? (
+                        <button
+                          type="button"
+                          disabled={emRemarcacao}
+                          onClick={() =>
+                            void abrirRemarcacao(
+                              aula.ocupacaoId,
+                              veredicto.faltaId,
+                            )
+                          }
+                          className="min-h-11 rounded-full bg-[var(--color-primary-strong)] px-3 text-[11px] font-extrabold text-white disabled:opacity-60"
+                        >
+                          Remarcar
+                        </button>
+                      ) : avisou(aula) ? (
+                        /*
+                          **O motivo aparece, em vez do botão.** Aviso de
+                          falta sem caminho para repor e sem explicação é a
+                          tela deixando o aluno adivinhar por que o direito
+                          dele não está ali.
+                        */
+                        <span className="text-[11px] font-bold text-[var(--color-text-secondary)]">
+                          {EXPLICACAO[veredicto.motivo]}
+                        </span>
+                      ) : null}
                     </div>
                   )}
                 </div>
+                {emRemarcacao ? (
+                  <div className="mt-3 rounded-2xl bg-[var(--color-surface-container)] p-3">
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="text-[12px] font-extrabold text-foreground">
+                        Escolha o horário da reposição
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRemarcando(null);
+                          setOpcoes(null);
+                          setErroDaReposicao(null);
+                        }}
+                        className="text-[11px] font-extrabold text-[var(--color-text-secondary)] underline"
+                      >
+                        Cancelar
+                      </button>
+                    </div>
+                    {erroDaReposicao ? (
+                      <p
+                        role="alert"
+                        className="mt-2 text-[12px] font-bold text-[var(--color-error)]"
+                      >
+                        {erroDaReposicao}
+                      </p>
+                    ) : null}
+                    {opcoes === null ? (
+                      <p className="mt-2 text-[12px] text-[var(--color-text-secondary)]">
+                        Carregando...
+                      </p>
+                    ) : opcoes.length === 0 ? (
+                      /* Zero é uma resposta, e precisa ser dita — senão o
+                         aluno acha que a tela quebrou. */
+                      <p className="mt-2 text-[12px] text-[var(--color-text-secondary)]">
+                        Nenhuma turma com vaga nos próximos dias.
+                      </p>
+                    ) : (
+                      <ul className="mt-2">
+                        {opcoes.map((o) => (
+                          <li
+                            key={o.ocupacaoId}
+                            className="flex items-center justify-between gap-2 border-b border-border py-2 last:border-b-0"
+                          >
+                            {/* Mesma lição da TASK-004: sem `truncate`, com o
+                                `horaFim`, e `break-words` para nome longo não
+                                estourar a largura a 320px. */}
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[12px] font-extrabold break-words text-foreground">
+                                {o.turmaNome}
+                              </p>
+                              <p className="text-[11px] break-words text-[var(--color-text-secondary)]">
+                                {formatarData(o.data)} · {o.horaInicio}–
+                                {o.horaFim} · {o.quadraNome} ·{" "}
+                                {o.vagas === 1 ? "1 vaga" : `${o.vagas} vagas`}
+                              </p>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={marcando}
+                              onClick={() =>
+                                void confirmarRemarcacao(o.ocupacaoId)
+                              }
+                              className="shrink-0 rounded-2xl bg-[var(--color-primary-strong)] px-3 py-1.5 text-[12px] font-extrabold text-white disabled:opacity-50"
+                            >
+                              Marcar
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                ) : null}
               </article>
-            ))}
+              );
+            })}
             {/*
               SPEC-066/AC-003 — o paginador. `Paginacao` ja existe desde a
               SPEC-027 e se esconde sozinho quando ha uma pagina so, entao
