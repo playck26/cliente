@@ -3,11 +3,7 @@
 import { useEffect, useState } from "react";
 import { Check, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  apareceParaMim,
-  escondidosPeloFiltro,
-  filtroFazSentido,
-} from "@/lib/filtro-de-nivel";
+import { apareceParaMim } from "@/lib/filtro-de-nivel";
 import {
   ApiError,
   entrarNaTurma,
@@ -61,7 +57,6 @@ export function TurmasDoClube() {
    * faria o clube parecer vazio.
    */
   const [meuNivelId, setMeuNivelId] = useState<string | null>(null);
-  const [verTodas, setVerTodas] = useState(false);
 
   const carregar = () =>
     listTurmasDisponiveis()
@@ -132,11 +127,11 @@ export function TurmasDoClube() {
     );
   }
 
-  const ofereceFiltro = filtroFazSentido(turmas, meuNivelId);
-  const visiveis = turmas.filter((t) =>
-    apareceParaMim(t, meuNivelId, verTodas),
-  );
-  const escondidas = escondidosPeloFiltro(turmas, meuNivelId, verTodas);
+  // SPEC-072/D1 — **o `false` e literal, e e a decisao.** O escape "Todas"
+  // saiu (supersessao da SPEC-057/TASK-004), e a funcao pura continua
+  // aceitando o parametro de proposito: a `LIM-072b` preve a volta desta
+  // decisao se o volume crescer, e o modulo segue testado para os tres casos.
+  const visiveis = turmas.filter((t) => apareceParaMim(t, meuNivelId, false));
 
   return (
     <div className="space-y-4 px-5">
@@ -155,38 +150,12 @@ export function TurmasDoClube() {
       )}
 
       {/*
-        **O filtro só aparece quando muda alguma coisa** (`filtroFazSentido`):
-        num clube sem nivelamento, ou para o aluno que ainda não foi
-        classificado, ele seria um interruptor que não acende luz — e ocupa
-        espaço numa tela de 390px.
+        **O seletor "Meu nível / Todas" NÃO existe aqui** (SPEC-072/AC-003), e
+        não é caso de `hidden` nem de `display:none`: ele saiu do DOM. O
+        pedido é do Matheus Moura — *"que somente aparecesse ... turmas que são
+        do meu nível, para que eu não me confunda"* —, e ele supersede o escape
+        que a validação independente da SPEC-057 tinha pedido.
       */}
-      {ofereceFiltro && (
-        <div
-          className="flex gap-2"
-          role="group"
-          aria-label="Filtrar turmas por nível"
-        >
-          {[
-            { rotulo: "Meu nível", ativo: !verTodas, valor: false },
-            { rotulo: "Todas", ativo: verTodas, valor: true },
-          ].map(({ rotulo, ativo, valor }) => (
-            <button
-              key={rotulo}
-              type="button"
-              aria-pressed={ativo}
-              onClick={() => setVerTodas(valor)}
-              className={`min-h-9 rounded-full px-4 text-[13px] font-extrabold transition-colors ${
-                ativo
-                  ? "bg-[var(--color-primary-strong)] text-white"
-                  : "bg-surface text-[var(--color-text-secondary)] ring-1 ring-border"
-              }`}
-            >
-              {rotulo}
-            </button>
-          ))}
-        </div>
-      )}
-
       {turmas.length === 0 ? (
         <section className="rounded-3xl bg-surface p-6 text-center shadow-[var(--shadow-low)] ring-1 ring-border">
           <p className="text-[13px] font-bold text-[var(--color-text-secondary)]">
@@ -195,16 +164,17 @@ export function TurmasDoClube() {
         </section>
       ) : visiveis.length === 0 ? (
         /*
-          **Vazio do recorte ≠ clube sem turma.** A primeira frase tem saída
-          (o botão "Todas"); a segunda não tem. Escrever a segunda no lugar
-          da primeira faria o aluno achar que o clube não tem turma nenhuma.
+          **Vazio do recorte ≠ clube sem turma**, e as duas frases continuam
+          diferentes: uma diz que o clube não tem turma, a outra que nenhuma é
+          do nível dele.
+
+          **A saída que a primeira tinha saiu junto com o seletor**
+          (SPEC-072/D1). A frase não pode continuar mandando tocar em "Todas"
+          — botão que não existe mais é pior que nenhum botão.
         */
         <section className="rounded-3xl bg-surface p-6 text-center shadow-[var(--shadow-low)] ring-1 ring-border">
           <p className="text-[13px] font-bold text-[var(--color-text-secondary)]">
             Nenhuma turma do seu nível por enquanto.
-            {escondidas > 0
-              ? ` Toque em "Todas" para ver as outras ${escondidas === 1 ? "turma" : "turmas"} do clube.`
-              : ""}
           </p>
         </section>
       ) : (

@@ -246,13 +246,14 @@ describe("SPEC-046 — aulas para repor", () => {
  * de nível B. Filtrar é exibição — o crédito continua lá, o escape revela a
  * vaga, e o `POST` nunca ganhou recusa por nível.
  */
-describe("SPEC-057/TASK-004 — nível nas oportunidades (AC-026)", () => {
+describe("SPEC-072/TASK-002 — nível nas oportunidades, SEM escape", () => {
   const A = "nivel-a";
   const B = "nivel-b";
 
   const abrirEscolha = async () => {
-    render(<MinhasReposicoes />);
+    const resultado = render(<MinhasReposicoes />);
     fireEvent.click(await screen.findByText("Repor"));
+    return resultado;
   };
 
   beforeEach(() => {
@@ -261,6 +262,13 @@ describe("SPEC-057/TASK-004 — nível nas oportunidades (AC-026)", () => {
     getMeuCreditoDeReposicao.mockResolvedValue(credito());
   });
 
+  /**
+   * **A vaga existe e ele não a alcança — e a tela diz a verdade sobre
+   * isso.** É a `LIM-072a`: medido em produção, 2 de 3 reposições reais foram
+   * fora do nível, e **não há contorno** (nenhuma rota de gestor marca
+   * reposição). A frase não inventa compensação; diz o que continua valendo,
+   * que é o crédito.
+   */
   it("a única vaga é de OUTRO nível: a tela diz isso, e não `sem vaga`", async () => {
     listarOportunidadesDeReposicao.mockResolvedValue([
       { ...oportunidade, nivelId: B, nivelNome: "Avançado" },
@@ -275,16 +283,37 @@ describe("SPEC-057/TASK-004 — nível nas oportunidades (AC-026)", () => {
     expect(
       screen.queryByText(/Nenhuma turma com vaga nos próximos dias/),
     ).toBeNull();
+    // E não pode mandar tocar em "Todas", que não existe mais.
+    expect(screen.queryByText(/Toque em/)).toBeNull();
   });
 
-  it("`Todas` revela a vaga, e ela continua marcável", async () => {
+  /**
+   * **AC-003 — o seletor saiu do DOM**, e a asserção discrimina remover de
+   * esconder: `container.textContent` enxerga nó com `display:none`, que
+   * `queryByRole` não enxergaria.
+   */
+  it("AC-003: o seletor não está no DOM — nem escondido por CSS", async () => {
     listarOportunidadesDeReposicao.mockResolvedValue([
       { ...oportunidade, nivelId: B, nivelNome: "Avançado" },
+    ]);
+
+    const { container } = await abrirEscolha();
+    await screen.findByText(/Nenhum horário do seu nível/);
+
+    expect(
+      container.querySelector('[aria-label="Filtrar horários por nível"]'),
+    ).toBeNull();
+    expect(container.textContent).not.toContain("Meu nível");
+    expect(container.textContent).not.toContain("Todas");
+  });
+
+  it("do meu nível: aparece, e o botão de marcar continua lá", async () => {
+    listarOportunidadesDeReposicao.mockResolvedValue([
+      { ...oportunidade, nivelId: A, nivelNome: "Iniciante" },
     ]);
     marcarReposicao.mockResolvedValue(undefined);
 
     await abrirEscolha();
-    fireEvent.click(await screen.findByRole("button", { name: "Todas" }));
 
     expect(await screen.findByText("Iniciante Quinta")).toBeInTheDocument();
     fireEvent.click(screen.getByText("Marcar"));
@@ -293,9 +322,11 @@ describe("SPEC-057/TASK-004 — nível nas oportunidades (AC-026)", () => {
     });
   });
 
-  it("do meu nível: aparece sem precisar do escape", async () => {
+  /** **AC-004, metade do Cliente** — nulo nunca esconde nada (`INV-072b`). */
+  it("AC-004 (Cliente): aluno SEM nível vê TODAS as oportunidades", async () => {
+    getMeuCadastro.mockResolvedValue({ nivelId: null });
     listarOportunidadesDeReposicao.mockResolvedValue([
-      { ...oportunidade, nivelId: A, nivelNome: "Iniciante" },
+      { ...oportunidade, nivelId: B, nivelNome: "Avançado" },
     ]);
 
     await abrirEscolha();
@@ -303,7 +334,7 @@ describe("SPEC-057/TASK-004 — nível nas oportunidades (AC-026)", () => {
     expect(await screen.findByText("Iniciante Quinta")).toBeInTheDocument();
   });
 
-  it("sem nível nenhum nas opções, o filtro não aparece", async () => {
+  it("INV-141: oportunidade SEM nível aparece para quem tem nível", async () => {
     listarOportunidadesDeReposicao.mockResolvedValue([
       { ...oportunidade, nivelId: null, nivelNome: null },
     ]);
@@ -311,6 +342,5 @@ describe("SPEC-057/TASK-004 — nível nas oportunidades (AC-026)", () => {
     await abrirEscolha();
 
     expect(await screen.findByText("Iniciante Quinta")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Todas" })).toBeNull();
   });
 });
