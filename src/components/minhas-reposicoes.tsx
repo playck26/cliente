@@ -47,6 +47,19 @@ function diaEHora(data: string, hora: string): string {
   return `${dia}/${mes}/${ano} às ${hora}`;
 }
 
+/**
+ * SPEC-072/REQ-003 — **o fim da aula entra na linha.**
+ *
+ * O `OportunidadeDeReposicaoResponseDto` publica `horaFim` desde a SPEC-046,
+ * e esta tela o **descartava**. Quem lê *"19:00"* não sabe se a reposição
+ * ocupa uma hora ou três — e é a informação de que ele precisa para decidir
+ * se cabe no dia dele.
+ */
+function diaEFaixaDeHora(data: string, inicio: string, fim: string): string {
+  const [ano, mes, dia] = data.split("-");
+  return `${dia}/${mes}/${ano} · ${inicio}–${fim}`;
+}
+
 function Falta({
   f,
   onRepor,
@@ -326,12 +339,26 @@ export function MinhasReposicoes() {
                   key={o.ocupacaoId}
                   className="flex items-center justify-between gap-2 border-b border-border py-2 last:border-b-0"
                 >
-                  <div className="min-w-0">
-                    <p className="truncate text-[13px] font-extrabold text-foreground">
+                  {/*
+                    **SPEC-072/REQ-003 — sem `truncate`, e com o `horaFim`.**
+
+                    A linha espremia `data · quadra · vagas · nível` num `<p>`
+                    de uma linha só, a 320px: o `truncate` cortava com
+                    reticências justamente a parte que decide a escolha. A
+                    queixa do Matheus é esta.
+
+                    **`break-words` não é enfeite:** sem ele, um nome de turma
+                    longo e sem espaço não quebra e estoura a largura da
+                    página — trocar clipping por rolagem horizontal não é
+                    conserto. A `AC-006` mede as duas coisas.
+                  */}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-extrabold break-words text-foreground">
                       {o.turmaNome}
                     </p>
-                    <p className="truncate text-[12px] text-[var(--color-text-secondary)]">
-                      {diaEHora(o.data, o.horaInicio)} · {o.quadraNome} ·{" "}
+                    <p className="text-[12px] break-words text-[var(--color-text-secondary)]">
+                      {diaEFaixaDeHora(o.data, o.horaInicio, o.horaFim)} ·{" "}
+                      {o.quadraNome} ·{" "}
                       {o.vagas === 1 ? "1 vaga" : `${o.vagas} vagas`}
                       {o.nivelNome ? ` · ${o.nivelNome}` : ""}
                     </p>

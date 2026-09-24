@@ -34,10 +34,21 @@
  * próprios, que ocupam pixel e mudam o que a geometria mede. O objeto do
  * julgamento é o que o usuário recebe.
  *
- * **`NEXT_PUBLIC_API_URL` aponta para uma porta MORTA de propósito.** Nenhuma
- * prova aqui deve falar com servidor: ou a tela não chama API, ou a chamada é
- * interceptada por `page.route()`. Com um endereço vivo, um teste que
- * esqueceu o mock passaria por acidente hoje e quebraria amanhã.
+ * **`NEXT_PUBLIC_API_URL` aponta para a PRÓPRIA origem**, e não para uma porta
+ * morta — e a razão foi medida, não escolhida.
+ *
+ * A primeira versão apontava para `127.0.0.1:59999`, morta de propósito, para
+ * que um teste sem mock falhasse em vez de passar por acidente. **Não
+ * funciona:** a chamada da app leva `Authorization`, o que a torna "não
+ * simples"; o navegador manda um **preflight `OPTIONS`** antes, e a
+ * interceptação do Playwright **não o serve** — ele vai para a rede de
+ * verdade, encontra a porta fechada e o `fetch` morre com *"Failed to
+ * fetch"*. A tela vira boundary de erro e nenhuma geometria chega a existir.
+ *
+ * Mesma origem elimina o preflight, e a propriedade que interessava
+ * **sobrevive**: o `next start` não tem rota `/api/v1`, então chamada sem mock
+ * recebe a página 404 do Next e o cliente falha ao ler JSON. Continua falhando
+ * alto.
  */
 import { defineConfig, devices } from "@playwright/test";
 
@@ -72,8 +83,8 @@ export default defineConfig({
     // O `next build` sozinho leva ~1min nesta máquina; no CI, mais.
     timeout: 300_000,
     env: {
-      // Porta morta — ver o cabeçalho.
-      NEXT_PUBLIC_API_URL: "http://127.0.0.1:59999",
+      // Mesma origem, para não haver preflight — ver o cabeçalho.
+      NEXT_PUBLIC_API_URL: BASE,
     },
   },
 });
