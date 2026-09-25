@@ -34,6 +34,13 @@ const retirarAvisoDeFalta = vi.hoisted(() => vi.fn());
 const getMeuCreditoDeReposicao = vi.hoisted(() => vi.fn());
 const listarOportunidadesDeReposicao = vi.hoisted(() => vi.fn());
 const marcarReposicao = vi.hoisted(() => vi.fn());
+// SPEC-064/TASK-007 — o painel passou a ler o nivel e a fila. **Mocados de
+// proposito**: sem isto os reais rodavam, falhavam no jsdom e caiam no
+// `catch`, e as provas passavam por acidente de rede.
+const getMeuCadastro = vi.hoisted(() => vi.fn());
+const listarMinhaFila = vi.hoisted(() => vi.fn());
+const entrarNaFilaDeAula = vi.hoisted(() => vi.fn());
+const sairDaFila = vi.hoisted(() => vi.fn());
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push, back: vi.fn() }),
@@ -55,6 +62,10 @@ vi.mock("@/lib/api-client", async () => {
     getMeuCreditoDeReposicao,
     listarOportunidadesDeReposicao,
     marcarReposicao,
+    getMeuCadastro,
+    listarMinhaFila,
+    entrarNaFilaDeAula,
+    sairDaFila,
   };
 });
 
@@ -93,6 +104,12 @@ beforeEach(() => {
   });
   listarOportunidadesDeReposicao.mockReset().mockResolvedValue([]);
   marcarReposicao.mockReset().mockResolvedValue(undefined);
+  // Sem nivel por padrao: nulo nunca esconde nada (D15/INV-141), entao as
+  // provas antigas continuam medindo exatamente o que mediam.
+  getMeuCadastro.mockReset().mockResolvedValue({ nivelId: null });
+  listarMinhaFila.mockReset().mockResolvedValue([]);
+  entrarNaFilaDeAula.mockReset().mockResolvedValue(undefined);
+  sairDaFila.mockReset().mockResolvedValue(undefined);
   listMyClasses.mockReset().mockResolvedValue([aula]);
   listProximasAulas.mockReset().mockResolvedValue({
     data: [aula],
@@ -529,18 +546,21 @@ describe("SPEC-072/AC-007 — o botão só aparece com crédito UTILIZÁVEL", ()
    */
   const MOTIVOS = [
     ["sem-falta", credito({ faltas: [] })],
-    ["ja-reposta", credito({
-      faltas: [
-        falta({
-          reposicao: {
-            id: "r1",
-            turmaNome: "Outra",
-            data: "2026-09-10",
-            horaInicio: "19:00",
-          },
-        }),
-      ],
-    })],
+    [
+      "ja-reposta",
+      credito({
+        faltas: [
+          falta({
+            reposicao: {
+              id: "r1",
+              turmaNome: "Outra",
+              data: "2026-09-10",
+              horaInicio: "19:00",
+            },
+          }),
+        ],
+      }),
+    ],
     ["aula-cancelada", credito({ faltas: [falta({ aulaCancelada: true })] })],
     ["expirada", credito({ faltas: [falta({ expirada: true })] })],
     ["teto-do-mes", credito({ usadasNoMes: 2, porMes: 2 })],
@@ -555,9 +575,7 @@ describe("SPEC-072/AC-007 — o botão só aparece com crédito UTILIZÁVEL", ()
       expect(screen.queryByRole("button", { name: "Remarcar" })).toBeNull();
       // Aviso de falta sem caminho e sem explicação faz o aluno adivinhar por
       // que o direito dele não está ali.
-      expect(
-        await screen.findByText(EXPLICACAO[motivo]),
-      ).toBeInTheDocument();
+      expect(await screen.findByText(EXPLICACAO[motivo])).toBeInTheDocument();
     });
   }
 
@@ -653,10 +671,7 @@ describe("SPEC-072/AC-008 — sobe o faltaId DAQUELA ocupação", () => {
       expect(marcarReposicao).toHaveBeenCalledWith("falta-de-B", "destino-1");
     });
     // E não a da primeira, que um casamento por texto teria escolhido.
-    expect(marcarReposicao).not.toHaveBeenCalledWith(
-      "falta-de-A",
-      "destino-1",
-    );
+    expect(marcarReposicao).not.toHaveBeenCalledWith("falta-de-A", "destino-1");
   });
 });
 
@@ -747,11 +762,15 @@ describe("SPEC-072/AC-009 — toda recusa do servidor APARECE", () => {
 
   /** **E a tela não deixa o aluno achar que marcou.** */
   it("na recusa, o painel de escolha CONTINUA aberto", async () => {
-    marcarReposicao.mockRejectedValue(new ApiError(409, "Esta aula já está cheia."));
+    marcarReposicao.mockRejectedValue(
+      new ApiError(409, "Esta aula já está cheia."),
+    );
 
     await tentarMarcar();
 
-    expect(await screen.findByText("Esta aula já está cheia.")).toBeInTheDocument();
+    expect(
+      await screen.findByText("Esta aula já está cheia."),
+    ).toBeInTheDocument();
     // O "Marcar" ainda está lá: ninguém foi levado a achar que terminou.
     expect(screen.getByRole("button", { name: "Marcar" })).toBeInTheDocument();
     expect(
@@ -788,9 +807,7 @@ describe("SPEC-072/AC-009 — toda recusa do servidor APARECE", () => {
       expect(marcarReposicao).toHaveBeenCalledWith("f1", "destino-1");
     });
     await waitFor(() => {
-      expect(
-        screen.queryByText("Escolha o horário da reposição"),
-      ).toBeNull();
+      expect(screen.queryByText("Escolha o horário da reposição")).toBeNull();
     });
   });
 
@@ -814,5 +831,130 @@ describe("SPEC-072/AC-009 — toda recusa do servidor APARECE", () => {
     expect(
       await screen.findByText("Seu papel não pode isso."),
     ).toBeInTheDocument();
+  });
+});
+
+/**
+ * **O defeito que foi ao ar em `3248b94`, e a prova que o impede de voltar.**
+ *
+ * O painel de remarcar (SPEC-072/TASK-005) copiou a lista de oportunidades de
+ * "Aulas para repor" e **não copiou o recorte de nível**. Quem remarcava pela
+ * tela de Aulas via oportunidades de TODOS os níveis — o oposto do item 1 do
+ * card do Matheus: *"o aluno deve visualizar apenas turmas compatíveis com o
+ * nível dele"*.
+ *
+ * Nenhuma prova da TASK-005 pegou, porque nenhuma punha nível no aluno: com
+ * `nivelId` nulo, o recorte não esconde nada, e um painel sem recorte e um com
+ * recorte desenham a MESMA coisa. **Este caso só existe porque dá nível ao
+ * aluno.**
+ */
+describe("o painel de remarcar RECORTA por nível (o defeito de 3248b94)", () => {
+  const faltou = { ...aula, faltaAvisada: true };
+
+  beforeEach(() => {
+    listProximasAulas.mockResolvedValue(pagina([faltou]));
+    getMeuCadastro.mockResolvedValue({ nivelId: "nivel-a" });
+    getMeuCreditoDeReposicao.mockResolvedValue({
+      creditos: 1,
+      porMes: 2,
+      validadeDias: 30,
+      usadasNoMes: 0,
+      faltas: [
+        {
+          faltaId: "f1",
+          ocupacaoId: "o1",
+          turmaNome: "Iniciantes",
+          data: "2026-09-02",
+          horaInicio: "18:00",
+          horaFim: "19:00",
+          expiraEm: "2026-10-02",
+          expirada: false,
+          aulaCancelada: false,
+          reposicao: null,
+        },
+      ],
+    });
+  });
+
+  const oportunidade = (patch: Record<string, unknown>) => ({
+    ocupacaoId: "destino",
+    turmaId: "t9",
+    turmaNome: "Turma",
+    nivelId: null,
+    nivelNome: null,
+    quadraNome: "Quadra 9",
+    data: "2026-09-20",
+    horaInicio: "20:00",
+    horaFim: "21:00",
+    vagas: 3,
+    ...patch,
+  });
+
+  it("oportunidade de OUTRO nível não aparece no painel", async () => {
+    listarOportunidadesDeReposicao.mockResolvedValue([
+      oportunidade({
+        ocupacaoId: "do-meu",
+        turmaNome: "Do Meu Nivel",
+        nivelId: "nivel-a",
+      }),
+      oportunidade({
+        ocupacaoId: "de-outro",
+        turmaNome: "De Outro Nivel",
+        nivelId: "nivel-b",
+      }),
+    ]);
+
+    render(<MyClassesList />);
+    fireEvent.click(await screen.findByRole("button", { name: "Remarcar" }));
+
+    expect(await screen.findByText("Do Meu Nivel")).toBeInTheDocument();
+    expect(screen.queryByText("De Outro Nivel")).toBeNull();
+  });
+
+  it("turma SEM nível continua aparecendo para quem tem nível (INV-141)", async () => {
+    listarOportunidadesDeReposicao.mockResolvedValue([
+      oportunidade({ turmaNome: "Sem Nivelamento", nivelId: null }),
+    ]);
+
+    render(<MyClassesList />);
+    fireEvent.click(await screen.findByRole("button", { name: "Remarcar" }));
+
+    expect(await screen.findByText("Sem Nivelamento")).toBeInTheDocument();
+  });
+
+  it("falha ao ler o cadastro: nulo, e o painel mostra tudo (D15)", async () => {
+    getMeuCadastro.mockRejectedValue(new Error("rede"));
+    listarOportunidadesDeReposicao.mockResolvedValue([
+      oportunidade({ turmaNome: "De Qualquer Nivel", nivelId: "nivel-b" }),
+    ]);
+
+    render(<MyClassesList />);
+    fireEvent.click(await screen.findByRole("button", { name: "Remarcar" }));
+
+    expect(await screen.findByText("De Qualquer Nivel")).toBeInTheDocument();
+  });
+
+  /** SPEC-064/TASK-007 — a fila de espera também no painel da tela de Aulas. */
+  it("aula CHEIA no painel oferece entrar na fila, e pede as sem vaga", async () => {
+    listarOportunidadesDeReposicao.mockResolvedValue([
+      oportunidade({ ocupacaoId: "cheia", turmaNome: "Cheia", vagas: 0 }),
+    ]);
+
+    render(<MyClassesList />);
+    fireEvent.click(await screen.findByRole("button", { name: "Remarcar" }));
+
+    expect(listarOportunidadesDeReposicao).toHaveBeenCalledWith({
+      incluirSemVaga: true,
+    });
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Entrar na fila de espera desta aula",
+      }),
+    );
+    await waitFor(() => {
+      expect(entrarNaFilaDeAula).toHaveBeenCalledWith("cheia");
+    });
+    // E o "Marcar" não aparece numa aula cheia.
+    expect(screen.queryByRole("button", { name: "Marcar" })).toBeNull();
   });
 });

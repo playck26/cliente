@@ -12,16 +12,23 @@ import { SemanaDoAluno } from "@/components/semana-do-aluno";
 import {
   ApiError,
   avisarFalta,
+  entrarNaFilaDeAula,
+  getMeuCadastro,
   getMeuCreditoDeReposicao,
+  listarMinhaFila,
   listarOportunidadesDeReposicao,
   listProximasAulas,
   marcarReposicao,
   retirarAvisoDeFalta,
+  sairDaFila,
   type CreditoDeReposicao,
+  type LinhaDaFila,
   type MyClass,
   type OportunidadeDeReposicao,
 } from "@/lib/api-client";
+import { acaoDaOportunidade } from "@/lib/acao-da-oportunidade";
 import { creditoUtilizavel, EXPLICACAO } from "@/lib/credito-utilizavel";
+import { apareceParaMim } from "@/lib/filtro-de-nivel";
 
 const DIAS_SEMANA = [
   "Domingo",
@@ -161,6 +168,23 @@ export function MyClassesList() {
   } | null>(null);
   const [opcoes, setOpcoes] = useState<OportunidadeDeReposicao[] | null>(null);
   /**
+   * **O nível do aluno, e o painel TEM de recortar por ele.**
+   *
+   * A primeira versão deste painel (SPEC-072/TASK-005) copiou a lista de
+   * oportunidades de "Aulas para repor" e **não copiou o recorte** — então
+   * quem remarcava pela tela de Aulas via oportunidades de TODOS os níveis,
+   * que é exatamente o que o item 1 do card do Matheus mandou tirar. Foi ao ar
+   * assim em `3248b94`, e só apareceu quando esta task foi mexer no mesmo
+   * trecho. Duas telas, uma regra: o recorte mora em `filtro-de-nivel.ts`, e
+   * esta tela passa a chamá-lo.
+   *
+   * **Leitura tolerante, como na outra tela:** se `/me/cadastro` falhar, nulo
+   * mostra tudo (D15/INV-141). Errar mostrando demais é recuperável.
+   */
+  const [meuNivelId, setMeuNivelId] = useState<string | null>(null);
+  /** SPEC-064/TASK-007 — as filas em que ele já está, para o botão de cada aula cheia. */
+  const [minhaFila, setMinhaFila] = useState<LinhaDaFila[]>([]);
+  /**
    * **Erro próprio da reposição, e não o `error` da tela.**
    *
    * O `error` da lista SUBSTITUI a lista inteira; usá-lo aqui faria a recusa
@@ -220,6 +244,12 @@ export function MyClassesList() {
     void carregarCredito();
   }, [carregarCredito]);
 
+  useEffect(() => {
+    void getMeuCadastro()
+      .then((cadastro) => setMeuNivelId(cadastro.nivelId))
+      .catch(() => undefined);
+  }, []);
+
   /**
    * SPEC-031/REQ-006 — avisar que vai faltar, e desfazer.
    *
@@ -273,12 +303,53 @@ export function MyClassesList() {
     setOpcoes(null);
     setErroDaReposicao(null);
     try {
-      setOpcoes(await listarOportunidadesDeReposicao());
+      // SPEC-064/TASK-007 — as cheias também, para oferecer a fila de espera.
+      const [lista, fila] = await Promise.all([
+        listarOportunidadesDeReposicao({ incluirSemVaga: true }),
+        listarMinhaFila().catch(() => [] as LinhaDaFila[]),
+      ]);
+      setOpcoes(lista);
+      setMinhaFila(fila);
     } catch (e: unknown) {
       setOpcoes([]);
       setErroDaReposicao(
         mensagemDoServidor(e, "Não foi possível carregar os horários."),
       );
+    }
+  };
+
+  /**
+   * SPEC-064/TASK-007 — entrar e sair da fila de uma aula cheia, sem sair do
+   * painel. Relê a fila nos dois casos, inclusive no erro: o `JA_NA_FILA` é o
+   * servidor dizendo que a tela estava velha.
+   */
+  const entrarNaFila = async (ocupacaoId: string) => {
+    setMarcando(true);
+    setErroDaReposicao(null);
+    try {
+      await entrarNaFilaDeAula(ocupacaoId);
+    } catch (e: unknown) {
+      setErroDaReposicao(
+        mensagemDoServidor(e, "Não foi possível entrar na fila."),
+      );
+    } finally {
+      setMinhaFila(await listarMinhaFila().catch(() => minhaFila));
+      setMarcando(false);
+    }
+  };
+
+  const sairDaFilaDaAula = async (linhaId: string) => {
+    setMarcando(true);
+    setErroDaReposicao(null);
+    try {
+      await sairDaFila(linhaId);
+    } catch (e: unknown) {
+      setErroDaReposicao(
+        mensagemDoServidor(e, "Não foi possível sair da fila."),
+      );
+    } finally {
+      setMinhaFila(await listarMinhaFila().catch(() => minhaFila));
+      setMarcando(false);
     }
   };
 
@@ -434,16 +505,16 @@ export function MyClassesList() {
               const veredicto = creditoUtilizavel(credito, aula.ocupacaoId);
               const emRemarcacao = remarcando?.ocupacaoId === aula.ocupacaoId;
               return (
-              <article
-                key={aula.ocupacaoId}
-                className="rounded-3xl bg-surface p-4 shadow-[var(--shadow-low)] ring-1 ring-border"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-extrabold tracking-[0.14em] text-[var(--color-primary-strong)] uppercase">
-                      {formatarData(aula.data)} • {aula.horaInicio}
-                    </p>
-                    {/*
+                <article
+                  key={aula.ocupacaoId}
+                  className="rounded-3xl bg-surface p-4 shadow-[var(--shadow-low)] ring-1 ring-border"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-extrabold tracking-[0.14em] text-[var(--color-primary-strong)] uppercase">
+                        {formatarData(aula.data)} • {aula.horaInicio}
+                      </p>
+                      {/*
                       **SPEC-057/TASK-002/D10 — daqui se chega à turma.**
                       O card pede *"clicar para ver sua turma"*, e o nome é o
                       alvo natural: é o que a pessoa lê para saber de que
@@ -454,47 +525,47 @@ export function MyClassesList() {
                       clicável com botão dentro é a armadilha clássica: o
                       toque no botão vira navegação em metade das vezes.
                     */}
-                    <h2 className="mt-1 truncate text-[19px] font-extrabold text-[var(--color-text-primary)]">
-                      <Link
-                        href={`/minhas-aulas/turma/${aula.turmaId}`}
-                        className="hover:underline"
-                      >
-                        {aula.turmaNome ?? "Turma"}
-                      </Link>
-                    </h2>
-                    <p className="mt-1 flex items-center gap-1.5 text-[13px] font-semibold text-[var(--color-text-secondary)]">
-                      <TennisCourtIcon
-                        className="size-4 shrink-0"
-                        aria-hidden="true"
-                      />
-                      <span className="truncate">{aula.quadraNome}</span>
-                    </p>
+                      <h2 className="mt-1 truncate text-[19px] font-extrabold text-[var(--color-text-primary)]">
+                        <Link
+                          href={`/minhas-aulas/turma/${aula.turmaId}`}
+                          className="hover:underline"
+                        >
+                          {aula.turmaNome ?? "Turma"}
+                        </Link>
+                      </h2>
+                      <p className="mt-1 flex items-center gap-1.5 text-[13px] font-semibold text-[var(--color-text-secondary)]">
+                        <TennisCourtIcon
+                          className="size-4 shrink-0"
+                          aria-hidden="true"
+                        />
+                        <span className="truncate">{aula.quadraNome}</span>
+                      </p>
+                    </div>
+                    <span
+                      className={`flex size-12 shrink-0 items-center justify-center rounded-2xl ${index === 0 ? "bg-[var(--color-secondary-container)]" : "bg-[var(--color-primary-container)]/55"} text-[var(--color-primary-strong)]`}
+                    >
+                      {index === 0 ? (
+                        <Clock className="size-6" aria-hidden="true" />
+                      ) : (
+                        <TennisBallIcon className="size-6" aria-hidden="true" />
+                      )}
+                    </span>
                   </div>
-                  <span
-                    className={`flex size-12 shrink-0 items-center justify-center rounded-2xl ${index === 0 ? "bg-[var(--color-secondary-container)]" : "bg-[var(--color-primary-container)]/55"} text-[var(--color-primary-strong)]`}
-                  >
-                    {index === 0 ? (
-                      <Clock className="size-6" aria-hidden="true" />
-                    ) : (
-                      <TennisBallIcon className="size-6" aria-hidden="true" />
-                    )}
-                  </span>
-                </div>
-                <div className="mt-4 flex min-h-11 items-center justify-between rounded-2xl bg-[var(--color-surface-container)] px-4">
-                  <span className="text-[13px] font-bold text-[var(--color-text-secondary)]">
-                    {aula.horaInicio}–{aula.horaFim}
-                  </span>
-                  {/* SPEC-030 / achado 2 da validação cruzada — a aula que
+                  <div className="mt-4 flex min-h-11 items-center justify-between rounded-2xl bg-[var(--color-surface-container)] px-4">
+                    <span className="text-[13px] font-bold text-[var(--color-text-secondary)]">
+                      {aula.horaInicio}–{aula.horaFim}
+                    </span>
+                    {/* SPEC-030 / achado 2 da validação cruzada — a aula que
                       NÃO aconteceu. Sem isto ela aparecia aqui como
                       "Agendada" até o dia passar, e no dia seguinte sumia
                       das "Anteriores" (o filtro da avaliação) sem nunca
                       dizer o que houve. O aluno pode ter ido até o clube. */}
-                  {aula.naoRealizada ? (
-                    <span className="rounded-full bg-[var(--color-surface-container-high)] px-3 py-1 text-[11px] font-extrabold text-[var(--color-text-secondary)] ring-1 ring-border">
-                      Não realizada
-                    </span>
-                  ) : (
-                    /* SPEC-031/REQ-006 — avisar que vai faltar.
+                    {aula.naoRealizada ? (
+                      <span className="rounded-full bg-[var(--color-surface-container-high)] px-3 py-1 text-[11px] font-extrabold text-[var(--color-text-secondary)] ring-1 ring-border">
+                        Não realizada
+                      </span>
+                    ) : (
+                      /* SPEC-031/REQ-006 — avisar que vai faltar.
                        O selo "Agendada" some quando há aviso: dizer "Agendada"
                        ao lado de "vou faltar" seria a tela afirmando duas
                        coisas sobre o mesmo estado.
@@ -503,41 +574,41 @@ export function MyClassesList() {
                        aula que não houve não tem sentido, e o servidor
                        recusaria — a tela só não oferece o que seria recusado,
                        mesma regra da chamada. */
-                    <div className="flex items-center gap-2">
-                      {avisou(aula) ? (
-                        <span className="rounded-full bg-[var(--color-warning)]/15 px-3 py-1 text-[11px] font-extrabold text-[var(--color-text-primary)] ring-1 ring-border">
-                          Falta avisada
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-white px-3 py-1 text-[11px] font-extrabold text-[var(--color-primary-strong)] ring-1 ring-border">
-                          Agendada
-                        </span>
-                      )}
-                      {aula.turmaId ? (
-                        <button
-                          type="button"
-                          disabled={agindoEm === aula.ocupacaoId}
-                          // O rótulo visível vira "..." durante a ação, e um
-                          // nome acessível que muda no meio da operação deixa
-                          // quem usa leitor de tela sem referência. O
-                          // `aria-label` descreve a AÇÃO e não muda enquanto
-                          // ela acontece.
-                          aria-label={
-                            avisou(aula)
-                              ? "Desfazer aviso de falta"
-                              : "Avisar que vou faltar"
-                          }
-                          onClick={() => void alternarFalta(aula)}
-                          className="min-h-11 rounded-full px-3 text-[11px] font-extrabold text-[var(--color-primary-strong)] underline underline-offset-2 disabled:opacity-60"
-                        >
-                          {agindoEm === aula.ocupacaoId
-                            ? "..."
-                            : avisou(aula)
-                              ? "Desfazer"
-                              : "Vou faltar"}
-                        </button>
-                      ) : null}
-                      {/*
+                      <div className="flex items-center gap-2">
+                        {avisou(aula) ? (
+                          <span className="rounded-full bg-[var(--color-warning)]/15 px-3 py-1 text-[11px] font-extrabold text-[var(--color-text-primary)] ring-1 ring-border">
+                            Falta avisada
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-white px-3 py-1 text-[11px] font-extrabold text-[var(--color-primary-strong)] ring-1 ring-border">
+                            Agendada
+                          </span>
+                        )}
+                        {aula.turmaId ? (
+                          <button
+                            type="button"
+                            disabled={agindoEm === aula.ocupacaoId}
+                            // O rótulo visível vira "..." durante a ação, e um
+                            // nome acessível que muda no meio da operação deixa
+                            // quem usa leitor de tela sem referência. O
+                            // `aria-label` descreve a AÇÃO e não muda enquanto
+                            // ela acontece.
+                            aria-label={
+                              avisou(aula)
+                                ? "Desfazer aviso de falta"
+                                : "Avisar que vou faltar"
+                            }
+                            onClick={() => void alternarFalta(aula)}
+                            className="min-h-11 rounded-full px-3 text-[11px] font-extrabold text-[var(--color-primary-strong)] underline underline-offset-2 disabled:opacity-60"
+                          >
+                            {agindoEm === aula.ocupacaoId
+                              ? "..."
+                              : avisou(aula)
+                                ? "Desfazer"
+                                : "Vou faltar"}
+                          </button>
+                        ) : null}
+                        {/*
                         **SPEC-072/AC-007 — o "Remarcar" só existe quando o
                         crédito é utilizável**, e são cinco motivos para não
                         ser: sem falta casada por `ocupacaoId`, já reposta,
@@ -551,107 +622,151 @@ export function MyClassesList() {
                         que dependem da ocupação ESCOLHIDA não existem aqui, e
                         quem as cobre é a `AC-009` — por classe.
                       */}
-                      {veredicto.utilizavel ? (
-                        <button
-                          type="button"
-                          disabled={emRemarcacao}
-                          onClick={() =>
-                            void abrirRemarcacao(
-                              aula.ocupacaoId,
-                              veredicto.faltaId,
-                            )
-                          }
-                          className="min-h-11 rounded-full bg-[var(--color-primary-strong)] px-3 text-[11px] font-extrabold text-white disabled:opacity-60"
-                        >
-                          Remarcar
-                        </button>
-                      ) : avisou(aula) ? (
-                        /*
+                        {veredicto.utilizavel ? (
+                          <button
+                            type="button"
+                            disabled={emRemarcacao}
+                            onClick={() =>
+                              void abrirRemarcacao(
+                                aula.ocupacaoId,
+                                veredicto.faltaId,
+                              )
+                            }
+                            className="min-h-11 rounded-full bg-[var(--color-primary-strong)] px-3 text-[11px] font-extrabold text-white disabled:opacity-60"
+                          >
+                            Remarcar
+                          </button>
+                        ) : avisou(aula) ? (
+                          /*
                           **O motivo aparece, em vez do botão.** Aviso de
                           falta sem caminho para repor e sem explicação é a
                           tela deixando o aluno adivinhar por que o direito
                           dele não está ali.
                         */
-                        <span className="text-[11px] font-bold text-[var(--color-text-secondary)]">
-                          {EXPLICACAO[veredicto.motivo]}
-                        </span>
-                      ) : null}
-                    </div>
-                  )}
-                </div>
-                {emRemarcacao ? (
-                  <div className="mt-3 rounded-2xl bg-[var(--color-surface-container)] p-3">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <p className="text-[12px] font-extrabold text-foreground">
-                        Escolha o horário da reposição
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setRemarcando(null);
-                          setOpcoes(null);
-                          setErroDaReposicao(null);
-                        }}
-                        className="text-[11px] font-extrabold text-[var(--color-text-secondary)] underline"
-                      >
-                        Cancelar
-                      </button>
-                    </div>
-                    {erroDaReposicao ? (
-                      <p
-                        role="alert"
-                        className="mt-2 text-[12px] font-bold text-[var(--color-error)]"
-                      >
-                        {erroDaReposicao}
-                      </p>
-                    ) : null}
-                    {opcoes === null ? (
-                      <p className="mt-2 text-[12px] text-[var(--color-text-secondary)]">
-                        Carregando...
-                      </p>
-                    ) : opcoes.length === 0 ? (
-                      /* Zero é uma resposta, e precisa ser dita — senão o
-                         aluno acha que a tela quebrou. */
-                      <p className="mt-2 text-[12px] text-[var(--color-text-secondary)]">
-                        Nenhuma turma com vaga nos próximos dias.
-                      </p>
-                    ) : (
-                      <ul className="mt-2">
-                        {opcoes.map((o) => (
-                          <li
-                            key={o.ocupacaoId}
-                            className="flex items-center justify-between gap-2 border-b border-border py-2 last:border-b-0"
-                          >
-                            {/* Mesma lição da TASK-004: sem `truncate`, com o
-                                `horaFim`, e `break-words` para nome longo não
-                                estourar a largura a 320px. */}
-                            <div className="min-w-0 flex-1">
-                              <p className="text-[12px] font-extrabold break-words text-foreground">
-                                {o.turmaNome}
-                              </p>
-                              <p className="text-[11px] break-words text-[var(--color-text-secondary)]">
-                                {formatarData(o.data)} · {o.horaInicio}–
-                                {o.horaFim} · {o.quadraNome} ·{" "}
-                                {o.vagas === 1 ? "1 vaga" : `${o.vagas} vagas`}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              disabled={marcando}
-                              onClick={() =>
-                                void confirmarRemarcacao(o.ocupacaoId)
-                              }
-                              className="shrink-0 rounded-2xl bg-[var(--color-primary-strong)] px-3 py-1.5 text-[12px] font-extrabold text-white disabled:opacity-50"
-                            >
-                              Marcar
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
+                          <span className="text-[11px] font-bold text-[var(--color-text-secondary)]">
+                            {EXPLICACAO[veredicto.motivo]}
+                          </span>
+                        ) : null}
+                      </div>
                     )}
                   </div>
-                ) : null}
-              </article>
+                  {emRemarcacao ? (
+                    <div className="mt-3 rounded-2xl bg-[var(--color-surface-container)] p-3">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <p className="text-[12px] font-extrabold text-foreground">
+                          Escolha o horário da reposição
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setRemarcando(null);
+                            setOpcoes(null);
+                            setErroDaReposicao(null);
+                          }}
+                          className="text-[11px] font-extrabold text-[var(--color-text-secondary)] underline"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                      {erroDaReposicao ? (
+                        <p
+                          role="alert"
+                          className="mt-2 text-[12px] font-bold text-[var(--color-error)]"
+                        >
+                          {erroDaReposicao}
+                        </p>
+                      ) : null}
+                      {opcoes === null ? (
+                        <p className="mt-2 text-[12px] text-[var(--color-text-secondary)]">
+                          Carregando...
+                        </p>
+                      ) : opcoes.length === 0 ? (
+                        /* Zero é uma resposta, e precisa ser dita — senão o
+                         aluno acha que a tela quebrou. */
+                        <p className="mt-2 text-[12px] text-[var(--color-text-secondary)]">
+                          Nenhuma turma com vaga nos próximos dias.
+                        </p>
+                      ) : (
+                        <ul className="mt-2">
+                          {opcoes
+                            // O recorte que faltava — ver o comentário do
+                            // `meuNivelId`. Mesma função, mesmo `false`, da
+                            // outra tela.
+                            .filter((o) => apareceParaMim(o, meuNivelId, false))
+                            .map((o) => (
+                              <li
+                                key={o.ocupacaoId}
+                                className="flex items-center justify-between gap-2 border-b border-border py-2 last:border-b-0"
+                              >
+                                {/* Mesma lição da TASK-004: sem `truncate`, com o
+                                `horaFim`, e `break-words` para nome longo não
+                                estourar a largura a 320px. */}
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-[12px] font-extrabold break-words text-foreground">
+                                    {o.turmaNome}
+                                  </p>
+                                  <p className="text-[11px] break-words text-[var(--color-text-secondary)]">
+                                    {formatarData(o.data)} · {o.horaInicio}–
+                                    {o.horaFim} · {o.quadraNome} ·{" "}
+                                    {o.vagas === 0
+                                      ? "sem vaga"
+                                      : o.vagas === 1
+                                        ? "1 vaga"
+                                        : `${o.vagas} vagas`}
+                                  </p>
+                                </div>
+                                {(() => {
+                                  const acao = acaoDaOportunidade(o, minhaFila);
+                                  if (acao.tipo === "marcar") {
+                                    return (
+                                      <button
+                                        type="button"
+                                        disabled={marcando}
+                                        onClick={() =>
+                                          void confirmarRemarcacao(o.ocupacaoId)
+                                        }
+                                        className="shrink-0 rounded-2xl bg-[var(--color-primary-strong)] px-3 py-1.5 text-[12px] font-extrabold text-white disabled:opacity-50"
+                                      >
+                                        Marcar
+                                      </button>
+                                    );
+                                  }
+                                  if (acao.tipo === "entrar-na-fila") {
+                                    return (
+                                      <button
+                                        type="button"
+                                        disabled={marcando}
+                                        onClick={() =>
+                                          void entrarNaFila(o.ocupacaoId)
+                                        }
+                                        aria-label="Entrar na fila de espera desta aula"
+                                        className="shrink-0 rounded-2xl bg-surface px-3 py-1.5 text-[12px] font-extrabold text-[var(--color-primary-strong)] ring-1 ring-border disabled:opacity-50"
+                                      >
+                                        Entrar na fila
+                                      </button>
+                                    );
+                                  }
+                                  return (
+                                    <button
+                                      type="button"
+                                      disabled={marcando}
+                                      onClick={() =>
+                                        void sairDaFilaDaAula(acao.linhaId)
+                                      }
+                                      aria-label="Você está na fila de espera desta aula — sair"
+                                      className="shrink-0 rounded-2xl bg-surface px-3 py-1.5 text-[12px] font-extrabold text-[var(--color-text-secondary)] ring-1 ring-border disabled:opacity-50"
+                                    >
+                                      Sair da fila
+                                    </button>
+                                  );
+                                })()}
+                              </li>
+                            ))}
+                        </ul>
+                      )}
+                    </div>
+                  ) : null}
+                </article>
               );
             })}
             {/*

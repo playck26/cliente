@@ -1,16 +1,21 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { acaoDaOportunidade } from "@/lib/acao-da-oportunidade";
 import { apareceParaMim } from "@/lib/filtro-de-nivel";
 import {
   getMeuCadastro,
   ApiError,
   desmarcarReposicao,
+  entrarNaFilaDeAula,
   getMeuCreditoDeReposicao,
+  listarMinhaFila,
   listarOportunidadesDeReposicao,
   marcarReposicao,
+  sairDaFila,
   type CreditoDeReposicao,
   type FaltaParaRepor,
+  type LinhaDaFila,
   type OportunidadeDeReposicao,
 } from "@/lib/api-client";
 
@@ -58,6 +63,68 @@ function diaEHora(data: string, hora: string): string {
 function diaEFaixaDeHora(data: string, inicio: string, fim: string): string {
   const [ano, mes, dia] = data.split("-");
   return `${dia}/${mes}/${ano} · ${inicio}–${fim}`;
+}
+
+/**
+ * SPEC-064/TASK-007 — **um botão por oportunidade, e quem decide qual é a
+ * `acaoDaOportunidade`.** Os três têm o mesmo corpo visual de propósito: a
+ * prova de geometria da SPEC-072 (`AC-006`) mede o botão "Marcar" a 320px, e um
+ * botão de fila mais largo espremeria a informação que ela protege.
+ *
+ * **Rótulo curto, nome acessível completo.** "Entrar na fila" cabe ao lado do
+ * texto; o `aria-label` diz o que acontece, para quem não vê a linha inteira.
+ */
+function BotaoDaOportunidade({
+  acao,
+  ocupada,
+  onMarcar,
+  onEntrarNaFila,
+  onSairDaFila,
+}: {
+  acao: ReturnType<typeof acaoDaOportunidade>;
+  ocupada: boolean;
+  onMarcar: () => void;
+  onEntrarNaFila: () => void;
+  onSairDaFila: (linhaId: string) => void;
+}) {
+  const classe =
+    "shrink-0 rounded-2xl px-3 py-1.5 text-[12px] font-extrabold active:scale-[0.99] disabled:opacity-50";
+  if (acao.tipo === "marcar") {
+    return (
+      <button
+        type="button"
+        disabled={ocupada}
+        onClick={onMarcar}
+        className={`${classe} bg-[var(--color-primary-strong)] text-white`}
+      >
+        Marcar
+      </button>
+    );
+  }
+  if (acao.tipo === "entrar-na-fila") {
+    return (
+      <button
+        type="button"
+        disabled={ocupada}
+        onClick={onEntrarNaFila}
+        aria-label="Entrar na fila de espera desta aula"
+        className={`${classe} bg-surface text-[var(--color-primary-strong)] ring-1 ring-border`}
+      >
+        Entrar na fila
+      </button>
+    );
+  }
+  return (
+    <button
+      type="button"
+      disabled={ocupada}
+      onClick={() => onSairDaFila(acao.linhaId)}
+      aria-label="Você está na fila de espera desta aula — sair"
+      className={`${classe} bg-surface text-[var(--color-text-secondary)] ring-1 ring-border`}
+    >
+      Sair da fila
+    </button>
+  );
 }
 
 function Falta({
@@ -154,6 +221,16 @@ export function MinhasReposicoes() {
    */
   const [meuNivelId, setMeuNivelId] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+  /**
+   * SPEC-064/TASK-007 — **as filas em que ele já está.** Sem isto a tela não
+   * sabe distinguir "entrar na fila" de "sair da fila" numa aula cheia.
+   *
+   * **Leitura tolerante:** se ela falhar, a lista de oportunidades continua —
+   * o aluno perde só a informação de que já está na fila, e ao tentar entrar
+   * de novo o servidor responde `JA_NA_FILA`. Errar mostrando "entrar" é
+   * recuperável; errar escondendo as oportunidades não é.
+   */
+  const [minhaFila, setMinhaFila] = useState<LinhaDaFila[]>([]);
 
   async function recarregar() {
     setDados(await getMeuCreditoDeReposicao());
@@ -187,13 +264,58 @@ export function MinhasReposicoes() {
     setEscolhendo(faltaId);
     setOpcoes(null);
     try {
-      setOpcoes(await listarOportunidadesDeReposicao());
+      // SPEC-064/TASK-007 — **as cheias também**, para oferecer a fila. É o
+      // que o card 5331 chama de "encontra a aula para repor, mas não tem
+      // vaga".
+      const [lista, fila] = await Promise.all([
+        listarOportunidadesDeReposicao({ incluirSemVaga: true }),
+        listarMinhaFila().catch(() => [] as LinhaDaFila[]),
+      ]);
+      setOpcoes(lista);
+      setMinhaFila(fila);
     } catch (e: unknown) {
       setErro(
         e instanceof ApiError
           ? e.message
           : "Não foi possível carregar os horários.",
       );
+    }
+  }
+
+  /**
+   * SPEC-064/TASK-007 — **entrar e sair da fila de uma AULA.**
+   *
+   * Relê a fila nos dois casos, inclusive no erro: o `409 JA_NA_FILA` é o
+   * servidor dizendo que a tela estava velha, e continuar mostrando "entrar"
+   * depois dele seria insistir numa informação desmentida.
+   */
+  async function entrarNaFila(ocupacaoId: string) {
+    setOcupada(true);
+    setErro(null);
+    try {
+      await entrarNaFilaDeAula(ocupacaoId);
+    } catch (e: unknown) {
+      setErro(
+        e instanceof ApiError ? e.message : "Não foi possível entrar na fila.",
+      );
+    } finally {
+      setMinhaFila(await listarMinhaFila().catch(() => minhaFila));
+      setOcupada(false);
+    }
+  }
+
+  async function sairDaFilaDaAula(linhaId: string) {
+    setOcupada(true);
+    setErro(null);
+    try {
+      await sairDaFila(linhaId);
+    } catch (e: unknown) {
+      setErro(
+        e instanceof ApiError ? e.message : "Não foi possível sair da fila.",
+      );
+    } finally {
+      setMinhaFila(await listarMinhaFila().catch(() => minhaFila));
+      setOcupada(false);
     }
   }
 
@@ -210,9 +332,7 @@ export function MinhasReposicoes() {
       // divergiria no primeiro caso que eu não previsse.
       await recarregar();
     } catch (e: unknown) {
-      setErro(
-        e instanceof ApiError ? e.message : "Não foi possível marcar.",
-      );
+      setErro(e instanceof ApiError ? e.message : "Não foi possível marcar.");
     } finally {
       setOcupada(false);
     }
@@ -359,18 +479,23 @@ export function MinhasReposicoes() {
                     <p className="text-[12px] break-words text-[var(--color-text-secondary)]">
                       {diaEFaixaDeHora(o.data, o.horaInicio, o.horaFim)} ·{" "}
                       {o.quadraNome} ·{" "}
-                      {o.vagas === 1 ? "1 vaga" : `${o.vagas} vagas`}
+                      {/* "0 vagas" leria como erro de conta; "sem vaga" é o
+                          estado, e é o que explica o botão ao lado. */}
+                      {o.vagas === 0
+                        ? "sem vaga"
+                        : o.vagas === 1
+                          ? "1 vaga"
+                          : `${o.vagas} vagas`}
                       {o.nivelNome ? ` · ${o.nivelNome}` : ""}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    disabled={ocupada}
-                    onClick={() => void confirmar(o.ocupacaoId)}
-                    className="shrink-0 rounded-2xl bg-[var(--color-primary-strong)] px-3 py-1.5 text-[12px] font-extrabold text-white active:scale-[0.99] disabled:opacity-50"
-                  >
-                    Marcar
-                  </button>
+                  <BotaoDaOportunidade
+                    acao={acaoDaOportunidade(o, minhaFila)}
+                    ocupada={ocupada}
+                    onMarcar={() => void confirmar(o.ocupacaoId)}
+                    onEntrarNaFila={() => void entrarNaFila(o.ocupacaoId)}
+                    onSairDaFila={(linhaId) => void sairDaFilaDaAula(linhaId)}
+                  />
                 </li>
               ))}
             </ul>

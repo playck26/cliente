@@ -1,4 +1,10 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { MyClass } from "@/lib/api-client";
 
@@ -133,6 +139,9 @@ const RESERVA = {
 
 describe("HomeView", () => {
   beforeEach(() => {
+    // SPEC-073 — o papel guardado muda o caminho da home (D1/D2), e o
+    // `savePapel` da AC-018 vazava para os casos seguintes.
+    localStorage.clear();
     vi.clearAllMocks();
     listMyBookingsMock.mockResolvedValue({ itens: [], truncou: false });
     vi.useFakeTimers({ shouldAdvanceTime: true });
@@ -288,6 +297,9 @@ describe("HomeView", () => {
  */
 describe("SPEC-057/TASK-003 — a home abre na agenda", () => {
   beforeEach(() => {
+    // SPEC-073 — o papel guardado muda o caminho da home (D1/D2), e o
+    // `savePapel` da AC-018 vazava para os casos seguintes.
+    localStorage.clear();
     vi.clearAllMocks();
     listMyBookingsMock.mockResolvedValue({ itens: [], truncou: false });
     vi.useFakeTimers({ shouldAdvanceTime: true });
@@ -412,5 +424,155 @@ describe("SPEC-057/TASK-003 — a home abre na agenda", () => {
     expect(
       screen.getByRole("link", { name: /Abrir Turma A/ }),
     ).toHaveAttribute("href", "/minhas-aulas/turma/t1");
+  });
+});
+
+/** Promessa que o teste resolve quando quiser — é o que separa "em fila" de "junto". */
+function adiada<T>() {
+  let resolve!: (valor: T) => void;
+  let reject!: (erro: unknown) => void;
+  const promise = new Promise<T>((r, j) => {
+    resolve = r;
+    reject = j;
+  });
+  return { promise, resolve, reject };
+}
+
+/**
+ * SPEC-073 — **a home que esperava em fila.**
+ *
+ * Eram três idas uma depois da outra: `me`, depois as aulas, depois as
+ * reservas. As provas aqui penduram uma das pontas e olham se a outra já
+ * saiu — é a única forma de distinguir "junto" de "em série" sem relógio.
+ */
+describe("SPEC-073 — a home não espera em fila", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    vi.clearAllMocks();
+    listMyBookingsMock.mockResolvedValue({ itens: [], truncou: false });
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(QUARTA);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("AC-001/AC-002: com papel de aluno guardado, aulas E reservas saem antes do `getMe()` voltar, com a janela de sempre", async () => {
+    savePapel("aluno");
+    getMeMock.mockReturnValue(new Promise(() => {}));
+    listMyClassesMock.mockResolvedValue([]);
+
+    render(<HomeView />);
+
+    await waitFor(() => expect(listMyClassesMock).toHaveBeenCalledTimes(1));
+    expect(listMyBookingsMock).toHaveBeenCalledTimes(1);
+    // 02/09 + 60 dias = 01/11. Adiantar não pode encurtar a janela do cartão.
+    const janela = { de: "2026-09-01", ate: "2026-11-01" };
+    expect(listMyClassesMock).toHaveBeenCalledWith(janela);
+    expect(listMyBookingsMock).toHaveBeenCalledWith(janela);
+  });
+
+  it("AC-003: papel guardado de aluno, mas o `getMe()` diz gestor — nada da resposta adiantada aparece", async () => {
+    savePapel("aluno");
+    getMeMock.mockResolvedValue({ ...ALUNO, role: "company_admin" });
+    listMyClassesMock.mockResolvedValue([AULA]);
+
+    render(<HomeView />);
+
+    await waitFor(() => {
+      expect(screen.getAllByText(/Olá, Ana/).length).toBeGreaterThan(0);
+    });
+    await waitFor(() => expect(screen.queryByRole("grid")).toBeNull());
+    // O custo declarado (LIM-073a): a chamada aconteceu, o resultado não.
+    expect(listMyClassesMock).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/Turma A/)).toBeNull();
+    expect(screen.queryByRole("region", { name: "Sua próxima aula" })).toBeNull();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("AC-004: papel guardado de aluno e `getMe()` com 403 — a mensagem humana, e nenhuma aula adiantada", async () => {
+    savePapel("aluno");
+    getMeMock.mockRejectedValue(new ApiErrorFalso(403, "Forbidden"));
+    listMyClassesMock.mockResolvedValue([AULA]);
+
+    render(<HomeView />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /sua conta não tem acesso/i,
+    );
+    expect(screen.queryByText(/Turma A/)).toBeNull();
+    expect(screen.queryByRole("grid")).toBeNull();
+  });
+
+  it("AC-005: sem papel guardado, as reservas saem sem esperar as aulas", async () => {
+    getMeMock.mockResolvedValue(ALUNO);
+    listMyClassesMock.mockReturnValue(new Promise(() => {}));
+
+    render(<HomeView />);
+
+    await waitFor(() => expect(listMyBookingsMock).toHaveBeenCalledTimes(1));
+    expect(listMyClassesMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("AC-006: a grade aparece antes do dado, e não diz vazio enquanto carrega", async () => {
+    savePapel("aluno");
+    const me = adiada<typeof ALUNO>();
+    const aulas = adiada<MyClass[]>();
+    getMeMock.mockReturnValue(me.promise);
+    listMyClassesMock.mockReturnValue(aulas.promise);
+
+    render(<HomeView />);
+
+    expect(
+      await screen.findByRole("grid", { name: /Calendário de setembro/i }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Carregando sua agenda…")).toBeInTheDocument();
+    expect(screen.getByLabelText("Carregando sua próxima aula")).toBeInTheDocument();
+    expect(screen.queryByText("Nenhum compromisso neste mês.")).toBeNull();
+    expect(screen.queryByText("Nenhuma aula marcada")).toBeNull();
+
+    // Controle positivo: resolvida vazia, o vazio aparece. Sem este par,
+    // apagar a frase de vez passaria na metade de cima.
+    me.resolve(ALUNO);
+    aulas.resolve([]);
+    expect(
+      await screen.findByText("Nenhum compromisso neste mês."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Carregando sua agenda…")).toBeNull();
+  });
+
+  /**
+   * **AC-007 — a fixture tem de distinguir.** A aula é de OUTUBRO: uma aula de
+   * setembro nunca apareceria na grade de outubro, com ou sem a guarda, e a
+   * prova passaria sobre o defeito. Outubro responde vazio primeiro; a carga
+   * inicial chega depois trazendo a aula do dia 15. Sem a guarda, o dia 15
+   * ganharia a marca.
+   */
+  it("AC-007: a carga inicial que chega depois da troca de mês não pinta a grade, e alimenta o cartão", async () => {
+    savePapel("aluno");
+    const me = adiada<typeof ALUNO>();
+    const inicial = adiada<MyClass[]>();
+    getMeMock.mockReturnValue(me.promise);
+    listMyClassesMock
+      .mockReturnValueOnce(inicial.promise)
+      .mockResolvedValueOnce([]);
+
+    render(<HomeView />);
+    await screen.findByRole("grid", { name: /Calendário de setembro/i });
+
+    fireEvent.click(screen.getByRole("button", { name: "Próximo mês" }));
+    await screen.findByRole("grid", { name: /Calendário de outubro/i });
+    await waitFor(() => expect(listMyClassesMock).toHaveBeenCalledTimes(2));
+
+    me.resolve(ALUNO);
+    inicial.resolve([
+      { ...AULA, ocupacaoId: "oc-out", data: "2026-10-15", turmaNome: "Turma Outubro" },
+    ]);
+
+    const cartao = await screen.findByRole("region", { name: "Sua próxima aula" });
+    expect(within(cartao).getByText("Turma Outubro")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "15, sem compromisso" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "15: 1 compromisso" })).toBeNull();
   });
 });

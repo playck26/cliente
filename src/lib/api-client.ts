@@ -809,10 +809,24 @@ export async function getMeuCreditoDeReposicao(): Promise<CreditoDeReposicao> {
   return (await res.json()) as CreditoDeReposicao;
 }
 
-export async function listarOportunidadesDeReposicao(): Promise<
-  OportunidadeDeReposicao[]
-> {
-  const res = await authFetch("/me/reposicoes/oportunidades");
+/**
+ * SPEC-064/TASK-007 — **`incluirSemVaga` traz também a aula CHEIA**, com
+ * `vagas: 0`, para a tela oferecer a fila de espera em vez do "Marcar".
+ *
+ * **ORDEM DE ROLLOUT, e ela é dura:** o Back valida com
+ * `forbidNonWhitelisted`, então pedir `incluirSemVaga` a um Back que ainda não
+ * conhece o parâmetro devolve **400 na lista inteira** — o aluno perderia até
+ * as oportunidades com vaga. **O `back` tem de estar no ar antes deste
+ * Cliente**, e o rollback é na ordem inversa.
+ */
+export async function listarOportunidadesDeReposicao(
+  opcoes: { incluirSemVaga?: boolean } = {},
+): Promise<OportunidadeDeReposicao[]> {
+  const res = await authFetch(
+    opcoes.incluirSemVaga
+      ? "/me/reposicoes/oportunidades?incluirSemVaga=true"
+      : "/me/reposicoes/oportunidades",
+  );
   return (await res.json()) as OportunidadeDeReposicao[];
 }
 
