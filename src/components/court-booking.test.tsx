@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiError } from "@/lib/api-client";
-import { CourtBooking } from "./court-booking";
+import { CourtBooking, dataInicialDaUrl } from "./court-booking";
 
 /**
  * A confirmação de reserva, e o defeito que este arquivo nasceu para
@@ -31,6 +31,12 @@ const reservar = vi.hoisted(() => vi.fn());
 const configDePagamento = vi.hoisted(() => vi.fn());
 const carteira = vi.hoisted(() => vi.fn());
 const disponiveis = vi.hoisted(() => vi.fn());
+// SPEC-074 — os avisos de horário. **Mocados de propósito**, e não deixados
+// cair no `catch`: uma função real rodando no jsdom falha e some, e a prova
+// passaria por acidente (a lição da SPEC-064/TASK-007).
+const meusAvisos = vi.hoisted(() => vi.fn());
+const pedirAviso = vi.hoisted(() => vi.fn());
+const cancelarAviso = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/api-client", async () => {
   const real =
@@ -45,6 +51,9 @@ vi.mock("@/lib/api-client", async () => {
     getPublicPaymentConfig: configDePagamento,
     getMinhaCarteira: carteira,
     adicionaisDisponiveis: disponiveis,
+    listarMinhasPreReservas: meusAvisos,
+    pedirPreReserva: pedirAviso,
+    cancelarPreReserva: cancelarAviso,
   };
 });
 
@@ -93,6 +102,8 @@ beforeEach(() => {
   carteira.mockResolvedValue({ saldoCentavos: 50_000, movimentos: [] });
   // SPEC-054: clube sem adicional ativo é o caso dos testes anteriores.
   disponiveis.mockResolvedValue([]);
+  // SPEC-074: nenhum aviso vivo é o caso dos testes anteriores.
+  meusAvisos.mockResolvedValue([]);
 });
 
 /** Seleciona o horário e confirma — o caminho que todo caso percorre. */
@@ -372,5 +383,160 @@ describe("SPEC-054 — adicionais na reserva de quadra", () => {
     await waitFor(() => expect(disponiveis.mock.calls.length).toBeGreaterThan(antes));
     // O pedido continua montado: a pessoa ajusta e tenta de novo.
     expect(screen.getByText("Confirmar reserva")).toBeInTheDocument();
+  });
+});
+
+/**
+ * SPEC-074/D10 — **o horário ocupado deixou de ser um botão morto.**
+ *
+ * Tocar abre a confirmação de pedir aviso (AC-018), e o ocupado NUNCA entra na
+ * seleção de reserva — a prova é o "Confirmar reserva", que só existe com
+ * algum horário selecionado.
+ */
+describe("SPEC-074 — o horário ocupado, e o aviso de que ele vagou", () => {
+  const OCUPADO = {
+    estado: "aberto",
+    slots: [
+      { slot: "10:00-11:00", status: "livre" },
+      { slot: "11:00-12:00", status: "ocupado_avulso" },
+      { slot: "12:00-13:00", status: "ocupado_turma" },
+    ],
+  };
+
+  it("AC-018 — tocar o ocupado abre a confirmação, e NÃO o põe na seleção", async () => {
+    disponibilidade.mockResolvedValue(OCUPADO);
+    render(<CourtBooking id={QUADRA} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /11:00/ }));
+
+    expect(
+      await screen.findByText(
+        "Este horário está ocupado. Quer ser avisado se ele vagar?",
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Confirmar reserva")).not.toBeInTheDocument();
+  });
+
+  it("AC-018 — confirmar chama o POST com a quadra, o dia e SÓ o início", async () => {
+    disponibilidade.mockResolvedValue(OCUPADO);
+    pedirAviso.mockResolvedValue({
+      id: "av-1",
+      quadraId: QUADRA,
+      data: "2099-01-01",
+      horaInicio: "11:00",
+      horaFim: "12:00",
+      estado: "aguardando",
+      criadaEm: "2099-01-01T00:00:00.000Z",
+    });
+    render(<CourtBooking id={QUADRA} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /11:00/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Me avise" }));
+
+    await waitFor(() => expect(pedirAviso).toHaveBeenCalled());
+    const [pedido] = pedirAviso.mock.calls[0] as [
+      { quadraId: string; data: string; horaInicio: string },
+    ];
+    expect(Object.keys(pedido).sort()).toEqual(["data", "horaInicio", "quadraId"]);
+    expect(pedido.quadraId).toBe(QUADRA);
+    expect(pedido.horaInicio).toBe("11:00");
+    expect(
+      await screen.findByText(/se este horário vagar, você recebe um aviso/),
+    ).toBeInTheDocument();
+  });
+
+  it("AC-018 — o ocupado de TURMA também pede aviso", async () => {
+    disponibilidade.mockResolvedValue(OCUPADO);
+    render(<CourtBooking id={QUADRA} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /12:00/ }));
+
+    expect(
+      await screen.findByRole("button", { name: "Me avise" }),
+    ).toBeInTheDocument();
+  });
+
+  it("AC-018 — o slot com aviso ativo mostra \"Aviso ativo\" e oferece CANCELAR", async () => {
+    disponibilidade.mockResolvedValue(OCUPADO);
+    cancelarAviso.mockResolvedValue(undefined);
+    // O aviso casa por quadra, DIA e início: a tela abre no dia do aviso.
+    meusAvisos.mockResolvedValue([
+      {
+        id: "av-7",
+        quadraId: QUADRA,
+        data: "2099-03-15",
+        horaInicio: "11:00",
+        horaFim: "12:00",
+        estado: "aguardando",
+        criadaEm: "2099-01-01T00:00:00.000Z",
+      },
+    ]);
+    render(<CourtBooking id={QUADRA} dataInicial="2099-03-15" />);
+
+    const slot = (await screen.findByText("Aviso ativo")).closest(
+      "button",
+    ) as HTMLButtonElement;
+    fireEvent.click(slot);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Cancelar aviso" }),
+    );
+
+    await waitFor(() => expect(cancelarAviso).toHaveBeenCalledWith("av-7"));
+    expect(await screen.findByText("Aviso cancelado.")).toBeInTheDocument();
+  });
+
+  it("AC-018 — o LIVRE continua selecionável, e não abre a confirmação", async () => {
+    disponibilidade.mockResolvedValue(OCUPADO);
+    render(<CourtBooking id={QUADRA} />);
+
+    fireEvent.click(await screen.findByRole("button", { name: /10:00/ }));
+
+    expect(await screen.findByText("Confirmar reserva")).toBeInTheDocument();
+    expect(
+      screen.queryByText(
+        "Este horário está ocupado. Quer ser avisado se ele vagar?",
+      ),
+    ).not.toBeInTheDocument();
+  });
+
+  it("vagou com a tela aberta (`HORARIO_LIVRE`): mostra a recusa e RELÊ a grade", async () => {
+    disponibilidade.mockResolvedValue(OCUPADO);
+    pedirAviso.mockRejectedValue(
+      new ApiError(409, "Este horário está livre: reserve direto.", "HORARIO_LIVRE"),
+    );
+    render(<CourtBooking id={QUADRA} />);
+    await screen.findByRole("button", { name: /11:00/ });
+    const leiturasAntes = disponibilidade.mock.calls.length;
+
+    fireEvent.click(screen.getByRole("button", { name: /11:00/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "Me avise" }));
+
+    await waitFor(() =>
+      expect(disponibilidade.mock.calls.length).toBeGreaterThan(leiturasAntes),
+    );
+  });
+
+  it("AC-019 — a data da URL abre naquele dia", async () => {
+    render(<CourtBooking id={QUADRA} dataInicial="2099-03-15" />);
+
+    await waitFor(() => expect(disponibilidade).toHaveBeenCalled());
+    expect(disponibilidade.mock.calls[0]).toEqual([QUADRA, "2099-03-15"]);
+  });
+});
+
+describe("SPEC-074/AC-019 — `dataInicialDaUrl`", () => {
+  const HOJE = "2026-09-25";
+
+  it.each([
+    ["2026-10-02", "2026-10-02"],
+    ["2026-09-25", "2026-09-25"],
+    ["2026-09-24", HOJE],
+    ["2026-13-40", HOJE],
+    ["2026-02-30", HOJE],
+    ["02/10/2026", HOJE],
+    ["", HOJE],
+    [undefined, HOJE],
+  ])("%p → %p", (valor, esperado) => {
+    expect(dataInicialDaUrl(valor, HOJE)).toBe(esperado);
   });
 });

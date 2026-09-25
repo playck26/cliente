@@ -850,6 +850,43 @@ export async function desmarcarReposicao(id: string): Promise<void> {
 }
 
 /**
+ * SPEC-074 — **a pré-reserva: pedir aviso de um horário ocupado.**
+ *
+ * O aluno toca num horário OCUPADO da grade e pede para ser avisado; quando ele
+ * vagar, todos que pediram recebem o aviso, e **quem reservar primeiro fica com
+ * ele** — o aviso não segura nada (LIM-074a). Só o INÍCIO do slot vai no
+ * corpo: o fim é o servidor que diz.
+ */
+export type PreReserva = components["schemas"]["PreReservaResponseDto"];
+
+/** Os pedidos VIVOS do aluno, por início do horário. */
+export async function listarMinhasPreReservas(): Promise<PreReserva[]> {
+  const res = await authFetch("/me/pre-reservas");
+  return (await res.json()) as PreReserva[];
+}
+
+/**
+ * Pode recusar, e cada recusa tem código: `HORARIO_LIVRE` (vagou enquanto a
+ * tela estava aberta — reserve direto), `HORARIO_JA_E_SEU`,
+ * `PRE_RESERVA_DUPLICADA`, `LIMITE_DE_PRE_RESERVAS` e as mesmas de reservar.
+ */
+export async function pedirPreReserva(pedido: {
+  quadraId: string;
+  data: string;
+  horaInicio: string;
+}): Promise<PreReserva> {
+  const res = await authFetch("/me/pre-reservas", {
+    method: "POST",
+    body: JSON.stringify(pedido),
+  });
+  return (await res.json()) as PreReserva;
+}
+
+export async function cancelarPreReserva(id: string): Promise<void> {
+  await authFetch(`/me/pre-reservas/${id}`, { method: "DELETE" });
+}
+
+/**
  * SPEC-064/TASK-005 — **a fila de espera, pelo lado do aluno.**
  *
  * A fila existe no Back desde 20/09 e **nenhuma tela a usava**: só o arquivo
