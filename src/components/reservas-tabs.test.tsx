@@ -34,6 +34,11 @@ vi.mock("@/components/my-bookings-list", () => ({
     <div data-testid="lista-de-reservas" data-aba={aba} />
   ),
 }));
+// SPEC-074: os avisos de horário também são mockados — o que está em teste aqui
+// é EM QUAL aba eles aparecem, não o que mostram (a lista tem as provas dela).
+vi.mock("@/components/avisos-de-horario", () => ({
+  AvisosDeHorario: () => <div data-testid="avisos-de-horario" />,
+}));
 vi.mock("@/components/top-app-bar", () => ({ TopAppBar: () => null }));
 vi.mock("@/components/bottom-nav", () => ({ BottomNav: () => null }));
 
@@ -155,5 +160,18 @@ describe("a prova olha para o que diz olhar", () => {
     expect(normalizarAbaDeReservas("")).toBe(ABA_PADRAO);
     expect(normalizarAbaDeReservas("ANTERIORES")).toBe(ABA_PADRAO);
     expect(normalizarAbaDeReservas("anteriores ")).toBe(ABA_PADRAO);
+  });
+});
+
+describe("SPEC-074/D10 — os avisos de horário moram na aba Reservas", () => {
+  it("aparecem em Reservas", () => {
+    render(<ReservasTabs />);
+    expect(screen.getByTestId("avisos-de-horario")).toBeInTheDocument();
+  });
+
+  it("NÃO aparecem em Anteriores, que é histórico", () => {
+    params.valor = "aba=anteriores";
+    render(<ReservasTabs />);
+    expect(screen.queryByTestId("avisos-de-horario")).not.toBeInTheDocument();
   });
 });

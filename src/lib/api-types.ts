@@ -1892,6 +1892,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/pre-reservas": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["MePreReservasController_meus"];
+        put?: never;
+        post: operations["MePreReservasController_pedir"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/pre-reservas/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete: operations["MePreReservasController_cancelar"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2664,10 +2696,14 @@ export interface components {
             prazoCancelamentoReservaHoras: number | null;
             /** @example 150 */
             precoAulaPadrao: number | null;
+            /** @example null */
+            antecedenciaFilaAulaHoras: number | null;
             /** @example Quadra */
             nomeTipoQuadra: string;
             /** @example Aula particular */
             nomeTipoAula: string;
+            /** @example 2 */
+            antecedenciaFilaAulaPadraoHoras: number;
         };
         MinhaEmpresaResponseDto: {
             /** Format: uuid */
@@ -3023,6 +3059,11 @@ export interface components {
              * @example 150
              */
             precoAulaPadrao?: number | null;
+            /**
+             * @description Com quantas horas antes da aula a fila de espera de AULA ainda chama alguem. `null` = usa o padrao do servidor (`antecedenciaFilaAulaPadraoHoras`). Nao vale para a fila de turma.
+             * @example 2
+             */
+            antecedenciaFilaAulaHoras?: number | null;
         };
         ConfigOperacaoResponseDto: {
             /** @example 2 */
@@ -3031,6 +3072,8 @@ export interface components {
             prazoCancelamentoReservaHoras: number | null;
             /** @example 150 */
             precoAulaPadrao: number | null;
+            /** @example null */
+            antecedenciaFilaAulaHoras: number | null;
         };
         DiaDaAgendaResponseDto: {
             /** @example 2026-09-01 */
@@ -4251,6 +4294,39 @@ export interface components {
              * @example 5f7c1e2a-0000-4000-8000-000000000004
              */
             reposicaoId: string | null;
+        };
+        PreReservaResponseDto: {
+            /** @example 5f7c1e2a-0000-4000-8000-000000000003 */
+            id: string;
+            /** @example 5f7c1e2a-0000-4000-8000-000000000001 */
+            quadraId: string;
+            /** @example 2026-10-02 */
+            data: string;
+            /** @example 19:00 */
+            horaInicio: string;
+            /** @example 20:00 */
+            horaFim: string;
+            /**
+             * @description Nasce `aguardando`. Quem o muda para `avisada` é o varredor (SPEC-074/D3), nunca esta rota.
+             * @example aguardando
+             */
+            estado: string;
+            /** @example 2026-09-25T12:31:00.000Z */
+            criadaEm: string;
+        };
+        PedirPreReservaDto: {
+            /** @example 5f7c1e2a-0000-4000-8000-000000000001 */
+            quadraId: string;
+            /**
+             * @description AAAA-MM-DD
+             * @example 2026-10-02
+             */
+            data: string;
+            /**
+             * @description O início do slot, em hora cheia. O fim é o servidor que diz.
+             * @example 19:00
+             */
+            horaInicio: string;
         };
     };
     responses: never;
@@ -7636,7 +7712,10 @@ export interface operations {
     };
     MeReposicoesController_oportunidades: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Inclui as ocorrencias SEM VAGA (`vagas: 0`), para o aluno poder entrar na fila de espera delas (card 5331). Sem o parametro, so as que tem vaga — o comportamento de antes desta task. */
+                incluirSemVaga?: boolean;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -8118,6 +8197,95 @@ export interface operations {
         requestBody?: never;
         responses: {
             204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MePreReservasController_meus: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreReservaResponseDto"][];
+                };
+            };
+        };
+    };
+    MePreReservasController_pedir: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PedirPreReservaDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PreReservaResponseDto"];
+                };
+            };
+            /** @description A quadra não existe nesta empresa. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description O horário está livre (`HORARIO_LIVRE`), já é do aluno (`HORARIO_JA_E_SEU`), ou o aviso já foi pedido (`PRE_RESERVA_DUPLICADA`). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Aluno inativo (`ALUNO_INATIVO`), quadra fora de operação (`QUADRA_INATIVA`), horário que já começou (`HORARIO_NO_PASSADO`), fora do expediente (`FORA_DO_EXPEDIENTE`) ou teto de avisos ativos (`LIMITE_DE_PRE_RESERVAS`). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    MePreReservasController_cancelar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description O pedido não existe, é de outro aluno ou já terminou — os três no mesmo `404`, que não revela o pedido de ninguém. */
+            404: {
                 headers: {
                     [name: string]: unknown;
                 };

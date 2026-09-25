@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
+  Bell,
   CheckCircle2,
   CreditCard,
   MessageCircle,
@@ -21,14 +22,18 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   ApiError,
+  cancelarPreReserva,
   createBooking,
   getAvailability,
   getMinhaCarteira,
   getPublicPaymentConfig,
+  listarMinhasPreReservas,
   listCourts,
+  pedirPreReserva,
   type Availability,
   type Court,
   type ItemDoPedido,
+  type PreReserva,
   type PublicPaymentConfig,
 } from "@/lib/api-client";
 import { hojeNoClubeIso, isoDeOffsetNoClube } from "@/lib/fuso";
@@ -70,12 +75,40 @@ function formatarDataCurta(iso: string): string {
   return `${DIAS_SEMANA_CURTO[data.getUTCDay()]}, ${String(dia).padStart(2, "0")}/${String(mes).padStart(2, "0")}`;
 }
 
+/**
+ * SPEC-074/D10 — **a data que veio pela URL** (`/quadras/<id>?data=AAAA-MM-DD`),
+ * que é por onde o aviso de horário livre traz o aluno ao dia certo.
+ *
+ * **Malformada, inexistente ou anterior a hoje cai em HOJE, sem erro**: a URL
+ * vem de um aviso que pode ser antigo, e uma tela de erro para "o horário já
+ * passou" puniria quem só tocou numa notificação velha. O dia que existe é
+ * conferido por ida e volta — regex não sabe quantos dias tem fevereiro
+ * (DEF-020).
+ */
+export function dataInicialDaUrl(
+  valor: string | undefined,
+  hoje: string = hojeNoClubeIso(),
+): string {
+  if (!valor || !/^\d{4}-\d{2}-\d{2}$/.test(valor)) return hoje;
+  const [ano, mes, dia] = valor.split("-").map(Number);
+  const montada = new Date(Date.UTC(ano, mes - 1, dia));
+  if (montada.toISOString().slice(0, 10) !== valor) return hoje;
+  return valor < hoje ? hoje : valor;
+}
+
 // REQ-005 (SPEC-005): grade de disponibilidade + reserva múltipla.
-export function CourtBooking({ id }: { id: string }) {
+export function CourtBooking({
+  id,
+  dataInicial,
+}: {
+  id: string;
+  /** SPEC-074/D10 — o `?data=` da URL, cru; quem valida é `dataInicialDaUrl`. */
+  dataInicial?: string;
+}) {
   const router = useRouter();
   const [quadra, setQuadra] = useState<Court | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [data, setData] = useState(() => hojeNoClubeIso());
+  const [data, setData] = useState(() => dataInicialDaUrl(dataInicial));
   // Resolvidas na montagem, não no import: ver `datasDisponiveis`.
   const [datasDaGrade] = useState(datasDisponiveis);
   const [availability, setAvailability] = useState<Availability | null>(null);
@@ -111,6 +144,25 @@ export function CourtBooking({ id }: { id: string }) {
    * reservaria sem a pessoa ter visto a lista. O seletor avisa; o botão espera.
    */
   const [adicionaisCarregando, setAdicionaisCarregando] = useState(false);
+  /**
+   * SPEC-074/D10 — **os avisos de horário do aluno, e o horário ocupado que ele
+   * tocou.** O slot ocupado deixou de ser `disabled`: tocar abre a confirmação
+   * de pedir aviso, e **nunca** entra na seleção de reserva.
+   */
+  const [meusAvisos, setMeusAvisos] = useState<PreReserva[]>([]);
+  const [slotOcupado, setSlotOcupado] = useState<string | null>(null);
+  const [avisoEnviando, setAvisoEnviando] = useState(false);
+  const [avisoErro, setAvisoErro] = useState<string | null>(null);
+  const [avisoMensagem, setAvisoMensagem] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Falha aqui não derruba a tela: sem a lista, o aluno perde o "Aviso
+    // ativo" no slot, não a grade. Professor e gestor caem no `403`, e para
+    // eles o silêncio é o certo.
+    listarMinhasPreReservas()
+      .then(setMeusAvisos)
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     listCourts()
@@ -162,6 +214,11 @@ export function CourtBooking({ id }: { id: string }) {
     // desta PR, que reproduziu o caso antes de eu acreditar nele.
     setBookingError(null);
     if (!manterConfirmacao) setBookingOk(false);
+    // SPEC-074 — a confirmação de aviso é de UM horário de UM dia; trocar de
+    // dia a fecha, pelo mesmo motivo que o erro da reserva morre aqui.
+    setSlotOcupado(null);
+    setAvisoErro(null);
+    setAvisoMensagem(null);
     try {
       const result = await getAvailability(id, targetData);
       setAvailability(result);
@@ -188,6 +245,68 @@ export function CourtBooking({ id }: { id: string }) {
         ? atual.filter((slot) => slot !== rotulo)
         : [...atual, rotulo],
     );
+  }
+
+  /** O aviso vivo do aluno para ESTE slot, desta quadra, deste dia. */
+  function avisoDoSlot(rotulo: string): PreReserva | undefined {
+    const [inicio] = rotulo.split("-");
+    return meusAvisos.find(
+      (a) => a.quadraId === id && a.data === data && a.horaInicio === inicio,
+    );
+  }
+
+  /**
+   * SPEC-074/AC-018 — **tocar um horário ocupado abre a confirmação**, e não
+   * seleciona nada: ocupado nunca entra no pedido de reserva.
+   */
+  function tocarOcupado(rotulo: string) {
+    setAvisoErro(null);
+    setAvisoMensagem(null);
+    setSlotOcupado((atual) => (atual === rotulo ? null : rotulo));
+  }
+
+  async function pedirAviso(rotulo: string) {
+    const [horaInicio] = rotulo.split("-");
+    setAvisoErro(null);
+    setAvisoEnviando(true);
+    try {
+      const pedido = await pedirPreReserva({ quadraId: id, data, horaInicio });
+      setMeusAvisos((atual) => [...atual, pedido]);
+      setAvisoMensagem(
+        "Pronto: se este horário vagar, você recebe um aviso. Quem reservar primeiro fica com ele.",
+      );
+    } catch (err) {
+      setAvisoErro(
+        err instanceof ApiError
+          ? err.message
+          : "Não foi possível pedir o aviso. Tente de novo.",
+      );
+      // Vagou enquanto a tela estava aberta: a grade velha mente, e o aluno
+      // pode reservar direto.
+      if (err instanceof ApiError && err.code === "HORARIO_LIVRE") {
+        void loadAvailability(data);
+      }
+    } finally {
+      setAvisoEnviando(false);
+    }
+  }
+
+  async function cancelarAviso(aviso: PreReserva) {
+    setAvisoErro(null);
+    setAvisoEnviando(true);
+    try {
+      await cancelarPreReserva(aviso.id);
+      setMeusAvisos((atual) => atual.filter((a) => a.id !== aviso.id));
+      setAvisoMensagem("Aviso cancelado.");
+    } catch (err) {
+      setAvisoErro(
+        err instanceof ApiError
+          ? err.message
+          : "Não foi possível cancelar o aviso. Tente de novo.",
+      );
+    } finally {
+      setAvisoEnviando(false);
+    }
   }
 
   // SPEC-033 — a reserva nasce `pago` quando o crédito cobre. Sem isto a tela
@@ -470,22 +589,33 @@ export function CourtBooking({ id }: { id: string }) {
                     const livre = slot.status === "livre";
                     const selecionado = slotsSelecionados.includes(slot.slot);
                     const [inicio] = slot.slot.split("-");
+                    const comAviso = !livre && avisoDoSlot(slot.slot);
                     return (
                       <button
                         key={slot.slot}
                         type="button"
-                        disabled={!livre}
-                        onClick={() => alternarSlot(slot.slot)}
-                        aria-pressed={selecionado}
-                        className={`flex min-h-12 flex-col items-center justify-center rounded-2xl px-1 text-[13px] font-extrabold transition-colors ${!livre ? "cursor-not-allowed bg-[var(--color-surface-container-high)] text-[var(--color-text-secondary)] opacity-50" : selecionado ? "bg-[var(--color-primary-strong)] text-white shadow-[var(--shadow-glow)]" : "bg-[var(--color-surface-container)] text-[var(--color-text-secondary)] hover:text-[var(--color-primary-strong)]"}`}
+                        // SPEC-074/D10 — o ocupado deixou de ser `disabled`:
+                        // tocar abre a confirmação de aviso, e NUNCA seleciona.
+                        onClick={() =>
+                          livre
+                            ? alternarSlot(slot.slot)
+                            : tocarOcupado(slot.slot)
+                        }
+                        aria-pressed={livre ? selecionado : undefined}
+                        aria-expanded={
+                          livre ? undefined : slotOcupado === slot.slot
+                        }
+                        className={`flex min-h-12 flex-col items-center justify-center rounded-2xl px-1 text-[13px] font-extrabold transition-colors ${!livre ? (comAviso ? "bg-[var(--color-secondary-container)] text-[var(--color-primary-strong)] ring-1 ring-[var(--color-primary-strong)]/40" : "bg-[var(--color-surface-container-high)] text-[var(--color-text-secondary)] opacity-60") : selecionado ? "bg-[var(--color-primary-strong)] text-white shadow-[var(--shadow-glow)]" : "bg-[var(--color-surface-container)] text-[var(--color-text-secondary)] hover:text-[var(--color-primary-strong)]"}`}
                       >
                         {inicio}
                         <span className="mt-0.5 text-[9px] font-bold opacity-75">
                           {livre
                             ? "Livre"
-                            : slot.status === "ocupado_turma"
-                              ? "Turma"
-                              : "Reservado"}
+                            : comAviso
+                              ? "Aviso ativo"
+                              : slot.status === "ocupado_turma"
+                                ? "Turma"
+                                : "Reservado"}
                         </span>
                       </button>
                     );
@@ -493,6 +623,83 @@ export function CourtBooking({ id }: { id: string }) {
                 </div>
               ) : null}
             </section>
+
+            {/*
+              SPEC-074/D10 — a confirmação do aviso de horário. Em linha, e não
+              num diálogo: é o padrão das confirmações deste app (a saída da
+              conta, no topo), e o slot tocado continua à vista logo acima.
+            */}
+            {slotOcupado
+              ? (() => {
+                  const aviso = avisoDoSlot(slotOcupado);
+                  const [inicio] = slotOcupado.split("-");
+                  return (
+                    <section
+                      aria-label="Aviso de horário"
+                      className="space-y-3 rounded-3xl bg-surface p-4 shadow-[var(--shadow-low)] ring-1 ring-border"
+                    >
+                      <p className="flex items-start gap-2 text-sm font-semibold">
+                        <Bell
+                          className="mt-0.5 size-4 shrink-0 text-[var(--color-primary-strong)]"
+                          aria-hidden="true"
+                        />
+                        {aviso
+                          ? `Você vai ser avisado se o horário das ${inicio} vagar.`
+                          : "Este horário está ocupado. Quer ser avisado se ele vagar?"}
+                      </p>
+                      {!aviso ? (
+                        <p className="text-[13px] text-[var(--color-text-secondary)]">
+                          Se vagar, todo mundo que pediu recebe o aviso ao mesmo
+                          tempo, e quem reservar primeiro fica com ele.
+                        </p>
+                      ) : null}
+                      {avisoErro ? (
+                        <p
+                          role="alert"
+                          className="text-sm font-semibold text-[var(--color-error)]"
+                        >
+                          {avisoErro}
+                        </p>
+                      ) : null}
+                      {avisoMensagem ? (
+                        <p
+                          role="status"
+                          className="text-sm font-semibold text-[var(--color-primary-strong)]"
+                        >
+                          {avisoMensagem}
+                        </p>
+                      ) : null}
+                      <div className="flex gap-2">
+                        {aviso ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={avisoEnviando}
+                            onClick={() => void cancelarAviso(aviso)}
+                          >
+                            Cancelar aviso
+                          </Button>
+                        ) : (
+                          <Button
+                            type="button"
+                            disabled={avisoEnviando}
+                            onClick={() => void pedirAviso(slotOcupado)}
+                          >
+                            Me avise
+                          </Button>
+                        )}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          onClick={() => setSlotOcupado(null)}
+                        >
+                          {aviso ? "Fechar" : "Agora não"}
+                        </Button>
+                      </div>
+                    </section>
+                  );
+                })()
+              : null}
 
             {slotsSelecionados.length > 0 ? (
               <PassoDeAdicionais

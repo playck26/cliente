@@ -1,5 +1,6 @@
 "use client";
 
+import { AvisosDeHorario } from "@/components/avisos-de-horario";
 import { BottomNav } from "@/components/bottom-nav";
 import { MyBookingsList } from "@/components/my-bookings-list";
 import { TopAppBar } from "@/components/top-app-bar";
@@ -105,6 +106,12 @@ export function ReservasTabs() {
         aria-labelledby={`aba-${ativa}`}
         className="mt-5"
       >
+        {/*
+          SPEC-074/D10 — os avisos de horário, só na aba "Reservas": é onde o
+          aluno acompanha o que pediu, e "Anteriores" é histórico. Sem avisos,
+          o componente não desenha nada.
+        */}
+        {ativa === "reservas" ? <AvisosDeHorario /> : null}
         {/*
           A `key` força remontar ao trocar de aba, e isso é de propósito: sem
           ela o React reaproveitaria a instância, e a página em que a pessoa
