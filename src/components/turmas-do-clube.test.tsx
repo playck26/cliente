@@ -104,6 +104,48 @@ describe("SPEC-064 — a fila nasce onde a recusa aparece", () => {
     ).not.toBeInTheDocument();
   });
 
+  /**
+   * **A interação que NENHUMA das duas specs mediu, e ela é uma perda.**
+   *
+   * O botão da fila mora **dentro** do card, e o card só existe para turma
+   * `visivel` — `turmas.filter((t) => apareceParaMim(t, meuNivelId, false))`.
+   * Logo: **turma cheia de OUTRO nível não tem porta de entrada na fila.**
+   *
+   * Antes da SPEC-072 o escape "Todas" a revelava, e o aluno podia entrar na
+   * fila dela. A `LIM-072a` mediu o custo da remoção na **reposição** (2 de 3
+   * reais eram fora do nível) e **não** na fila de espera — este caso é o
+   * custo que faltava medir.
+   *
+   * O teste fixa o comportamento **atual**, que é o que a `D1` manda. Ele
+   * existe para que a perda seja visível em código, e não descoberta por um
+   * aluno que esperava uma vaga que ninguém ia lhe oferecer.
+   */
+  it("turma CHEIA de outro nível não oferece fila — o card nem existe (custo da D1)", async () => {
+    getMeuCadastro.mockResolvedValue({ nivelId: "nivel-a" });
+    listTurmasDisponiveis.mockResolvedValue([
+      turma({
+        id: "t-cheia-de-outro-nivel",
+        nome: "Avançados Cheia",
+        nivelId: "nivel-b",
+        nivelNome: "B",
+        matriculados: 8,
+        podeEntrar: false,
+        motivo: "TURMA_CHEIA",
+      }),
+    ]);
+
+    render(<TurmasDoClube />);
+
+    // O recorte come o card inteiro, e com ele a única porta da fila.
+    expect(
+      await screen.findByText(/Nenhuma turma do seu nível/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Avançados Cheia")).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Entrar na fila de espera" }),
+    ).toBeNull();
+  });
+
   it("já na fila, o botão vira SAIR e usa o id da linha", async () => {
     listTurmasDisponiveis.mockResolvedValue([
       turma({ matriculados: 8, podeEntrar: false, motivo: "TURMA_CHEIA" }),
