@@ -202,6 +202,7 @@ export function CalendarioDoAluno({
   nomes = NOMES_PADRAO,
   mostrarLinkDaTurma = true,
   onJanela,
+  carregando = false,
 }: {
   compromissos: Compromisso[];
   /** Os nomes que o clube deu aos tipos de reserva (SPEC-054/D1). */
@@ -210,6 +211,12 @@ export function CalendarioDoAluno({
   mostrarLinkDaTurma?: boolean;
   /** Avisado ao trocar de mês, para o pai pedir a janela nova. */
   onJanela?: (janela: { de: string; ate: string }) => void;
+  /**
+   * SPEC-073/D2 — a grade desenha antes do dado, como a do professor. Enquanto
+   * isto for verdadeiro a lista embaixo **não diz "nenhum compromisso"**:
+   * afirmar vazio antes de saber é o que a SPEC-057/AC-019 tirou do hero.
+   */
+  carregando?: boolean;
 }) {
   const hoje = hojeNoClube();
   const [ano, setAno] = useState(hoje.ano);
@@ -370,7 +377,14 @@ export function CalendarioDoAluno({
       </div>
 
       {/* AC-004 — mês vazio é informação, não erro. */}
-      {doMes.length === 0 ? (
+      {carregando ? (
+        <p
+          role="status"
+          className="px-1 text-[13px] font-semibold text-[var(--color-text-secondary)]"
+        >
+          Carregando sua agenda…
+        </p>
+      ) : doMes.length === 0 ? (
         <p className="px-1 text-[13px] font-semibold text-[var(--color-text-secondary)]">
           Nenhum compromisso neste mês.
         </p>
