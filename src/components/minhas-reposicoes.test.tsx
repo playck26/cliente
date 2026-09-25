@@ -19,6 +19,12 @@ const getMeuCadastro = vi.hoisted(() => vi.fn());
 const listarOportunidadesDeReposicao = vi.hoisted(() => vi.fn());
 const marcarReposicao = vi.hoisted(() => vi.fn());
 const desmarcarReposicao = vi.hoisted(() => vi.fn());
+// SPEC-064/TASK-007 — a tela passou a ler a propria fila e a entrar/sair dela.
+// **Mocados de proposito:** sem isto o `listarMinhaFila` REAL rodava, falhava no
+// jsdom e caia no `catch` — as provas ficavam verdes por acidente de rede.
+const listarMinhaFila = vi.hoisted(() => vi.fn());
+const entrarNaFilaDeAula = vi.hoisted(() => vi.fn());
+const sairDaFila = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/api-client", async () => {
   const real =
@@ -32,6 +38,9 @@ vi.mock("@/lib/api-client", async () => {
     listarOportunidadesDeReposicao,
     marcarReposicao,
     desmarcarReposicao,
+    listarMinhaFila,
+    entrarNaFilaDeAula,
+    sairDaFila,
   };
 });
 
@@ -80,6 +89,9 @@ beforeEach(() => {
   getMeuCadastro.mockResolvedValue({ nivelId: null });
   getMeuCreditoDeReposicao.mockResolvedValue(credito());
   listarOportunidadesDeReposicao.mockResolvedValue([oportunidade]);
+  listarMinhaFila.mockResolvedValue([]);
+  entrarNaFilaDeAula.mockResolvedValue(undefined);
+  sairDaFila.mockResolvedValue(undefined);
 });
 
 describe("SPEC-046 — aulas para repor", () => {
@@ -342,5 +354,122 @@ describe("SPEC-072/TASK-002 — nível nas oportunidades, SEM escape", () => {
     await abrirEscolha();
 
     expect(await screen.findByText("Iniciante Quinta")).toBeInTheDocument();
+  });
+});
+
+/**
+ * SPEC-064/TASK-007 — **a aula cheia oferece a fila de espera** (card 5331).
+ *
+ * *"Usuário quer repor aula, encontra aula para repor, mas não tem vaga. Deixa
+ * o aviso de interesse."* Até esta task ele nunca encontrava: o Back descartava
+ * a aula cheia, e `entrarNaFilaDeAula` existia sem nenhum componente que a
+ * chamasse.
+ */
+describe("SPEC-064/TASK-007 — a fila de espera numa aula CHEIA", () => {
+  const cheia = { ...oportunidade, ocupacaoId: "oc-cheia", vagas: 0 };
+
+  const abrirEscolha = async () => {
+    render(<MinhasReposicoes />);
+    fireEvent.click(await screen.findByText("Repor"));
+  };
+
+  /**
+   * **Sem este pedido, o Back nunca manda a cheia** — e todo o resto desta
+   * task é inalcançável. Pedir sem o parâmetro é a regressão que este caso
+   * pega.
+   */
+  it("a tela PEDE as aulas sem vaga", async () => {
+    await abrirEscolha();
+
+    await waitFor(() => {
+      expect(listarOportunidadesDeReposicao).toHaveBeenCalledWith({
+        incluirSemVaga: true,
+      });
+    });
+  });
+
+  it("aula cheia: diz 'sem vaga' e oferece ENTRAR na fila, não Marcar", async () => {
+    listarOportunidadesDeReposicao.mockResolvedValue([cheia]);
+
+    await abrirEscolha();
+
+    expect(await screen.findByText(/sem vaga/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "Entrar na fila de espera desta aula",
+      }),
+    ).toBeInTheDocument();
+    // "Marcar" numa aula cheia levaria a `409 TURMA_SEM_VAGA`.
+    expect(screen.queryByRole("button", { name: "Marcar" })).toBeNull();
+  });
+
+  it("entrar na fila chama a rota com o id da OCORRÊNCIA, e relê a fila", async () => {
+    listarOportunidadesDeReposicao.mockResolvedValue([cheia]);
+
+    await abrirEscolha();
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Entrar na fila de espera desta aula",
+      }),
+    );
+
+    await waitFor(() => {
+      expect(entrarNaFilaDeAula).toHaveBeenCalledWith("oc-cheia");
+    });
+    // Relida depois do gesto: é o que faz o botão virar "Sair da fila".
+    await waitFor(() => {
+      expect(listarMinhaFila.mock.calls.length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  it("já na fila DESTA aula: oferece SAIR, com o id da LINHA", async () => {
+    listarOportunidadesDeReposicao.mockResolvedValue([cheia]);
+    listarMinhaFila.mockResolvedValue([
+      { id: "linha-3", fila: "aula", ocupacaoId: "oc-cheia" },
+    ]);
+
+    await abrirEscolha();
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Você está na fila de espera desta aula — sair",
+      }),
+    );
+
+    // A rota de saída pede o id da LINHA, não o da ocupação.
+    await waitFor(() => {
+      expect(sairDaFila).toHaveBeenCalledWith("linha-3");
+    });
+  });
+
+  /** A recusa aparece — o mesmo princípio da AC-009 da SPEC-072. */
+  it("a recusa ao entrar na fila aparece na tela", async () => {
+    listarOportunidadesDeReposicao.mockResolvedValue([cheia]);
+    entrarNaFilaDeAula.mockRejectedValue(
+      new ApiError(409, "Você já está nesta fila.", "JA_NA_FILA"),
+    );
+
+    await abrirEscolha();
+    fireEvent.click(
+      await screen.findByRole("button", {
+        name: "Entrar na fila de espera desta aula",
+      }),
+    );
+
+    expect(
+      await screen.findByText("Você já está nesta fila."),
+    ).toBeInTheDocument();
+  });
+
+  it("aula COM vaga continua sendo Marcar — nada muda para ela", async () => {
+    await abrirEscolha();
+
+    expect(
+      await screen.findByRole("button", { name: "Marcar" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", {
+        name: "Entrar na fila de espera desta aula",
+      }),
+    ).toBeNull();
   });
 });

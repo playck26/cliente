@@ -138,6 +138,10 @@ const RESPOSTAS: Record<string, Record<string, unknown> | unknown[] | null> = {
     faltas: [FALTA],
   },
   "/api/v1/me/reposicoes/oportunidades": [OPORTUNIDADE],
+  // SPEC-064/TASK-007 — a tela passou a ler a propria fila, para saber se
+  // oferece "entrar" ou "sair" numa aula cheia. Vazia: a geometria que esta
+  // prova mede e a da linha com "Marcar", e ela nao muda.
+  "/api/v1/me/fila-de-espera": [],
 };
 
 /**
