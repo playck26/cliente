@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
@@ -13,6 +13,7 @@ import {
 } from "@/components/calendario-do-aluno";
 import { CartaoDaProximaAula } from "@/components/cartao-da-proxima-aula";
 import { TopAppBar } from "@/components/top-app-bar";
+import { getPapel } from "@/lib/auth-storage";
 import { hojeNoClube } from "@/lib/fuso";
 import {
   NOMES_PADRAO,
@@ -28,6 +29,19 @@ import {
   type MyClass,
   type Usuario,
 } from "@/lib/api-client";
+
+/** O `subscribe` do `useSyncExternalStore`: o papel só muda no login e no logout, e os dois navegam. */
+const NAO_MUDA = () => () => {};
+
+/**
+ * SPEC-073/D1 — **aulas e reservas saem juntas**, e antes saíam em fila: as
+ * reservas só eram pedidas depois que as aulas chegavam. `allSettled`, e não
+ * `all`, pela SPEC-059/D5 — a falha de uma não derruba a outra — e porque ela
+ * nunca rejeita: a busca adiantada pode ser largada sem virar erro solto.
+ */
+function buscarAgenda(janela: { de: string; ate: string }) {
+  return Promise.allSettled([listMyClasses(janela), listMyBookings(janela)]);
+}
 
 /**
  * SPEC-005/REQ-001 — a primeira tela do aluno.
@@ -98,6 +112,19 @@ export function HomeView() {
   );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * SPEC-073 — o papel gravado no login, lido como a `BottomNav` lê:
+   * `useSyncExternalStore`, porque o `localStorage` não existe no servidor e
+   * lê-lo no corpo quebraria a hidratação. O servidor vê `null` ("não sei") e
+   * desenha o esqueleto de sempre.
+   */
+  const papelGuardado = useSyncExternalStore(NAO_MUDA, getPapel, () => null);
+  /**
+   * SPEC-073/D3 — **qual pedido de agenda ainda pinta a grade.** O molde é o
+   * DEF-021 do professor: duas setas rápidas, ou uma seta durante a carga
+   * inicial, e a resposta velha chegava por último pintando o mês errado.
+   */
+  const pedidoDaAgenda = useRef(0);
 
   // DEF-007 (2026-08-24) — três defeitos empilhados, achados em produção:
   //
@@ -124,53 +151,65 @@ export function HomeView() {
   useEffect(() => {
     let ativo = true;
 
+    const hoje = hojeNoClube();
+    const daqui60Dias = new Date(
+      Date.UTC(hoje.ano, hoje.mes - 1, hoje.dia + 60),
+    )
+      .toISOString()
+      .slice(0, 10);
+    const janela = {
+      de: janelaDoMes(hoje.ano, hoje.mes).de,
+      ate: daqui60Dias,
+    };
+    const meuPedido = ++pedidoDaAgenda.current;
+
+    // SPEC-073/D1 — **com o papel guardado de aluno, a agenda não espera o
+    // `getMe()`.** Eram três idas em fila (`me` → aulas → reservas), e a do
+    // professor é uma. O papel guardado só decide QUANDO pedir: quem decide o
+    // que pinta continua sendo o `getMe()` logo abaixo, e o servidor recusa o
+    // que não for do papel (INV-073a).
+    const adiantada = getPapel() === "aluno" ? buscarAgenda(janela) : null;
+
     getMe()
       .then(async (usuarioData) => {
         if (!ativo) return;
         setUsuario(usuarioData);
 
+        // Resposta adiantada de quem não é aluno é descartada sem pintar
+        // (AC-003). Ela não rejeita — `allSettled` —, então largar a promessa
+        // aqui não vira erro solto.
         if (usuarioData.role !== "aluno") return;
 
-        try {
-          const hoje = hojeNoClube();
-          const daqui60Dias = new Date(
-            Date.UTC(hoje.ano, hoje.mes - 1, hoje.dia + 60),
-          )
-            .toISOString()
-            .slice(0, 10);
-          const janela = {
-            de: janelaDoMes(hoje.ano, hoje.mes).de,
-            ate: daqui60Dias,
-          };
-          const aulasData = await listMyClasses(janela);
-          if (ativo) {
-            setAulasDoCartao(aulasData);
-            setCompromissos(aulasData.map(deAula));
-          }
+        const [aulas, reservas] = await (adiantada ?? buscarAgenda(janela));
+        if (!ativo) return;
 
-          // SPEC-059/D5 — **a falha de uma não derruba a outra.** Sem as
-          // reservas, a grade mostra as aulas e o aviso ocupa o lugar do que
-          // faltou. Meia agenda com aviso é melhor que tela vazia (AC-019 da
-          // SPEC-057, aplicada de novo).
-          try {
-            const reservas = await listMyBookings(janela);
-            if (ativo) {
-              setCompromissos([
-                ...aulasData.map(deAula),
-                ...reservas.itens.map(deReserva),
-              ]);
-              // O teto da varredura é declarado, não escondido: se ele cortou,
-              // a tela avisa em vez de mostrar meia agenda como se fosse
-              // inteira (achado da validação independente).
-              if (reservas.truncou) setReservasIndisponiveis(true);
-            }
-          } catch {
-            if (ativo) setReservasIndisponiveis(true);
-          }
-        } catch {
+        if (aulas.status === "rejected") {
           // A agenda é dado secundário: sem ela a home fica de pé, e o
           // aviso ocupa o lugar dela em vez do lugar da tela.
-          if (ativo) setAgendaIndisponivel(true);
+          setAgendaIndisponivel(true);
+          return;
+        }
+
+        // SPEC-073/D3 — o cartão é SEMPRE desta carga: ele olha a próxima
+        // aula, não o mês que o aluno foi espiar enquanto ela chegava.
+        setAulasDoCartao(aulas.value);
+
+        // SPEC-059/D5 — **a falha de uma não derruba a outra.** Sem as
+        // reservas, a grade mostra as aulas e o aviso ocupa o lugar do que
+        // faltou. O teto da varredura é declarado, não escondido: se ele
+        // cortou, a tela avisa em vez de mostrar meia agenda como inteira.
+        const itensDeReserva =
+          reservas.status === "fulfilled" ? reservas.value.itens : [];
+        if (reservas.status === "rejected" || reservas.value.truncou) {
+          setReservasIndisponiveis(true);
+        }
+
+        // A grade, só se nenhuma troca de mês saiu depois desta carga.
+        if (pedidoDaAgenda.current === meuPedido) {
+          setCompromissos([
+            ...aulas.value.map(deAula),
+            ...itensDeReserva.map(deReserva),
+          ]);
         }
       })
       .catch((err: unknown) => {
@@ -192,6 +231,14 @@ export function HomeView() {
 
   const primeiroNome = usuario?.nome.split(" ")[0];
   const ehAluno = usuario?.role === "aluno";
+  /**
+   * SPEC-073/D2 — **a grade antes do dado.** Enquanto o `getMe()` não volta,
+   * o papel guardado basta para DESENHAR (navegação, não autorização — é o
+   * mesmo uso que a barra de baixo faz dele). Depois que ele volta, só ele
+   * vale.
+   */
+  const pareceAluno = usuario ? ehAluno : papelGuardado === "aluno";
+  const mostrarAgenda = !error && pareceAluno && !agendaIndisponivel;
 
   return (
     <main className="app-screen min-h-screen overflow-hidden bg-background pb-36">
@@ -227,7 +274,11 @@ export function HomeView() {
           </section>
         ) : null}
 
-        {loading && !error ? (
+        {/*
+          Sem papel guardado (sessão de antes do DEF-011) a home não sabe o
+          que desenhar até o `getMe()` voltar: fica o esqueleto de sempre.
+        */}
+        {loading && !error && !pareceAluno ? (
           <section
             className="h-[420px] animate-pulse rounded-3xl bg-[var(--color-surface-container)]"
             aria-label="Carregando sua agenda"
@@ -238,8 +289,17 @@ export function HomeView() {
           SPEC-058/D3 — o cartão vem ANTES do calendário: ele responde "quanto
           falta", que é a pergunta de quem abre o app com pressa. A grade, que
           responde "quando são as outras", vem logo abaixo.
+
+          SPEC-073/D2 — durante a carga, um esqueleto do tamanho do cartão:
+          o cartão vazio diria "Nenhuma aula marcada" antes de saber.
         */}
-        {!loading && !error && ehAluno && !agendaIndisponivel ? (
+        {mostrarAgenda && loading ? (
+          <section
+            className="h-[132px] animate-pulse rounded-3xl bg-[var(--color-surface-container)]"
+            aria-label="Carregando sua próxima aula"
+          />
+        ) : null}
+        {mostrarAgenda && !loading ? (
           <CartaoDaProximaAula aulas={aulasDoCartao} />
         ) : null}
 
@@ -249,12 +309,14 @@ export function HomeView() {
           falso: na home o cartão já leva à turma, e dois caminhos para o
           mesmo lugar na mesma tela foi o que a SPEC-057/D13 tirou.
         */}
-        {!loading && !error && ehAluno && !agendaIndisponivel ? (
+        {mostrarAgenda ? (
           <CalendarioDoAluno
             compromissos={compromissos}
             nomes={nomes}
             mostrarLinkDaTurma={false}
+            carregando={loading}
             onJanela={(janela) => {
+              const meuPedido = ++pedidoDaAgenda.current;
               Promise.all([
                 listMyClasses(janela),
                 listMyBookings(janela).catch(() => {
@@ -263,6 +325,9 @@ export function HomeView() {
                 }),
               ])
                 .then(([aulas, reservas]) => {
+                  // SPEC-073/D3 — resposta de um mês que já saiu da tela
+                  // não pinta a grade.
+                  if (pedidoDaAgenda.current !== meuPedido) return;
                   setCompromissos([
                     ...aulas.map(deAula),
                     ...reservas.itens.map(deReserva),
