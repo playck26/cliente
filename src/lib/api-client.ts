@@ -836,6 +836,56 @@ export async function desmarcarReposicao(id: string): Promise<void> {
 }
 
 /**
+ * SPEC-064/TASK-005 — **a fila de espera, pelo lado do aluno.**
+ *
+ * A fila existe no Back desde 20/09 e **nenhuma tela a usava**: só o arquivo
+ * de tipos gerado conhecia estas rotas. A LIM-064d promete que quem não tem
+ * push *"vê na tela da fila"*, e a tela não existia.
+ *
+ * `vezAberta` vem **calculado do servidor** e não é `estado === "chamado"`:
+ * o varredor que expira a vez tem interruptor (D8), então uma linha pode
+ * estar `chamado` com o prazo vencido. A tela obedece ao campo, e não ao
+ * estado — oferecer confirmação que o servidor recusa é o DEF-011.
+ */
+export type LinhaDaFila = components["schemas"]["MinhaLinhaDaFilaResponseDto"];
+
+export async function listarMinhaFila(): Promise<LinhaDaFila[]> {
+  const res = await authFetch("/me/fila-de-espera");
+  return (await res.json()) as LinhaDaFila[];
+}
+
+export async function entrarNaFilaDeTurma(turmaId: string): Promise<void> {
+  await authFetch("/me/fila-de-espera/turmas", {
+    method: "POST",
+    body: JSON.stringify({ turmaId }),
+  });
+}
+
+export async function entrarNaFilaDeAula(ocupacaoId: string): Promise<void> {
+  await authFetch("/me/fila-de-espera/aulas", {
+    method: "POST",
+    body: JSON.stringify({ ocupacaoId }),
+  });
+}
+
+/**
+ * Sair vale **inclusive depois de chamado** — desistir da vez é legítimo, e
+ * libera o alvo para o próximo do ciclo.
+ */
+export async function sairDaFila(id: string): Promise<void> {
+  await authFetch(`/me/fila-de-espera/${id}`, { method: "DELETE" });
+}
+
+/**
+ * Confirmar a vez. **Pode recusar com `409`, e a recusa é normal**: a fila é
+ * convite para tentar primeiro, não reserva (LIM-064a), e a vaga pode ter
+ * sido tomada pela tela normal durante o prazo (LIM-064f).
+ */
+export async function confirmarVezNaFila(id: string): Promise<void> {
+  await authFetch(`/me/fila-de-espera/${id}/confirmar`, { method: "POST" });
+}
+
+/**
  * SPEC-057/TASK-002/D11 — **a janela é opcional, e a ausência dela é o
  * contrato de antes.**
  *

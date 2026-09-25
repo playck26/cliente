@@ -1,11 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  apareceParaMim,
-  escondidosPeloFiltro,
-  filtroFazSentido,
-} from "@/lib/filtro-de-nivel";
+import { apareceParaMim } from "@/lib/filtro-de-nivel";
 import {
   getMeuCadastro,
   ApiError,
@@ -49,6 +45,19 @@ import {
 function diaEHora(data: string, hora: string): string {
   const [ano, mes, dia] = data.split("-");
   return `${dia}/${mes}/${ano} às ${hora}`;
+}
+
+/**
+ * SPEC-072/REQ-003 — **o fim da aula entra na linha.**
+ *
+ * O `OportunidadeDeReposicaoResponseDto` publica `horaFim` desde a SPEC-046,
+ * e esta tela o **descartava**. Quem lê *"19:00"* não sabe se a reposição
+ * ocupa uma hora ou três — e é a informação de que ele precisa para decidir
+ * se cabe no dia dele.
+ */
+function diaEFaixaDeHora(data: string, inicio: string, fim: string): string {
+  const [ano, mes, dia] = data.split("-");
+  return `${dia}/${mes}/${ano} · ${inicio}–${fim}`;
 }
 
 function Falta({
@@ -122,20 +131,28 @@ export function MinhasReposicoes() {
   const [opcoes, setOpcoes] = useState<OportunidadeDeReposicao[] | null>(null);
   const [ocupada, setOcupada] = useState(false);
   /**
-   * SPEC-057/TASK-004 (card 5350) — **o mesmo recorte da lista de turmas.**
+   * SPEC-057/TASK-004 (card 5350), **superseded pela SPEC-072/D1** — o mesmo
+   * recorte da lista de turmas, agora **sem escape**.
    *
    * Esta lista é a que mais confunde: ela traz ocorrências de **todas** as
    * turmas ativas do clube das quais o aluno não participa.
    *
-   * **E é a que mais exige cuidado**, porque aqui há um direito já pago: o
+   * **E é a que mais exigia cuidado**, porque aqui há um direito já pago: o
    * crédito de reposição. O veredito independente da SPEC-057 levantou
    * exatamente este caso — aluno de nível A, crédito na mão, e a única vaga
-   * numa turma de nível B. Por isso o escape ("Todas") vale aqui igual, e
-   * **filtrar não consome, não expira e não bloqueia** nada: o `POST`
-   * continua aceitando a vaga escondida (D16).
+   * numa turma de nível B —, e o escape ("Todas") nasceu dele.
+   *
+   * **O escape saiu, e os dados NÃO apoiaram a remoção.** Medido em produção
+   * em 2026-09-24: das três reposições já marcadas, **duas foram fora do
+   * nível**; e não há rota de gestor que contorne (`@Controller` só existe em
+   * `me/reposicoes`). O custo foi medido, ficou maior do que se imaginava, e
+   * a autoridade aceitou pagar — está na `LIM-072a`.
+   *
+   * **O que continua valendo é a D16:** filtrar é exibição. Não consome, não
+   * expira e não bloqueia nada — o `POST` segue aceitando a vaga escondida, e
+   * a metade de Back da `AC-004` prova isso no servidor.
    */
   const [meuNivelId, setMeuNivelId] = useState<string | null>(null);
-  const [verTodas, setVerTodas] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
   async function recarregar() {
@@ -216,10 +233,12 @@ export function MinhasReposicoes() {
     }
   }
 
+  // SPEC-072/D1 — o `false` literal é a decisão: não há mais escape. O
+  // parâmetro sobrevive na função pura porque a `LIM-072b` prevê esta decisão
+  // voltar à mesa se o volume crescer.
   const visiveis = (opcoes ?? []).filter((o) =>
-    apareceParaMim(o, meuNivelId, verTodas),
+    apareceParaMim(o, meuNivelId, false),
   );
-  const escondidas = escondidosPeloFiltro(opcoes ?? [], meuNivelId, verTodas);
 
   return (
     <section className="rounded-3xl bg-surface p-4 shadow-[var(--shadow-low)] ring-1 ring-border">
@@ -281,33 +300,10 @@ export function MinhasReposicoes() {
             </button>
           </div>
 
-          {opcoes !== null && filtroFazSentido(opcoes, meuNivelId) && (
-            <div
-              className="mt-2 flex gap-2"
-              role="group"
-              aria-label="Filtrar horários por nível"
-            >
-              {[
-                { rotulo: "Meu nível", ativo: !verTodas, valor: false },
-                { rotulo: "Todas", ativo: verTodas, valor: true },
-              ].map(({ rotulo, ativo, valor }) => (
-                <button
-                  key={rotulo}
-                  type="button"
-                  aria-pressed={ativo}
-                  onClick={() => setVerTodas(valor)}
-                  className={`min-h-8 rounded-full px-3 text-[12px] font-extrabold transition-colors ${
-                    ativo
-                      ? "bg-[var(--color-primary-strong)] text-white"
-                      : "bg-surface text-[var(--color-text-secondary)] ring-1 ring-border"
-                  }`}
-                >
-                  {rotulo}
-                </button>
-              ))}
-            </div>
-          )}
-
+          {/*
+            **O seletor "Meu nível / Todas" NÃO existe aqui**
+            (SPEC-072/AC-003): saiu do DOM, não está escondido por CSS.
+          */}
           {opcoes === null ? (
             <p className="mt-2 text-[12px] text-[var(--color-text-secondary)]">
               Carregando...
@@ -324,11 +320,17 @@ export function MinhasReposicoes() {
               **O crédito não pode sumir atrás do filtro.** Há vaga; ela só
               não é do nível dele. Dizer "nenhuma turma com vaga" aqui seria a
               tela escondendo um direito que o aluno já pagou.
+
+              **E agora não há saída** — é o que a `LIM-072a` declara, com o
+              número na mesa. A frase diz a verdade que sobrou: o crédito
+              **continua valendo**, porque filtrar não consome nem expira
+              (D16). Mandar "falar com o clube" seria inventar compensação: a
+              v1 desta spec ia registrar que *"o gestor marca pelo Admin"*, e
+              **isso é falso** — essa rota não existe.
             */
             <p className="mt-2 text-[12px] text-[var(--color-text-secondary)]">
-              Nenhum horário do seu nível. Toque em &ldquo;Todas&rdquo; para
-              ver {escondidas === 1 ? "o outro horário" : "os outros horários"}{" "}
-              com vaga.
+              Nenhum horário do seu nível com vaga por enquanto. Seu crédito
+              continua valendo — tente de novo mais tarde.
             </p>
           ) : (
             <ul className="mt-2">
@@ -337,12 +339,26 @@ export function MinhasReposicoes() {
                   key={o.ocupacaoId}
                   className="flex items-center justify-between gap-2 border-b border-border py-2 last:border-b-0"
                 >
-                  <div className="min-w-0">
-                    <p className="truncate text-[13px] font-extrabold text-foreground">
+                  {/*
+                    **SPEC-072/REQ-003 — sem `truncate`, e com o `horaFim`.**
+
+                    A linha espremia `data · quadra · vagas · nível` num `<p>`
+                    de uma linha só, a 320px: o `truncate` cortava com
+                    reticências justamente a parte que decide a escolha. A
+                    queixa do Matheus é esta.
+
+                    **`break-words` não é enfeite:** sem ele, um nome de turma
+                    longo e sem espaço não quebra e estoura a largura da
+                    página — trocar clipping por rolagem horizontal não é
+                    conserto. A `AC-006` mede as duas coisas.
+                  */}
+                  <div className="min-w-0 flex-1">
+                    <p className="text-[13px] font-extrabold break-words text-foreground">
                       {o.turmaNome}
                     </p>
-                    <p className="truncate text-[12px] text-[var(--color-text-secondary)]">
-                      {diaEHora(o.data, o.horaInicio)} · {o.quadraNome} ·{" "}
+                    <p className="text-[12px] break-words text-[var(--color-text-secondary)]">
+                      {diaEFaixaDeHora(o.data, o.horaInicio, o.horaFim)} ·{" "}
+                      {o.quadraNome} ·{" "}
                       {o.vagas === 1 ? "1 vaga" : `${o.vagas} vagas`}
                       {o.nivelNome ? ` · ${o.nivelNome}` : ""}
                     </p>

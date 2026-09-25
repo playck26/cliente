@@ -15,6 +15,9 @@ const listTurmasDisponiveis = vi.hoisted(() => vi.fn());
 const getMeuCadastro = vi.hoisted(() => vi.fn());
 const entrarNaTurma = vi.hoisted(() => vi.fn());
 const sairDaTurma = vi.hoisted(() => vi.fn());
+const listarMinhaFila = vi.hoisted(() => vi.fn());
+const entrarNaFilaDeTurma = vi.hoisted(() => vi.fn());
+const sairDaFila = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/api-client", async () => {
   const real =
@@ -27,6 +30,9 @@ vi.mock("@/lib/api-client", async () => {
     getMeuCadastro,
     entrarNaTurma,
     sairDaTurma,
+    listarMinhaFila,
+    entrarNaFilaDeTurma,
+    sairDaFila,
   };
 });
 
@@ -49,12 +55,112 @@ function turma(patch: Record<string, unknown> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // SPEC-057/TASK-004 — a tela passou a perguntar o nível do aluno. Padrão
-  // SEM nível: é o estado da maioria em produção, e nele o recorte não
-  // esconde nada — as provas antigas continuam medindo o que mediam.
+  // SPEC-057/TASK-004 — a tela passou a perguntar o nível do aluno. O padrão
+  // daqui é SEM nível porque nele o recorte não esconde nada, e as provas
+  // antigas continuam medindo o que mediam.
+  //
+  // **Não porque seja o estado da maioria:** essa premissa caiu na medição de
+  // 2026-09-24 (12 alunos ativos, 9 COM nível — 75%). Ver a supersessão na
+  // SPEC-072.
   getMeuCadastro.mockResolvedValue({ nivelId: null });
   entrarNaTurma.mockResolvedValue(undefined);
   sairDaTurma.mockResolvedValue(undefined);
+  // SPEC-064/TASK-005 — sem fila por padrão: as provas antigas continuam
+  // medindo o que mediam.
+  listarMinhaFila.mockResolvedValue([]);
+  entrarNaFilaDeTurma.mockResolvedValue(undefined);
+  sairDaFila.mockResolvedValue(undefined);
+});
+
+describe("SPEC-064 — a fila nasce onde a recusa aparece", () => {
+  it("TURMA_CHEIA oferece entrar na fila, e o toque chama a rota", async () => {
+    listTurmasDisponiveis.mockResolvedValue([
+      turma({ matriculados: 8, podeEntrar: false, motivo: "TURMA_CHEIA" }),
+    ]);
+
+    render(<TurmasDoClube />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Entrar na fila de espera" }),
+    );
+
+    await waitFor(() => expect(entrarNaFilaDeTurma).toHaveBeenCalledWith("t1"));
+  });
+
+  it("OUTRO motivo NÃO oferece fila — esperar não resolve", async () => {
+    // **O caso que discrimina.** Cadastro não aprovado, limite de turmas e
+    // turma inativa não viram vaga com o tempo; oferecer fila neles seria
+    // convite que nunca se cumpre.
+    listTurmasDisponiveis.mockResolvedValue([
+      turma({ podeEntrar: false, motivo: "LIMITE_DE_TURMAS" }),
+    ]);
+
+    render(<TurmasDoClube />);
+
+    expect(
+      await screen.findByText("Você atingiu o limite de turmas deste clube"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Entrar na fila de espera" }),
+    ).not.toBeInTheDocument();
+  });
+
+  /**
+   * **A interação que NENHUMA das duas specs mediu, e ela é uma perda.**
+   *
+   * O botão da fila mora **dentro** do card, e o card só existe para turma
+   * `visivel` — `turmas.filter((t) => apareceParaMim(t, meuNivelId, false))`.
+   * Logo: **turma cheia de OUTRO nível não tem porta de entrada na fila.**
+   *
+   * Antes da SPEC-072 o escape "Todas" a revelava, e o aluno podia entrar na
+   * fila dela. A `LIM-072a` mediu o custo da remoção na **reposição** (2 de 3
+   * reais eram fora do nível) e **não** na fila de espera — este caso é o
+   * custo que faltava medir.
+   *
+   * O teste fixa o comportamento **atual**, que é o que a `D1` manda. Ele
+   * existe para que a perda seja visível em código, e não descoberta por um
+   * aluno que esperava uma vaga que ninguém ia lhe oferecer.
+   */
+  it("turma CHEIA de outro nível não oferece fila — o card nem existe (custo da D1)", async () => {
+    getMeuCadastro.mockResolvedValue({ nivelId: "nivel-a" });
+    listTurmasDisponiveis.mockResolvedValue([
+      turma({
+        id: "t-cheia-de-outro-nivel",
+        nome: "Avançados Cheia",
+        nivelId: "nivel-b",
+        nivelNome: "B",
+        matriculados: 8,
+        podeEntrar: false,
+        motivo: "TURMA_CHEIA",
+      }),
+    ]);
+
+    render(<TurmasDoClube />);
+
+    // O recorte come o card inteiro, e com ele a única porta da fila.
+    expect(
+      await screen.findByText(/Nenhuma turma do seu nível/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Avançados Cheia")).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Entrar na fila de espera" }),
+    ).toBeNull();
+  });
+
+  it("já na fila, o botão vira SAIR e usa o id da linha", async () => {
+    listTurmasDisponiveis.mockResolvedValue([
+      turma({ matriculados: 8, podeEntrar: false, motivo: "TURMA_CHEIA" }),
+    ]);
+    listarMinhaFila.mockResolvedValue([
+      { id: "linha-1", fila: "turma", turmaId: "t1", vezAberta: false },
+    ]);
+
+    render(<TurmasDoClube />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Você está na fila — sair" }),
+    );
+
+    await waitFor(() => expect(sairDaFila).toHaveBeenCalledWith("linha-1"));
+  });
 });
 
 describe("a ocupação à vista (pedido do Israel)", () => {
@@ -292,7 +398,7 @@ describe("SPEC-057/TASK-002 — a nota não aparece mais para o aluno", () => {
   });
 });
 
-describe("SPEC-057/TASK-004 — o recorte por nível", () => {
+describe("SPEC-072/TASK-002 — o recorte por nível, agora SEM escape", () => {
   const A = "nivel-a";
   const B = "nivel-b";
 
@@ -301,7 +407,7 @@ describe("SPEC-057/TASK-004 — o recorte por nível", () => {
     getMeuCadastro.mockResolvedValue({ nivelId: A });
   });
 
-  it("AC-023: por padrão, some a turma de outro nível", async () => {
+  it("some a turma de outro nível — e não há mais como revelá-la", async () => {
     listTurmasDisponiveis.mockResolvedValue([
       turma({ id: "t1", nome: "Do meu nível", nivelId: A, nivelNome: "A" }),
       turma({ id: "t2", nome: "De outro nível", nivelId: B, nivelNome: "B" }),
@@ -313,7 +419,7 @@ describe("SPEC-057/TASK-004 — o recorte por nível", () => {
     expect(screen.queryByText("De outro nível")).toBeNull();
   });
 
-  it("AC-023: e o nível da turma aparece no cartão", async () => {
+  it("e o nível da turma aparece no cartão", async () => {
     listTurmasDisponiveis.mockResolvedValue([
       turma({ nivelId: A, nivelNome: "Iniciante" }),
     ]);
@@ -323,22 +429,45 @@ describe("SPEC-057/TASK-004 — o recorte por nível", () => {
     expect(await screen.findByText("Iniciante")).toBeInTheDocument();
   });
 
-  it("AC-025: `Ver todas` revela o que o recorte escondeu", async () => {
+  /**
+   * **AC-003 — o seletor NÃO EXISTE, e isso não é o mesmo que estar
+   * escondido.**
+   *
+   * `queryByRole` devolveria `null` também para um botão com `display:none`
+   * ou `aria-hidden`, porque ele sai da árvore de acessibilidade — a
+   * asserção óbvia **não discrimina** remover de esconder, e a AC pede
+   * exatamente essa distinção.
+   *
+   * `container.textContent` **inclui** o texto de nó escondido por CSS. É
+   * por isso que a prova olha para ele: esconder por estilo deixa este caso
+   * vermelho, que é o que a sabotagem da spec exige.
+   */
+  it("AC-003: o seletor não está no DOM — nem escondido por CSS", async () => {
     listTurmasDisponiveis.mockResolvedValue([
       turma({ id: "t1", nome: "Do meu nível", nivelId: A, nivelNome: "A" }),
       turma({ id: "t2", nome: "De outro nível", nivelId: B, nivelNome: "B" }),
     ]);
 
-    render(<TurmasDoClube />);
+    const { container } = render(<TurmasDoClube />);
     await screen.findByText("Do meu nível");
 
-    fireEvent.click(screen.getByRole("button", { name: /Todas/ }));
-
-    expect(await screen.findByText("De outro nível")).toBeInTheDocument();
+    expect(
+      container.querySelector('[aria-label="Filtrar turmas por nível"]'),
+    ).toBeNull();
+    expect(container.textContent).not.toContain("Meu nível");
+    expect(container.textContent).not.toContain("Todas");
   });
 
-  /** **INV-141** — o caso da maioria dos alunos hoje. */
-  it("AC-024: aluno SEM nível vê tudo, e o filtro nem aparece", async () => {
+  /**
+   * **AC-004, metade do Cliente.** Nulo nunca esconde nada (`INV-072b`): um
+   * filtro que escondesse tudo de quem não foi classificado transformaria a
+   * melhoria em apagão.
+   *
+   * A outra metade desta AC é do **Back**, com `POST` real — o servidor
+   * continua aceitando reposição fora do nível. São duas porque este teste
+   * usa o cliente mockado e não diz nada sobre o servidor (foi o B02).
+   */
+  it("AC-004 (Cliente): aluno SEM nível vê TODAS as turmas", async () => {
     getMeuCadastro.mockResolvedValue({ nivelId: null });
     listTurmasDisponiveis.mockResolvedValue([
       turma({ id: "t1", nome: "Do nível A", nivelId: A, nivelNome: "A" }),
@@ -349,10 +478,9 @@ describe("SPEC-057/TASK-004 — o recorte por nível", () => {
 
     expect(await screen.findByText("Do nível A")).toBeInTheDocument();
     expect(screen.getByText("Do nível B")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Todas/ })).toBeNull();
   });
 
-  it("AC-024: turma SEM nível aparece para quem tem nível", async () => {
+  it("INV-141: turma SEM nível aparece para quem tem nível", async () => {
     listTurmasDisponiveis.mockResolvedValue([
       turma({ id: "t1", nome: "Sem nivelamento", nivelId: null }),
       turma({ id: "t2", nome: "De outro nível", nivelId: B, nivelNome: "B" }),
@@ -365,11 +493,12 @@ describe("SPEC-057/TASK-004 — o recorte por nível", () => {
   });
 
   /**
-   * **AC-025 — o vazio tem de dizer a verdade.** "Nenhuma turma do seu nível"
-   * e "o clube não tem turma" são coisas diferentes, e só a primeira tem
-   * saída.
+   * **O vazio tem de dizer a verdade, e a verdade mudou.** "Nenhuma turma do
+   * seu nível" e "o clube não tem turma" continuam sendo coisas diferentes —
+   * mas a primeira **não tem mais saída**, e a frase não pode continuar
+   * mandando tocar num botão que saiu do DOM.
    */
-  it("AC-025: vazio do filtro é diferente de clube sem turma", async () => {
+  it("vazio do recorte ≠ clube sem turma, e a frase não oferece o que não existe", async () => {
     listTurmasDisponiveis.mockResolvedValue([
       turma({ id: "t2", nome: "De outro nível", nivelId: B, nivelNome: "B" }),
     ]);
@@ -379,9 +508,8 @@ describe("SPEC-057/TASK-004 — o recorte por nível", () => {
     expect(
       await screen.findByText(/Nenhuma turma do seu nível/),
     ).toBeInTheDocument();
-    expect(
-      screen.queryByText(/ainda não tem turmas cadastradas/),
-    ).toBeNull();
+    expect(screen.queryByText(/ainda não tem turmas cadastradas/)).toBeNull();
+    expect(screen.queryByText(/Toque em/)).toBeNull();
   });
 
   it("clube sem turma nenhuma continua com a mensagem de sempre", async () => {
@@ -395,11 +523,11 @@ describe("SPEC-057/TASK-004 — o recorte por nível", () => {
   });
 
   /**
-   * **O filtro não pode derrubar a tela.** O nível é informação secundária:
-   * se `/me/cadastro` falhar, a lista continua — sem recorte, que é o
-   * comportamento seguro (mostra mais, não menos).
+   * **O recorte não pode derrubar a tela.** O nível é informação secundária:
+   * se `/me/cadastro` falhar, a lista continua inteira — mostrar demais é
+   * recuperável, esconder faria o clube parecer vazio.
    */
-  it("falha ao ler o cadastro: a lista aparece inteira, sem filtro", async () => {
+  it("falha ao ler o cadastro: a lista aparece inteira, sem recorte", async () => {
     getMeuCadastro.mockRejectedValue(new Error("rede"));
     listTurmasDisponiveis.mockResolvedValue([
       turma({ id: "t1", nome: "Do nível A", nivelId: A, nivelNome: "A" }),

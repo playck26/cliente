@@ -3,14 +3,13 @@
 import { useEffect, useState } from "react";
 import { Check, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  apareceParaMim,
-  escondidosPeloFiltro,
-  filtroFazSentido,
-} from "@/lib/filtro-de-nivel";
+import { apareceParaMim } from "@/lib/filtro-de-nivel";
 import {
   ApiError,
+  entrarNaFilaDeTurma,
   entrarNaTurma,
+  listarMinhaFila,
+  sairDaFila,
   getMeuCadastro,
   listTurmasDisponiveis,
   sairDaTurma,
@@ -53,6 +52,17 @@ export function TurmasDoClube() {
   const [erro, setErro] = useState<string | null>(null);
   const [agindoEm, setAgindoEm] = useState<string | null>(null);
   /**
+   * SPEC-064/TASK-005 — **as filas do aluno, por turma.**
+   *
+   * A fila existe no Back desde 20/09 e esta tela era o único lugar onde
+   * "Sem vagas" aparecia — ou seja, o único lugar onde entrar na fila faz
+   * sentido. Sem isto, a pessoa lê "Sem vagas" e o assunto morre ali.
+   *
+   * **Falha tolerada:** se a chamada cair, a tela segue sem o botão de fila.
+   * O catálogo é o conteúdo; a fila é o extra.
+   */
+  const [filaPorTurma, setFilaPorTurma] = useState<Record<string, string>>({});
+  /**
    * SPEC-057/TASK-004 (card 5350) — o nível do aluno, para recortar a lista.
    *
    * **Buscado à parte e com falha tolerada**, como a média: o nível é
@@ -61,12 +71,25 @@ export function TurmasDoClube() {
    * faria o clube parecer vazio.
    */
   const [meuNivelId, setMeuNivelId] = useState<string | null>(null);
-  const [verTodas, setVerTodas] = useState(false);
 
   const carregar = () =>
     listTurmasDisponiveis()
-      .then((lista) => {
+      .then(async (lista) => {
         setTurmas(lista);
+        // As filas VIVAS do aluno, indexadas por turma. Uma ida só, ao lado
+        // da lista — e tolerante: sem ela o catálogo continua inteiro.
+        try {
+          const fila = await listarMinhaFila();
+          setFilaPorTurma(
+            Object.fromEntries(
+              fila
+                .filter((l) => l.fila === "turma" && l.turmaId)
+                .map((l) => [l.turmaId as string, l.id]),
+            ),
+          );
+        } catch {
+          setFilaPorTurma({});
+        }
         /*
           SPEC-057/TASK-002/D12 (card 5352) — **a nota saiu da tela do
           aluno.** O card pede "ocultar nota da turma do usuário final e do
@@ -107,13 +130,22 @@ export function TurmasDoClube() {
    * o toque. Receber `TURMA_CHEIA` e continuar mostrando "7 de 8" seria a
    * tela insistindo numa informação que o servidor acabou de desmentir.
    */
-  const agir = async (turma: TurmaDisponivel, acao: "entrar" | "sair") => {
+  const agir = async (
+    turma: TurmaDisponivel,
+    acao: "entrar" | "sair" | "entrar-na-fila" | "sair-da-fila",
+  ) => {
     setAgindoEm(turma.id);
     setErro(null);
     try {
-      await (acao === "entrar"
-        ? entrarNaTurma(turma.id)
-        : sairDaTurma(turma.id));
+      if (acao === "entrar-na-fila") {
+        await entrarNaFilaDeTurma(turma.id);
+      } else if (acao === "sair-da-fila") {
+        await sairDaFila(filaPorTurma[turma.id]);
+      } else {
+        await (acao === "entrar"
+          ? entrarNaTurma(turma.id)
+          : sairDaTurma(turma.id));
+      }
     } catch (e: unknown) {
       setErro(
         e instanceof ApiError ? e.message : "Não foi possível concluir.",
@@ -132,11 +164,11 @@ export function TurmasDoClube() {
     );
   }
 
-  const ofereceFiltro = filtroFazSentido(turmas, meuNivelId);
-  const visiveis = turmas.filter((t) =>
-    apareceParaMim(t, meuNivelId, verTodas),
-  );
-  const escondidas = escondidosPeloFiltro(turmas, meuNivelId, verTodas);
+  // SPEC-072/D1 — **o `false` e literal, e e a decisao.** O escape "Todas"
+  // saiu (supersessao da SPEC-057/TASK-004), e a funcao pura continua
+  // aceitando o parametro de proposito: a `LIM-072b` preve a volta desta
+  // decisao se o volume crescer, e o modulo segue testado para os tres casos.
+  const visiveis = turmas.filter((t) => apareceParaMim(t, meuNivelId, false));
 
   return (
     <div className="space-y-4 px-5">
@@ -155,38 +187,12 @@ export function TurmasDoClube() {
       )}
 
       {/*
-        **O filtro só aparece quando muda alguma coisa** (`filtroFazSentido`):
-        num clube sem nivelamento, ou para o aluno que ainda não foi
-        classificado, ele seria um interruptor que não acende luz — e ocupa
-        espaço numa tela de 390px.
+        **O seletor "Meu nível / Todas" NÃO existe aqui** (SPEC-072/AC-003), e
+        não é caso de `hidden` nem de `display:none`: ele saiu do DOM. O
+        pedido é do Matheus Moura — *"que somente aparecesse ... turmas que são
+        do meu nível, para que eu não me confunda"* —, e ele supersede o escape
+        que a validação independente da SPEC-057 tinha pedido.
       */}
-      {ofereceFiltro && (
-        <div
-          className="flex gap-2"
-          role="group"
-          aria-label="Filtrar turmas por nível"
-        >
-          {[
-            { rotulo: "Meu nível", ativo: !verTodas, valor: false },
-            { rotulo: "Todas", ativo: verTodas, valor: true },
-          ].map(({ rotulo, ativo, valor }) => (
-            <button
-              key={rotulo}
-              type="button"
-              aria-pressed={ativo}
-              onClick={() => setVerTodas(valor)}
-              className={`min-h-9 rounded-full px-4 text-[13px] font-extrabold transition-colors ${
-                ativo
-                  ? "bg-[var(--color-primary-strong)] text-white"
-                  : "bg-surface text-[var(--color-text-secondary)] ring-1 ring-border"
-              }`}
-            >
-              {rotulo}
-            </button>
-          ))}
-        </div>
-      )}
-
       {turmas.length === 0 ? (
         <section className="rounded-3xl bg-surface p-6 text-center shadow-[var(--shadow-low)] ring-1 ring-border">
           <p className="text-[13px] font-bold text-[var(--color-text-secondary)]">
@@ -195,16 +201,17 @@ export function TurmasDoClube() {
         </section>
       ) : visiveis.length === 0 ? (
         /*
-          **Vazio do recorte ≠ clube sem turma.** A primeira frase tem saída
-          (o botão "Todas"); a segunda não tem. Escrever a segunda no lugar
-          da primeira faria o aluno achar que o clube não tem turma nenhuma.
+          **Vazio do recorte ≠ clube sem turma**, e as duas frases continuam
+          diferentes: uma diz que o clube não tem turma, a outra que nenhuma é
+          do nível dele.
+
+          **A saída que a primeira tinha saiu junto com o seletor**
+          (SPEC-072/D1). A frase não pode continuar mandando tocar em "Todas"
+          — botão que não existe mais é pior que nenhum botão.
         */
         <section className="rounded-3xl bg-surface p-6 text-center shadow-[var(--shadow-low)] ring-1 ring-border">
           <p className="text-[13px] font-bold text-[var(--color-text-secondary)]">
             Nenhuma turma do seu nível por enquanto.
-            {escondidas > 0
-              ? ` Toque em "Todas" para ver as outras ${escondidas === 1 ? "turma" : "turmas"} do clube.`
-              : ""}
           </p>
         </section>
       ) : (
@@ -306,6 +313,37 @@ export function TurmasDoClube() {
                           {EXPLICACAO[turma.motivo] ?? "Não disponível"}
                         </p>
                       )}
+                      {/*
+                        SPEC-064/TASK-005 — **a fila nasce onde a recusa
+                        aparece.** Só em `TURMA_CHEIA`: os outros motivos
+                        (cadastro não aprovado, limite de turmas, turma
+                        inativa) não são resolvidos por esperar, e oferecer
+                        fila neles seria convite que nunca vira vaga.
+                      */}
+                      {turma.motivo === "TURMA_CHEIA" &&
+                        (filaPorTurma[turma.id] ? (
+                          <button
+                            type="button"
+                            className="mt-2 w-full text-[12px] font-bold text-[var(--color-text-secondary)] underline"
+                            disabled={agindoEm === turma.id}
+                            onClick={() => void agir(turma, "sair-da-fila")}
+                          >
+                            {agindoEm === turma.id
+                              ? "Saindo…"
+                              : "Você está na fila — sair"}
+                          </button>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            className="mt-2 w-full"
+                            disabled={agindoEm === turma.id}
+                            onClick={() => void agir(turma, "entrar-na-fila")}
+                          >
+                            {agindoEm === turma.id
+                              ? "Entrando…"
+                              : "Entrar na fila de espera"}
+                          </Button>
+                        ))}
                     </>
                   )}
                 </div>

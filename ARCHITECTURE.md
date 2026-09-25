@@ -1,13 +1,17 @@
 # ARCHITECTURE — `cliente` (PlayCK)
 
-**Fonte: análise direta do código.** Data: **2026-09-15** (era 2026-09-14).
-**Conferido por comando nesta data:** 52 arquivos de teste, 568 casos, 45
-componentes (`vitest run --pool=threads`, em série; `.tsx` de `src/components`,
-sem subpastas e sem os `.test.tsx`). *A SPEC-052 registrou 43/473/42; a SPEC-053
-somou três arquivos de teste e um componente (`nova-reserva`); a SPEC-054 soma
-cinco arquivos de teste (um deles `scripts/netlify-ignore.test.mjs`, a regra de
-deploy) e dois componentes (`passo-de-adicionais` e
-`itens-da-reserva`), mais `lib/nomes-de-tipo.ts`.*
+**Fonte: análise direta do código.** Data: **2026-09-24** (era 2026-09-15).
+**Conferido por comando nesta data:** **69** arquivos de teste, **777** casos,
+**51** componentes e **20** módulos em `lib/` (`vitest run --pool=threads`, em
+série; `.tsx` de `src/components`, sem subpastas e sem os `.test.tsx`).
+**Mais 2 arquivos de prova de NAVEGADOR, 8 casos** (`pnpm run test:navegador`)
+— categoria que não existia nesta planta.
+
+*Histórico dos números: a SPEC-052 registrou 43/473/42; a SPEC-054 levou a
+52/568/45; e este ciclo (SPEC-072) fecha em 69/777/51. **O salto de 17 arquivos
+e 209 casos não é todo desta spec** — são as SPECs 055 a 071, que passaram sem
+atualizar esta planta. Fica registrado porque planta desatualizada é pior que
+planta ausente: quem lê confia nela.*
 
 Planta **AS-IS**. Intenção arquitetural vive em `TARGET_ARCHITECTURE.md`
 (raiz do workspace) + ADRs em `DECISIONS.md`. Divergência entre este
@@ -30,11 +34,36 @@ acompanhar reservas e criar a própria conta pelos três caminhos de onboarding.
 | `shadcn` | ^4.16.2 | componentes gerados em `components/ui/` |
 | `tailwind-merge`, `clsx`, `class-variance-authority` | — | composição de classes |
 | `lucide-react` | ^1.29.0 | ícones |
+| `@playwright/test` | ^1.63.0 | **prova de navegador** (SPEC-072/TASK-003) |
 
 **NÃO existem no projeto:** biblioteca de estado global (Redux, Zustand,
 Jotai, Recoil), React Query/SWR, form library (React Hook Form, Formik),
 cliente HTTP (axios), i18n, biblioteca de datas (date-fns, dayjs — usa-se
 `Intl` e `Date` nativos), Storybook, Sentry.
+
+### Duas suítes, e a fronteira é explícita (SPEC-072/TASK-003)
+
+| Suíte | Onde | Ambiente | Prova |
+|---|---|---|---|
+| `pnpm test` | `src/**`, `scripts/**` | `vitest` + **jsdom** | comportamento, contrato de chamada, DOM |
+| `pnpm run test:navegador` | `e2e/**` | **Chromium**, 320px, build de produção | **geometria** — pixel, interseção, clipping, rolagem |
+
+**O jsdom não tem layout engine.** `getBoundingClientRect()` devolve zero em
+`width`, `height` e `right`; `scrollWidth` devolve zero no documento;
+`getComputedStyle` só lê o declarado. **Toda alegação visual deste projeto era
+indemonstrável antes da SPEC-072** — asserção de texto fica verde com
+`overflow:hidden` num ancestral, com conteúdo atrás do botão e com rolagem
+horizontal.
+
+A fronteira é mecânica: o `vitest.config.mts` **exclui** `e2e/**`. É
+`exclude` e não `include` de propósito — um `include: ["src/**"]` calou 44
+testes de `scripts/` sem um único vermelho, e o que denunciou foi a contagem.
+**Include estreito perde em silêncio; exclude só tira o que nomeia.**
+
+**O job `navegador` do CI roda a segunda suíte, e NÃO é obrigatório:** o
+ruleset do `main` exige `build` e `contrato`. Gate declarado aberto, não
+mecanizado — `src/lib/prova-visual.test.ts` guarda a existência do job, não o
+veredito dele.
 
 ## 2. Visão geral e fluxo de referência
 
@@ -241,12 +270,16 @@ deploy*.
 |---|---|
 | `page.tsx` fina; lógica em componente cliente | revisão |
 | Todo acesso autenticado por `authFetch` | busca por `fetch(` fora de `lib/` — **0 violações em 2026-08-22** |
-| `api-types.ts` nunca editado à mão, e em dia com o contrato fixado | job **`contrato`** do CI (SPEC-067): regenera do `back@<sha>` do `contrato.lock.json` e compara — reprova a PR. Obrigatório só depois da TASK-004 |
+| `api-types.ts` nunca editado à mão, e em dia com o contrato fixado | job **`contrato`** do CI (SPEC-067): regenera do `back@<sha>` do `contrato.lock.json` e compara — reprova a PR. **Já é obrigatório** — conferido pela API em 2026-09-24: `required_status_checks` do `main` traz `build` **e** `contrato`, com `strict_required_status_checks_policy`. A frase anterior, *"só depois da TASK-004"*, ficou velha |
 | Sem estado global sem ADR | busca por libs de estado no CI seria o gate — **hoje não existe** |
 | **Fixture de tela é tipada pelo contrato (`MyClass`, `AulaAnterior`, …), nunca objeto literal solto nem `unknown[]`.** Fixture sem tipo é o que deixa um campo obrigatório novo passar despercebido: `naoRealizada` entrou no contrato, duas telas ganharam ramo por causa dele, e **as provas das duas ficavam verdes se o ramo sumisse** — o `tsc` não tinha como cobrar um campo de um `Record<string, unknown>` | **não existe gate automático** — as fixtures de `home-view.test.tsx`, `aulas-anteriores.test.tsx`, `my-classes-list.test.tsx` e `semana-do-aluno.test.tsx` estão tipadas; o `tsc` passa a ser o gate a partir daí, para o próximo campo. Um gate que varra `src/**/*.test.tsx` atrás de fixture sem anotação ainda não foi escrito |
 | **O que a tela afirma sobre o servidor vale sobre o que FOI ENVIADO, não sobre o que está na tela quando a resposta chega.** Os controles seguem vivos durante a requisição de propósito (em quadra, travar a tela é pior), então existe uma janela em que o rascunho já mudou e a resposta ainda fala do envio anterior — foi "Salvo" aparecendo ao lado da marca que o servidor nunca recebeu | prova com **promessa controlada**, não `mockResolvedValue`: `chamada-nao-houve.test.tsx`, describe "o rascunho durante o salvamento". `mockResolvedValue` achata o tempo assíncrono e essa janela deixa de existir dentro da prova |
 | `typecheck`, `lint`, `test`, `build` verdes | CI (GitHub Actions) a cada push |
 | `comprimir-imagem.ts` idêntico entre `admin` e `cliente` | **não existe gate** — poly-repo sem pacote compartilhado (ADR-001). Custo declarado, ver a seção da compressão |
+| **Alegação VISUAL se prova em navegador, nunca em jsdom** (SPEC-072/D2). Campo presente no texto não é campo visível na tela: `overflow:hidden` num ancestral, conteúdo atrás do botão, largura insuficiente e rolagem horizontal deixam a asserção de texto verde com a queixa de pé | `pnpm run test:navegador` (job `navegador`). O detector do corte é geométrico e exato — elemento cortado por `text-overflow` tem `scrollWidth` **maior** que `clientWidth`. **O job não é obrigatório no ruleset**, e `src/lib/prova-visual.test.ts` guarda a existência dele |
+| **Aula e crédito de reposição se casam por `ocupacaoId`, nunca por texto de exibição** (SPEC-072/INV-072c). `turmaNome + data + horaInicio` funciona no teste e casa o crédito errado em produção: o schema não torna o nome da turma único | `credito-utilizavel.test.ts` — o caso das duas faltas indistinguíveis por texto, e a asserção **nomeia** o `faltaId`. Sabotagem: casar pela primeira falta derruba 3 casos |
+| **Filtro de nível é EXIBIÇÃO, e o servidor não recusa** (SPEC-072/INV-072a). Nível nunca foi autoridade | **duas metades em duas camadas:** no Cliente, `turmas-do-clube.test.tsx`; no **Back**, `test/fit/spec-072-credito-e-nivel.fit-spec.ts`, com `POST` real. A metade do Cliente usa o serviço mockado e **não diria nada** sobre o servidor |
+| **Recusa do servidor nunca vira silêncio na tela** (SPEC-072/INV-072f), e o mecanismo é por **CLASSE**: uma lista de códigos conhecidos não alcança resposta sem `code`, sem corpo, com código novo, nem o que o back acrescentar depois | `my-classes-list.test.tsx`. Sabotagem que prova o desenho: trocar a classe por uma lista dos cinco códigos nomeados deixa **os cinco verdes** e derruba **só** o genérico |
 
 ## 9. Compressão de imagem no navegador (SPEC-018/TASK-002)
 
@@ -782,7 +815,10 @@ mundo muda, em vez de congela-lo.
 
 | # | Gap | Severidade |
 |---|---|---|
-| 1 | ~~`api-types.ts` pode ficar stale~~ — **fechado na SPEC-067**: o job `contrato` compara com o contrato fixado por SHA, e o `contrato.yml` abre PR quando o `back` anda. **Resta:** o job só bloqueia o merge depois que o ruleset o exigir (TASK-004) | Baixa |
+| 1 | ~~`api-types.ts` pode ficar stale~~ — **fechado por completo**: o job `contrato` compara com o contrato fixado por SHA, o `contrato.yml` abre PR quando o `back` anda, e o ruleset **já exige** o job (conferido pela API em 2026-09-24). *O "resta" que estava aqui caiu.* | — |
 | 2 | **Sem estado global e sem cache de servidor**: cada tela refaz suas chamadas. Adequado hoje; vira problema quando duas telas precisarem do mesmo dado fresco | Média |
 | 3 | Sem tratamento de offline apesar do service worker registrado (`cliente`) | Baixa |
 | 4 | Cobertura de teste concentrada em poucos componentes | Média |
+| 5 | **A PR-espelho `contrato/sync` não fica mergeável sozinha.** O `workflow_dispatch` que o `sincronizar-contrato.mjs` dispara cria os check runs no **commit**, mas eles **não entram no rollup da PR** — e é o rollup que o ruleset lê. Medido em 2026-09-24 nos três frontends: nenhuma `contrato/sync` jamais foi mergeada. O contorno é um push de **usuário** na mesma branch, que dispara `synchronize`. Conserto: PAT no script, ou outro gatilho | **Alta** |
+| 6 | **O painel de escolha dentro da tela de Aulas não tem prova de geometria** (SPEC-072/`LIM-072g`). A `AC-006` cobre a tela de oportunidades; o painel da `TASK-005` é uma **segunda** superfície com a mesma informação a 320px. Ele nasceu com as classes que a TASK-004 provou, mas **semelhança de código não é medição** | Média |
+| 7 | **O job `navegador` não é obrigatório.** O ruleset exige `build` e `contrato`; um `navegador` vermelho não bloqueia merge. `prova-visual.test.ts` guarda a existência do job, não o veredito | Média |

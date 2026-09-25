@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ArrowRight, History, Users } from "lucide-react";
 import { BottomNav } from "@/components/bottom-nav";
+import { MinhaFilaDeEspera } from "@/components/minha-fila-de-espera";
 import { MyClassesList } from "@/components/my-classes-list";
 import { TopAppBar } from "@/components/top-app-bar";
 
@@ -35,6 +36,18 @@ export function TelaDeAulas() {
   return (
     <main className="app-screen min-h-screen overflow-hidden bg-background pb-36">
       <TopAppBar />
+
+      {/*
+        SPEC-064/TASK-005 — **acima da agenda, e só quando há fila.**
+
+        O aviso "Sua vez" leva para cá (`destino_url` = `/minhas-aulas`), e a
+        vez tem prazo: enterrá-la embaixo da lista seria entregar o chamado
+        para quem rolar a tela. Quando não há fila, o componente não desenha
+        nada — bloco vazio permanente é ruído que ensina a ignorar a região.
+      */}
+      <div className="px-5 pt-3">
+        <MinhaFilaDeEspera />
+      </div>
 
       <MyClassesList />
 

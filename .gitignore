@@ -39,3 +39,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# SPEC-072/TASK-003 - saida do Playwright (trace, relatorio, cache do
+# navegador). Nada disso e fonte, e o trace chega a dezenas de MB.
+/test-results
+/playwright-report
+/blob-report
+/playwright/.cache

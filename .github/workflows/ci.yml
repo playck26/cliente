@@ -43,9 +43,10 @@ jobs:
   # SPEC-067/TASK-001 — os tipos gerados correspondem ao contrato FIXADO?
   #
   # Job proprio, e nao um passo do `build`, porque e pelo NOME que o ruleset o
-  # exige (TASK-004): `contrato` vira `required_status_checks` ao lado de
-  # `build`. Enquanto isso nao acontecer, ele aparece na PR mas nao bloqueia --
-  # e a INV-067a fica declarada aberta, nao "mecanizada".
+  # exige (TASK-004). **E ele JA exige** -- conferido em 2026-09-24 pela API,
+  # `required_status_checks` traz `build` e `contrato`, com
+  # `strict_required_status_checks_policy`. A INV-067a esta mecanizada; o
+  # comentario anterior, dizendo que "ainda nao bloqueia", ficou velho.
   #
   # O contrato vem do SHA em `src/lib/contrato.lock.json`, por `raw` imutavel.
   # Merge no Back NAO deixa este job vermelho: quem acompanha o `main` do Back
@@ -84,3 +85,50 @@ jobs:
           saida="$(node .github/scripts/conferir-contrato.mjs)"
           echo "$saida"
           echo "$saida" | grep -q '^OK src/lib/api-types.ts em dia'
+
+  # SPEC-072/AC-005 -- **a prova VISUAL, em navegador de verdade.**
+  #
+  # Job proprio pelo mesmo motivo do `contrato`: e pelo NOME que um ruleset
+  # pode vir a exigi-lo. Hoje ele NAO e required -- `build` e `contrato` sao
+  # os dois da regra --, entao ele aparece na PR sem bloquear. Fica declarado
+  # aberto, e nao "mecanizado".
+  #
+  # Por que existe: a queixa que originou a SPEC-072 e geometrica, e o
+  # `vitest` deste repositorio roda em jsdom, que NAO TEM layout engine --
+  # `getBoundingClientRect()` devolve zero em tudo. Asserção de texto fica
+  # verde com `overflow:hidden` num ancestral, com conteudo atras do botao e
+  # com overflow horizontal. Ou a prova e de navegador, ou nao e prova (D2).
+  #
+  # So `chromium`: um navegador ja da layout de verdade, e tres triplicariam
+  # o tempo do job sem responder outra pergunta. `--with-deps` porque o
+  # runner do Ubuntu nao traz as bibliotecas de sistema que o Chromium pede.
+  navegador:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm run test:navegador:instalar
+
+      # O `playwright.config.ts` constroi a app e sobe o `next start` sozinho
+      # (`webServer`), entao nao ha passo de build aqui: o objeto do
+      # julgamento e o bundle de PRODUCAO, nao o `next dev`.
+      - run: pnpm run test:navegador
+
+      # O trace so e gravado quando um caso falha (`retain-on-failure`).
+      # Sem ele, uma falha que so acontece no runner fica sem diagnostico.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-trace
+          path: test-results/
+          retention-days: 7
+          if-no-files-found: ignore
