@@ -31,6 +31,38 @@ function dataBR(iso: string): string {
 }
 
 /**
+ * SPEC-076/D4 — **o rótulo sai do `estado`**, e de nada mais.
+ *
+ * Antes ele saía de `podeLancar`: aula passada fora do prazo caía em "ainda
+ * não aconteceu" (fato 11) — a tela negava uma aula que tinha acontecido.
+ *
+ * SPEC-030 — `nao_houve` tem rótulo próprio, e não "chamada feita · 0/5": a
+ * contagem sugeriria uma chamada vazia, que é o oposto do que houve.
+ */
+function rotuloDaAula(o: Ocorrencia): string {
+  if (o.cancelada) return "aula cancelada";
+  switch (o.estado) {
+    case "futura":
+      return "ainda não aconteceu";
+    case "em_andamento":
+      return "aula em andamento";
+    case "pendente":
+      return "aguardando fechamento";
+    case "nao_houve":
+      return "aula não realizada";
+    case "sem_participantes":
+      return "sem participantes";
+    case "sem_registro":
+      return "sem registro";
+    case "feita":
+    case "legada":
+      return `chamada feita · ${o.marcados}/${o.totalAlunos}`;
+    default:
+      return "ver chamada";
+  }
+}
+
+/**
  * SPEC-013/AC-008 — quem está na quadra, e só isso.
  *
  * Sem telefone, sem e-mail, sem situação de pagamento. O servidor também
@@ -249,10 +281,14 @@ export function MinhaTurmaDetalheView({ id }: { id: string }) {
               <>
                 <ul className="flex flex-col gap-2">
                   {ocorrencias.map((o) => {
+                    // SPEC-076/D4 — a chamada é leitura, e a leitura vale para
+                    // TODA aula que já começou — não só para a que ainda está
+                    // no prazo, que era a regra de quem lançava presença.
+                    const legivel = o.cancelada || o.estado !== "futura";
                     const conteudo = (
                       <Card
                         className={
-                          o.podeLancar
+                          legivel
                             ? "border-0 shadow-[var(--shadow-low)] ring-1 ring-border transition-colors hover:ring-[var(--color-primary)]"
                             : "border-0 opacity-60 ring-1 ring-border"
                         }
@@ -265,48 +301,21 @@ export function MinhaTurmaDetalheView({ id }: { id: string }) {
                             {dataBR(o.data)}
                           </span>
                           <span
-                            className={`text-xs font-semibold ${o.podeLancar ? "text-[var(--color-primary-strong)]" : "text-[var(--color-text-secondary)]"}`}
+                            className={`text-xs font-semibold ${legivel ? "text-[var(--color-primary-strong)]" : "text-[var(--color-text-secondary)]"}`}
                           >
-                            {/* SPEC-030 — `nao_houve` vem ANTES de
-                                `chamadaFeita`, e tem que vir: uma aula não
-                                realizada tem cabeçalho e zero presenças,
-                                então cairia em "chamada feita · 0/5" — a
-                                contagem sugeriria que o professor lançou uma
-                                chamada vazia, que é o oposto do que houve. */}
-                            {o.cancelada
-                              ? "aula cancelada"
-                              : o.estado === "nao_houve"
-                                ? "aula não realizada"
-                                : o.estado === "sem_participantes"
-                                  ? "sem participantes"
-                                  : o.chamadaFeita
-                                  ? `chamada feita · ${o.marcados}/${o.totalAlunos}`
-                                  : o.podeLancar
-                                    ? "fazer chamada"
-                                    : "ainda não aconteceu"}
+                            {rotuloDaAula(o)}
                           </span>
                         </CardContent>
                       </Card>
                     );
 
-                    // INV-017 decide no servidor; aqui a tela só não oferece
-                    // o que seria recusado. Oferecer e depois recusar com
-                    // 422 seria pior: a pessoa tocaria, esperaria e levaria
-                    // um erro por algo que dava para saber antes.
-                    //
-                    // **SPEC-031/AC-019b — a cancelada TAMBÉM vira link**, e
-                    // isso não contradiz a regra acima: a tela de destino
-                    // entra em modo histórico e não oferece nada. O que a
-                    // regra proíbe é oferecer uma ação que seria recusada,
-                    // não oferecer a leitura de um registro que existe.
-                    //
-                    // Sem este link o AC-019 era promessa sobre uma tela
-                    // inalcançável: o professor não tinha por onde ver quem
-                    // avisou que ia faltar na aula que o clube cancelou — que
-                    // é exatamente quando a pergunta aparece.
+                    // **SPEC-031/AC-019b — a cancelada TAMBÉM vira link**: o
+                    // professor precisa ver quem avisou que ia faltar na aula
+                    // que o clube cancelou — é exatamente quando a pergunta
+                    // aparece. A tela de destino é leitura em todo caso.
                     return (
                       <li key={o.ocupacaoId}>
-                        {o.podeLancar || o.cancelada ? (
+                        {legivel ? (
                           <Link
                             href={`/chamada/${o.ocupacaoId}`}
                             className="block"
