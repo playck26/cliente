@@ -649,10 +649,14 @@ export type Ocorrencia = components["schemas"]["OcorrenciaDaTurmaResponseDto"];
  * pedem o mesmo cuidado na tela (só avisar no valor explícito), e agora a
  * que está escrita é a que corresponde à API.
  *
- * `versao` (INV-019) continua obrigatória: sem ela no PUT, dois aparelhos na
- * mesma chamada se sobrescrevem em silêncio.
+ * `versao` era o token do `PUT` da chamada, que saiu na SPEC-076; o campo
+ * fica no contrato, inerte (LIM-076d).
  */
 export type Chamada = components["schemas"]["ChamadaResponseDto"];
+
+/** SPEC-076/D3 — a resposta do "Desfazer": o estado da aula depois dele. */
+export type NaoHouveDesfeito =
+  components["schemas"]["NaoHouveDesfeitoResponseDto"];
 
 /**
  * SPEC-027 — paginada. `dias` e `page` coexistem de propósito: `dias` diz
@@ -676,18 +680,6 @@ export async function getChamada(ocupacaoId: string): Promise<Chamada> {
   return (await res.json()) as Chamada;
 }
 
-export async function salvarChamada(
-  ocupacaoId: string,
-  versao: string,
-  itens: { alunoId: string; status: StatusPresenca }[],
-): Promise<{ versao: string; total: number }> {
-  const res = await authFetch(`/me/teacher/attendance/${ocupacaoId}`, {
-    method: "PUT",
-    body: JSON.stringify({ versao, itens }),
-  });
-  return (await res.json()) as { versao: string; total: number };
-}
-
 /**
  * SPEC-030 — **a aula não aconteceu.**
  *
@@ -696,10 +688,7 @@ export async function salvarChamada(
  * calendário ficava com o ponto vermelho de "chamada pendente" **para
  * sempre** — o professor só conseguia zerar mentindo que deu a aula.
  *
- * **Sem corpo, de propósito.** A rota inteira é a afirmação. Mandar isto
- * como um campo no `salvarChamada` faria "salvei com zero alunos" e "a aula
- * não aconteceu" viajarem pelo mesmo caminho, que é exatamente a confusão
- * que a SPEC-015 já pagou uma vez para desfazer.
+ * **Sem corpo, de propósito.** A rota inteira é a afirmação.
  *
  * **Não é cancelar a aula.** Cancelar libera a quadra e é do gestor sobre a
  * grade; isto só diz o que aconteceu (LIM-030b).
@@ -716,6 +705,25 @@ export async function registrarNaoHouveAula(
     { method: "PUT" },
   );
   return (await res.json()) as { ocupacaoId: string; completude: string };
+}
+
+/**
+ * SPEC-076/D3 — **desfazer o "a aula não aconteceu".**
+ *
+ * Até a SPEC-076 o caminho de volta era lançar a chamada por cima, pelo `PUT`
+ * que saiu. Agora é esta rota: sobre chamada automática, o servidor a refecha
+ * com o instante de antes (a janela não recomeça); sobre registro humano,
+ * apaga o cabeçalho. Sem `nao_houve` gravado, não escreve nada e devolve o
+ * estado atual — tocar duas vezes não destrói a chamada refechada.
+ */
+export async function desfazerNaoHouveAula(
+  ocupacaoId: string,
+): Promise<NaoHouveDesfeito> {
+  const res = await authFetch(
+    `/me/teacher/attendance/${ocupacaoId}/nao-houve`,
+    { method: "DELETE" },
+  );
+  return (await res.json()) as NaoHouveDesfeito;
 }
 
 /**

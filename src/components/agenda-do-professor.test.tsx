@@ -14,8 +14,8 @@ import { AgendaDoProfessor } from "./agenda-do-professor";
  *
  * Duas coisas aqui não são detalhe de tela:
  *
- * 1. **a bolinha de chamada pendente**, que é a razão de a tela existir. Um
- *    calendário que só diz "tem aula terça" repete o que ele já sabe;
+ * 1. **a bolinha de chamada pendente SAIU** (SPEC-076/D4): ninguém lança
+ *    presença à mão, e cobrar o professor seria acusá-lo de esquecimento;
  * 2. **o mês em que a tela abre**, calculado no fuso do clube. Em UTC, no
  *    dia 30 de setembro às 21h de Brasília, ela abriria em outubro — e a
  *    pessoa acharia que perdeu as aulas do mês.
@@ -106,10 +106,10 @@ describe("navegar entre meses", () => {
   });
 });
 
-describe("a bolinha — a razão da tela", () => {
-  it("o dia com chamada pendente é anunciado como tal", async () => {
-    // Anunciado, e não só desenhado: um ponto vermelho de 6px não existe
-    // para quem usa leitor de tela.
+describe("SPEC-076/D4 — o mês não cobra chamada", () => {
+  it("dia com `pendentes > 0` não é anunciado nem desenhado como pendência", async () => {
+    // Era o caso que anunciava "1 sem chamada" e desenhava o ponto vermelho.
+    // Desde a SPEC-076 quem fecha a chamada é o sistema: não há o que cobrar.
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date("2026-09-15T12:00:00.000Z"));
     getAgendaDoProfessor.mockResolvedValue([
@@ -118,9 +118,9 @@ describe("a bolinha — a razão da tela", () => {
 
     render(<AgendaDoProfessor />);
 
-    expect(
-      await screen.findByLabelText("1: 2 aulas, 1 sem chamada"),
-    ).toBeInTheDocument();
+    const dia = await screen.findByLabelText("1: 2 aulas");
+    expect(dia.querySelector("[data-pendencia]")).toBeNull();
+    expect(screen.queryByLabelText(/sem chamada/)).not.toBeInTheDocument();
   });
 
   it("dia com tudo registrado não fala de pendência", async () => {
@@ -155,7 +155,7 @@ describe("do dia à chamada", () => {
     ]);
 
     render(<AgendaDoProfessor />);
-    fireEvent.click(await screen.findByLabelText("1: 1 aula, 1 sem chamada"));
+    fireEvent.click(await screen.findByLabelText("1: 1 aula"));
 
     await waitFor(() =>
       expect(getAulasDoDia).toHaveBeenCalledWith("2026-09-01"),
@@ -183,7 +183,7 @@ describe("do dia à chamada", () => {
     ]);
 
     render(<AgendaDoProfessor />);
-    fireEvent.click(await screen.findByLabelText("1: 1 aula, 1 sem chamada"));
+    fireEvent.click(await screen.findByLabelText("1: 1 aula"));
 
     const link = await screen.findByRole("link", { name: /Iniciantes/ });
     expect(link).toHaveAttribute("href", "/chamada/ocup-1");
@@ -271,8 +271,8 @@ describe("DEF-021 — a resposta atrasada do dia anterior", () => {
     );
 
     render(<AgendaDoProfessor />);
-    fireEvent.click(await screen.findByLabelText("1: 1 aula, 1 sem chamada"));
-    fireEvent.click(await screen.findByLabelText("2: 1 aula, 1 sem chamada"));
+    fireEvent.click(await screen.findByLabelText("1: 1 aula"));
+    fireEvent.click(await screen.findByLabelText("2: 1 aula"));
     expect(await screen.findByText("Turma do dia 2")).toBeInTheDocument();
 
     // A resposta do dia 1 chega agora — depois de o professor já ter aberto
@@ -303,8 +303,8 @@ describe("DEF-021 — a resposta atrasada do dia anterior", () => {
     );
 
     render(<AgendaDoProfessor />);
-    fireEvent.click(await screen.findByLabelText("1: 1 aula, 1 sem chamada"));
-    fireEvent.click(await screen.findByLabelText("2: 1 aula, 1 sem chamada"));
+    fireEvent.click(await screen.findByLabelText("1: 1 aula"));
+    fireEvent.click(await screen.findByLabelText("2: 1 aula"));
     await screen.findByText("Turma do dia 2");
 
     await act(async () => {
@@ -345,7 +345,7 @@ describe("DEF-021 — a resposta atrasada do dia anterior", () => {
     );
 
     render(<AgendaDoProfessor />);
-    const dia1 = await screen.findByLabelText("1: 1 aula, 1 sem chamada");
+    const dia1 = await screen.findByLabelText("1: 1 aula");
     fireEvent.click(dia1);
     fireEvent.click(dia1); // fecha
 
@@ -373,7 +373,7 @@ describe("quando a busca do dia falha", () => {
     getAulasDoDia.mockRejectedValue(new Error("rede"));
 
     render(<AgendaDoProfessor />);
-    fireEvent.click(await screen.findByLabelText("1: 1 aula, 1 sem chamada"));
+    fireEvent.click(await screen.findByLabelText("1: 1 aula"));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Não foi possível carregar as aulas deste dia.",
@@ -429,11 +429,13 @@ describe("SPEC-027 — aula futura não cobra chamada", () => {
 
   it("e a aula que já terminou CONTINUA levando — o outro lado", async () => {
     // Sem esta, esconder o link de tudo passaria na de cima e o professor
-    // ficaria sem lançar chamada nenhuma.
+    // ficaria sem ver a chamada. SPEC-076/D4: `pendente` é "aguardando o
+    // fechamento automático", neutro — não é mais cobrança.
     await abrirODia("pendente");
 
     expect(screen.getByRole("link")).toHaveAttribute("href", "/chamada/ocup-1");
-    expect(screen.getByText("Chamada pendente")).toBeInTheDocument();
+    expect(screen.getByText("Aguardando fechamento")).toBeInTheDocument();
+    expect(screen.queryByText("Chamada pendente")).not.toBeInTheDocument();
   });
 
   it("aula em andamento leva para a chamada, e NÃO fica em vermelho", async () => {
@@ -462,8 +464,7 @@ describe("SPEC-027 — aula futura não cobra chamada", () => {
 
     render(<AgendaDoProfessor />);
 
-    // O rótulo do dia só menciona "sem chamada" quando há pendência — era
-    // isso que aparecia na aula de 31/08 que ele viu.
+    // O rótulo do dia não menciona "sem chamada" (desde a SPEC-076, nunca).
     expect(await screen.findByLabelText("1: 1 aula")).toBeInTheDocument();
     expect(screen.queryByLabelText(/sem chamada/)).not.toBeInTheDocument();
   });
@@ -612,7 +613,7 @@ describe("SPEC-052 — o tipo de aula no mês", () => {
     render(<AgendaDoProfessor />);
 
     const soTurma = await screen.findByLabelText(
-      "1: 2 aulas de turma, 1 sem chamada",
+      "1: 2 aulas de turma",
     );
     const soParticular = screen.getByLabelText("2: 1 aula particular");
     const ambos = screen.getByLabelText("3: 1 aula de turma, 1 aula particular");
@@ -643,7 +644,7 @@ describe("SPEC-052 — o tipo de aula no mês", () => {
     ]);
   });
 
-  it("AC-005: no dia SELECIONADO os marcadores ficam sobre a pastilha, e a pendência fora dela", async () => {
+  it("AC-005: no dia SELECIONADO os marcadores ficam sobre a pastilha (e não há mais pendência)", async () => {
     // D3: o fundo do selecionado é `primary-strong` — a mesma cor do círculo.
     // Sem a pastilha, o marcador existiria no DOM e sumiria na tela.
     vi.useFakeTimers({ shouldAdvanceTime: true });
@@ -652,7 +653,7 @@ describe("SPEC-052 — o tipo de aula no mês", () => {
 
     render(<AgendaDoProfessor />);
     const dia = await screen.findByLabelText(
-      "1: 2 aulas de turma, 1 sem chamada",
+      "1: 2 aulas de turma",
     );
 
     expect(dia.querySelector("[data-pastilha]")).toBeNull();
@@ -664,9 +665,9 @@ describe("SPEC-052 — o tipo de aula no mês", () => {
     expect(marcadores(pastilha as HTMLElement)).toEqual([
       { tipo: "turma", forma: "circulo" },
     ]);
-    const pendencia = dia.querySelector("[data-pendencia]");
-    expect(pendencia).not.toBeNull();
-    expect(pastilha?.contains(pendencia as Node)).toBe(false);
+    // SPEC-076/D4 — a bolinha de pendência, que ficava fora da pastilha,
+    // não existe mais.
+    expect(dia.querySelector("[data-pendencia]")).toBeNull();
   });
 
   it("rollout: resumo SEM os campos novos mostra a grade de hoje, sem marcador de tipo e sem erro", async () => {
@@ -677,7 +678,7 @@ describe("SPEC-052 — o tipo de aula no mês", () => {
     ]);
 
     render(<AgendaDoProfessor />);
-    const dia = await screen.findByLabelText("1: 2 aulas, 1 sem chamada");
+    const dia = await screen.findByLabelText("1: 2 aulas");
 
     expect(dia).toBeEnabled();
     expect(marcadores(dia)).toEqual([]);
@@ -724,5 +725,56 @@ describe("SPEC-052 — o tipo de aula no mês", () => {
       "href",
       "/chamada/ocup-t",
     );
+  });
+});
+
+/**
+ * SPEC-076/AC-019 — **um mês com aula `pendente` e aula `sem_registro`**:
+ * nenhum selo vermelho, nenhuma bolinha; `pendente` diz "Aguardando
+ * fechamento" e `sem_registro` diz "Sem registro".
+ */
+describe("SPEC-076/AC-019 — a agenda não cobra", () => {
+  const aula = (ocupacaoId: string, turmaNome: string, chamada: string) => ({
+    ocupacaoId,
+    turmaId: "t1",
+    turmaNome,
+    quadraNome: "Quadra 1",
+    horaInicio: "16:00",
+    horaFim: "18:00",
+    chamada,
+  });
+
+  it("pendente e sem_registro: neutros, com o rótulo de cada um, e sem ponto", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-09-15T12:00:00.000Z"));
+    getAgendaDoProfessor.mockResolvedValue([
+      { data: "2026-09-01", aulas: 1, pendentes: 0 },
+      { data: "2026-09-14", aulas: 1, pendentes: 1 },
+    ]);
+    getAulasDoDia.mockImplementation((data: string) =>
+      Promise.resolve(
+        data === "2026-09-01"
+          ? [aula("ocup-velha", "Turma velha", "sem_registro")]
+          : [aula("ocup-nova", "Turma nova", "pendente")],
+      ),
+    );
+
+    const { container } = render(<AgendaDoProfessor />);
+
+    const velho = await screen.findByLabelText("1: 1 aula");
+    const novo = screen.getByLabelText("14: 1 aula");
+    expect(container.querySelector("[data-pendencia]")).toBeNull();
+
+    fireEvent.click(velho);
+    await screen.findByText("Turma velha");
+    const selo = screen.getByText("Sem registro");
+    expect(selo.className).not.toMatch(/color-error/);
+
+    fireEvent.click(novo);
+    await screen.findByText("Turma nova");
+    const aguardando = screen.getByText("Aguardando fechamento");
+    expect(aguardando.className).not.toMatch(/color-error/);
+    expect(screen.queryByText("Chamada pendente")).not.toBeInTheDocument();
+    expect(container.querySelector("[class*='color-error']")).toBeNull();
   });
 });

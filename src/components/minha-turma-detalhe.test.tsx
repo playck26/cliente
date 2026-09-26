@@ -335,3 +335,74 @@ describe("DEF-033 — a ficha sem aulas diz o que houve", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 });
+
+/**
+ * SPEC-076/AC-020 — **a aula passada fora do prazo diz o estado dela**, e é
+ * link para a leitura. Antes o rótulo saía de `podeLancar` e dizia "ainda não
+ * aconteceu" numa aula que tinha acontecido (fato 11).
+ */
+describe("SPEC-076/AC-020 — a ficha diz o estado, e leva à leitura", () => {
+  const ocorrencia = (
+    ocupacaoId: string,
+    estado: string,
+    extra: Record<string, unknown> = {},
+  ) => ({
+    ocupacaoId,
+    data: "2026-08-01",
+    horaInicio: "18:00",
+    horaFim: "19:00",
+    cancelada: false,
+    chamadaFeita: false,
+    marcados: 0,
+    totalAlunos: 4,
+    // Fora do prazo em todas: é o caso que o rótulo antigo errava.
+    podeLancar: false,
+    estado,
+    ...extra,
+  });
+
+  it("fora do prazo: cada estado com o seu rótulo, nunca 'ainda não aconteceu', e link", async () => {
+    responder([TERCA]);
+    listOcorrenciasMock.mockResolvedValue({
+      data: [
+        ocorrencia("oc-sem-registro", "sem_registro"),
+        ocorrencia("oc-pendente", "pendente"),
+        ocorrencia("oc-feita", "feita", { chamadaFeita: true, marcados: 4 }),
+        ocorrencia("oc-nao-houve", "nao_houve"),
+      ],
+      page: 1,
+      pageSize: 30,
+      total: 4,
+    });
+
+    render(<MinhaTurmaDetalheView id="t1" />);
+
+    const esperado: [string, RegExp][] = [
+      ["oc-sem-registro", /sem registro/],
+      ["oc-pendente", /aguardando fechamento/],
+      ["oc-feita", /chamada feita · 4\/4/],
+      ["oc-nao-houve", /aula não realizada/],
+    ];
+    for (const [id, rotulo] of esperado) {
+      const link = await screen.findByRole("link", { name: rotulo });
+      expect(link).toHaveAttribute("href", `/chamada/${id}`);
+    }
+    expect(screen.queryByText(/ainda não aconteceu/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/fazer chamada/)).not.toBeInTheDocument();
+  });
+
+  it("a aula futura diz 'ainda não aconteceu' e NÃO é link", async () => {
+    responder([TERCA]);
+    listOcorrenciasMock.mockResolvedValue({
+      data: [ocorrencia("oc-futura", "futura", { data: "2099-01-01" })],
+      page: 1,
+      pageSize: 30,
+      total: 1,
+    });
+
+    render(<MinhaTurmaDetalheView id="t1" />);
+
+    expect(await screen.findByText("ainda não aconteceu")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /ainda não aconteceu/ })).toBeNull();
+  });
+});

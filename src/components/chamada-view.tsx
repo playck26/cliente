@@ -1,34 +1,38 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, CalendarDays, Check, CircleSlash, Minus, Users } from "lucide-react";
+import { ArrowLeft, BellOff, CalendarDays, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { CourtLines } from "@/components/court-lines";
 import { TopAppBar } from "@/components/top-app-bar";
 import {
   ApiError,
+  desfazerNaoHouveAula,
   getChamada,
-  salvarChamada,
   registrarNaoHouveAula,
   type Chamada,
-  type StatusPresenca,
 } from "@/lib/api-client";
+import { isoDeOffsetNoClube } from "@/lib/fuso";
 
 /**
- * SPEC-057/TASK-001/D7 — **"Justificou" saiu das opções.** Com a presença
- * automática, a correção do professor é dizer quem FALTOU; a terceira opção
- * dividia a mesma falta em duas marcas sem mudar nada na frequência.
+ * SPEC-076/D1 — o que o servidor tem gravado para cada aluno, em texto.
  *
- * O valor continua existindo: chamada antiga com `justificado` é lida e
- * mostrada (ver `JustificadoLegado`), e salvar sem tocar nesse aluno mantém a
- * marca. O que muda é só que a tela não oferece mais criar uma.
+ * `justificado` não é mais gravado por ninguém; aparece só em registro antigo.
  */
-const OPCOES: { valor: StatusPresenca; label: string; Icon: typeof Check }[] = [
-  { valor: "presente", label: "Veio", Icon: Check },
-  { valor: "ausente", label: "Faltou", Icon: Minus },
-];
+const ROTULO: Record<string, string> = {
+  presente: "Veio",
+  ausente: "Faltou",
+  justificado: "Justificou (registro antigo)",
+};
+
+/**
+ * SPEC-030/D5 — o servidor recusa `nao_houve` em aula de data anterior a hoje
+ * menos estes dias (`AULA_ANTIGA`). O espelho do `JANELA_RETROATIVA_DIAS` do
+ * back, para a tela não oferecer o que seria recusado (AC-018).
+ */
+const JANELA_RETROATIVA_DIAS = 7;
 
 /** `2026-09-25T17:00:00.000Z` → `25/09 às 14:00`, no relógio de quem lê. */
 function formatarPrazo(iso: string): string {
@@ -37,89 +41,57 @@ function formatarPrazo(iso: string): string {
   return `${dois(d.getDate())}/${dois(d.getMonth() + 1)} às ${dois(d.getHours())}:${dois(d.getMinutes())}`;
 }
 
-const ROTULO: Record<string, string> = {
-  presente: "Veio",
-  ausente: "Faltou",
-  justificado: "Justificou",
-};
-
 /**
- * SPEC-057/TASK-001/D2 — o que a revisão da versão atual encontrou, para a
- * tela dizer antes de o professor salvar de novo.
+ * SPEC-076/D1 — de onde veio o que está na tela. Uma frase por situação, e
+ * nenhuma manda "marcar e salvar": ninguém grava presença à mão.
  */
-interface Revisao {
-  /** Estavam no rascunho e não estão mais na chamada. */
-  removidos: string[];
-  /** Entraram na chamada e precisam ser marcados. */
-  novos: string[];
-  /** O salvo difere do rascunho — o rascunho foi mantido. */
-  divergentes: { nome: string; salvo: string; rascunho: string }[];
+function origemDoRegistro(chamada: Chamada): string {
+  if (chamada.completude === "nao_houve") return "Aula não realizada.";
+  if (chamada.origem === "automatica") {
+    return "Fechada automaticamente — quem avisou falta pelo app aparece como Faltou.";
+  }
+  if (chamada.completude !== null) {
+    return "Registro humano anterior à automação.";
+  }
+  // Sem cabeçalho. `estado` vem do Back da SPEC-076; o antigo não o manda, e
+  // para ele a aula passada sem chamada é sempre `pendente` (D12).
+  const estado: string | undefined = chamada.estado;
+  if (estado === "sem_registro") return "Sem registro de presença.";
+  if (estado === "sem_participantes") {
+    return "Nenhum aluno participava desta aula — não há chamada a fechar.";
+  }
+  if (estado === "futura" || estado === "em_andamento") {
+    return "A aula ainda não terminou — a chamada é fechada automaticamente depois do fim.";
+  }
+  return "Aguardando o fechamento automático.";
 }
 
 /**
- * SPEC-014 — a chamada.
+ * SPEC-014 → SPEC-076 — **a chamada, só leitura.**
  *
- * O desenho todo responde a uma restrição de contexto: isto é usado **em
- * quadra**, no celular, com pressa, às vezes com sinal ruim. Daí três
- * decisões:
+ * Até a SPEC-076 esta tela era o lugar de marcar Veio/Faltou e salvar. O
+ * Israel decidiu (decisões 1 e 9) que ninguém grava presença à mão: o
+ * fechamento automático grava, e quem avisou falta pelo app vira "Faltou"
+ * (D2). O servidor tirou a rota (D1) — oferecer os botões aqui seria ensinar
+ * pelo erro.
  *
- * 1. Os três estados ficam visíveis o tempo todo, um toque cada. Nada de
- *    menu, nada de deslizar, nada de confirmar duas vezes.
- * 2. Salvar é explícito e manda a chamada inteira. Salvar a cada toque
- *    multiplicaria requisições justamente onde a rede é pior.
- * 3. Conflito (409) não descarta o que a pessoa acabou de marcar: ela vê o
- *    aviso e decide. Perder toque de quem está segurando uma raquete é o
- *    pior resultado possível.
- *
- * **SPEC-015/DEF-002 (TASK-000a):** salvar exigia apenas um aluno marcado, e
- * mandava só os marcados — uma chamada de 2 em 10 era gravada como se
- * estivesse pronta, e os outros 8 sumiam ao reabrir. Agora salvar só libera
- * com todos marcados, e existe "todos vieram" para o caso comum: exigir
- * completude sem dar o atalho seria trocar um defeito por atrito em quadra.
+ * Ficam as duas ações que continuam existindo, cada uma só onde o servidor
+ * aceitaria: "A aula não aconteceu" e o "Desfazer" dela (D3).
  */
 export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
   const router = useRouter();
   const [chamada, setChamada] = useState<Chamada | null>(null);
-  const [marcas, setMarcas] = useState<Record<string, StatusPresenca>>({});
-  const [salvando, setSalvando] = useState(false);
+  const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   /**
-   * SPEC-057/TASK-001/D2 — o 409, com o sinal do servidor. `null` sem
-   * conflito. `fechamentoAutomatico` escolhe a frase; ele diz que a chamada
-   * NASCEU automática, não que a última mudança foi do job.
-   */
-  const [conflito, setConflito] = useState<{
-    fechamentoAutomatico: boolean;
-  } | null>(null);
-  const [revisando, setRevisando] = useState(false);
-  const [revisao, setRevisao] = useState<Revisao | null>(null);
-  const [salvo, setSalvo] = useState(false);
-  /**
-   * **SPEC-030 / achado 2 da 3ª validação cruzada (MÉDIA) — o rascunho que a
-   * tela dava por salvo.**
-   *
-   * Salvar manda a chamada inteira e leva o tempo da pior rede do produto.
-   * Nesse meio-tempo os botões de cada aluno continuam vivos — de propósito:
-   * travar a tela em quadra, com sinal ruim, seria pior. Só que a resposta
-   * chegava e a tela dizia "Salvo" ao lado da marca NOVA, a que o servidor
-   * nunca recebeu. O professor lia "Salvo" sobre "Faltou" e ia embora com
-   * "Veio" gravado.
-   *
-   * Um contador em `ref`, e não em `state`, porque o que se compara é o
-   * valor no instante do envio contra o valor no instante da resposta —
-   * `state` capturado no fechamento daria justamente a fotografia velha que
-   * criou o defeito.
-   */
-  const edicoes = useRef(0);
-  /**
-   * SPEC-030 / achado 4 da 4ª validação cruzada — o `nao-houve` gravou, mas
-   * a releitura não voltou. A tela não sabe o estado novo e **sabe que não
-   * sabe**: some com a ação em vez de oferecê-la de novo sobre uma escrita
+   * SPEC-030 / achado 4 da 4ª validação cruzada — a escrita gravou, mas a
+   * releitura não voltou. A tela não sabe o estado novo e **sabe que não
+   * sabe**: some com as ações em vez de oferecê-las de novo sobre uma escrita
    * que já aconteceu.
    */
   const [releituraFalhou, setReleituraFalhou] = useState(false);
   /**
-   * SPEC-057/TASK-001/D5 — o relógio do prazo é o da abertura da tela, e não
+   * SPEC-057/TASK-001/D5 — o relógio dos prazos é o da abertura da tela, e não
    * o de cada render: render tem de ser puro. Tela aberta que atravessa o
    * prazo descobre pelo `422 AULA_ANTIGA` do servidor, que é o portão.
    */
@@ -127,14 +99,7 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
 
   useEffect(() => {
     getChamada(ocupacaoId)
-      .then((data) => {
-        setChamada(data);
-        const iniciais: Record<string, StatusPresenca> = {};
-        for (const aluno of data.alunos) {
-          if (aluno.status) iniciais[aluno.alunoId] = aluno.status;
-        }
-        setMarcas(iniciais);
-      })
+      .then(setChamada)
       .catch((err: unknown) => {
         setErro(
           err instanceof ApiError && err.status === 404
@@ -144,311 +109,114 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
       });
   }, [ocupacaoId]);
 
-  function marcar(alunoId: string, status: StatusPresenca) {
-    // **Achado 5 da 4ª validação cruzada (BAIXA) — interação não é
-    // alteração.** Era `edicoes.current += 1` seco: tocar de novo em "Veio"
-    // no aluno que já estava "Veio" contava como edição, e o botão voltava
-    // de "Salvo" para "Salvar chamada" anunciando um rascunho pendente que
-    // não existe. Em quadra, toque repetido é o normal — a pessoa confere.
-    if (marcas[alunoId] === status) return;
-    edicoes.current += 1;
-    setSalvo(false);
-    setMarcas((atual) => ({ ...atual, [alunoId]: status }));
-  }
-
   /**
-   * O caso comum de uma aula é todo mundo ter vindo. Sem este atalho, a
-   * regra de completude cobraria N toques para registrar "nada de
-   * anormal" — e quem está em quadra abandonaria a chamada.
+   * A escrita e a releitura em dois `try`: a releitura que falha não pode
+   * dizer que a escrita falhou (achado 4 da 4ª validação cruzada da SPEC-030)
+   * — um erro que nega uma escrita confirmada manda a pessoa refazê-la.
    */
-  function marcarTodosPresentes() {
-    if (!chamada) return;
-    // Mesma regra do `marcar`: se todos já estão presentes, o atalho não
-    // altera nada e não pode sujar o estado de "Salvo".
-    if (chamada.alunos.every((a) => marcas[a.alunoId] === "presente")) return;
-    edicoes.current += 1;
-    setSalvo(false);
-    setMarcas(
-      Object.fromEntries(
-        chamada.alunos.map((a) => [a.alunoId, "presente" as StatusPresenca]),
-      ),
-    );
-  }
-
-  async function salvar() {
+  async function escreverERelear(
+    escrever: () => Promise<unknown>,
+    falhaAoEscrever: string,
+    feito: string,
+  ) {
     if (!chamada) return;
     setErro(null);
-    setConflito(null);
-    setSalvando(true);
-    // O retrato do que está saindo. Tudo o que a resposta afirmar vale sobre
-    // ESTE conjunto, não sobre o que a tela mostrar quando ela chegar.
-    const enviadas = marcas;
-    const edicoesNoEnvio = edicoes.current;
+    setEnviando(true);
     try {
-      const itens = Object.entries(enviadas).map(([alunoId, status]) => ({
-        alunoId,
-        status,
-      }));
-      const res = await salvarChamada(chamada.ocupacaoId, chamada.versao, itens);
-      // A versão nova volta do servidor: sem atualizá-la, o próximo salvar
-      // desta mesma tela bateria de frente com a INV-019 e daria 409 contra
-      // a própria escrita anterior.
-      //
-      // **SPEC-030 / achado 3 da 2ª validação cruzada (MÉDIA).** Só a versão
-      // era atualizada, e o resto da tela ficava no estado ANTERIOR ao
-      // salvamento. Duas consequências, as duas silenciosas:
-      //
-      // 1. o botão "A aula não aconteceu" continuava visível, embora o
-      //    servidor já fosse recusá-lo com `CHAMADA_COM_PRESENCA`;
-      // 2. ao desfazer uma aula `nao_houve` por este caminho, a tela seguia
-      //    dizendo "registrada como não realizada" até recarregar — o
-      //    professor via a mensagem contrária ao que acabara de fazer.
-      //
-      // Não relê do servidor: **sabemos exatamente o que foi gravado**, e um
-      // GET a mais na pior rede do produto (em quadra) não paga o que já
-      // temos em mãos.
-      setRevisao(null);
-      setChamada({
-        ...chamada,
-        versao: res.versao,
-        completude: "completa",
-        // SPEC-057/TASK-001/D5 — salvar é ratificar: a origem atual vira a do
-        // professor, e a inicial (como a chamada nasceu) fica.
-        origem: "professor",
-        origemInicial: chamada.origemInicial ?? "professor",
-        alunos: chamada.alunos.map((a) => ({
-          ...a,
-          status: enviadas[a.alunoId] ?? a.status,
-        })),
-      });
-      // **Achado 2 da 3ª validação cruzada (MÉDIA).** Era `setSalvo(true)`
-      // seco. Se a pessoa marcou alguém enquanto o PUT estava no ar, o que
-      // está na tela não é o que o servidor gravou — e "Salvo" ao lado da
-      // marca nova é a tela afirmando uma coisa falsa sobre o servidor.
-      //
-      // Não desfaz o rascunho e não bloqueia: o botão volta a "Salvar
-      // chamada", que é a verdade (há mudança pendente) e o caminho
-      // (toque de novo).
-      setSalvo(edicoes.current === edicoesNoEnvio);
+      await escrever();
     } catch (err) {
-      if (err instanceof ApiError && err.status === 409) {
-        setConflito({
-          fechamentoAutomatico: err.corpo?.fechamentoAutomatico === true,
-        });
-      } else {
-        setErro(
-          err instanceof ApiError ? err.message : "Não foi possível salvar.",
-        );
-      }
-    } finally {
-      setSalvando(false);
+      setErro(err instanceof ApiError ? err.message : falhaAoEscrever);
+      setEnviando(false);
+      return;
     }
-  }
-
-  /**
-   * SPEC-057/TASK-001/D2 — **revisar a versão atual sem perder o rascunho.**
-   *
-   * Era `window.location.reload()`, que jogava fora exatamente o que o aviso
-   * prometia guardar ("suas marcações continuam aqui"). Agora:
-   *
-   * - relê pelo GET, sem recarregar a página;
-   * - reaplica o rascunho **só aos alunos que continuam na chamada**;
-   * - lista quem saiu, quem entrou (e precisa ser marcado) e onde o salvo
-   *   difere do rascunho;
-   * - **não salva sozinho**: o professor confere e toca em Salvar de novo,
-   *   agora contra a versão atual.
-   *
-   * GET que falha conserva tudo — rascunho e aviso — e diz isso. Recarregar a
-   * página ou fechar o navegador perde o rascunho (LIM-057k): ele mora só na
-   * memória, sem storage de dado pessoal.
-   */
-  async function revisarVersaoAtual() {
-    if (!chamada) return;
-    setErro(null);
-    setRevisando(true);
-    const rascunho = marcas;
     try {
-      const atual = await getChamada(chamada.ocupacaoId);
-      const idsAtuais = new Set(atual.alunos.map((a) => a.alunoId));
-      const idsAntigos = new Set(chamada.alunos.map((a) => a.alunoId));
-      const reaplicadas: Record<string, StatusPresenca> = {};
-      for (const aluno of atual.alunos) {
-        const minha = rascunho[aluno.alunoId];
-        if (minha) reaplicadas[aluno.alunoId] = minha;
-      }
-      setRevisao({
-        removidos: chamada.alunos
-          .filter((a) => rascunho[a.alunoId] && !idsAtuais.has(a.alunoId))
-          .map((a) => a.nome),
-        novos: atual.alunos
-          .filter((a) => !idsAntigos.has(a.alunoId))
-          .map((a) => a.nome),
-        divergentes: atual.alunos
-          .filter(
-            (a) =>
-              a.status !== null &&
-              rascunho[a.alunoId] !== undefined &&
-              rascunho[a.alunoId] !== a.status,
-          )
-          .map((a) => ({
-            nome: a.nome,
-            salvo: ROTULO[a.status as string] ?? String(a.status),
-            rascunho: ROTULO[rascunho[a.alunoId]] ?? rascunho[a.alunoId],
-          })),
-      });
-      setChamada(atual);
-      setMarcas(reaplicadas);
-      edicoes.current += 1;
-      setSalvo(false);
-      setConflito(null);
+      setChamada(await getChamada(chamada.ocupacaoId));
     } catch {
       setErro(
-        "Não foi possível carregar a versão atual. Suas marcações continuam " +
-          "aqui — tente revisar de novo.",
+        `${feito} Não foi possível atualizar a tela — recarregue para ver o estado atual.`,
       );
+      setReleituraFalhou(true);
     } finally {
-      setRevisando(false);
+      setEnviando(false);
     }
   }
 
-  /**
-   * SPEC-030 — **registrar que a aula não aconteceu.**
-   *
-   * Confirmação explícita antes de mandar. É a única ação desta tela que não
-   * é um toque reversível: as outras marcam presença e podem ser
-   * remarcadas até salvar, esta grava direto. E ela responde por todos os
-   * alunos de uma vez.
-   */
   async function naoHouveAula() {
     if (!chamada) return;
     if (
       !window.confirm(
         "Registrar que esta aula NÃO aconteceu?\n\n" +
-          (automaticaNaoRevisada
+          (chamada.origem === "automatica"
             ? "As presenças do fechamento automático serão apagadas. "
             : "") +
-          "Ela sai da lista de chamadas pendentes e não conta na frequência " +
-          "de ninguém. Você pode desfazer lançando a chamada normalmente.",
+          "Ela não conta na frequência de ninguém.",
       )
     ) {
       return;
     }
-    setErro(null);
-    setConflito(null);
-    setSalvando(true);
-    const edicoesNoEnvio = edicoes.current;
-    try {
-      await registrarNaoHouveAula(chamada.ocupacaoId);
-    } catch (err) {
-      setErro(
-        err instanceof ApiError
-          ? err.message
-          : "Não foi possível registrar. Tente de novo.",
-      );
-      setSalvando(false);
-      return;
-    }
-
-    // **Achado 4 da 4ª validação cruzada (MÉDIA) — a escrita já aconteceu, e
-    // daqui para baixo NADA pode dizer o contrário.**
-    //
-    // O `try` era um só, em volta do PUT e da releitura. Quando a rede caía
-    // só no GET — que é o caso comum em quadra, porque são duas idas —, a
-    // tela mostrava "Não foi possível registrar", conservava o estado
-    // anterior e voltava a oferecer a ação. **O servidor tinha registrado.**
-    // O professor tocaria de novo, e o segundo toque encontraria a aula já
-    // marcada.
-    //
-    // Um erro que nega uma escrita confirmada é pior que erro nenhum: ele
-    // manda a pessoa desfazer o que deu certo.
-    try {
-      // Relê porque o servidor é quem sabe a `versao` nova, e ela é o que
-      // permite desfazer sem levar 409.
-      setChamada(await getChamada(chamada.ocupacaoId));
-      // Mesma corrida do `salvar`, do outro lado: limpar as marcas apagaria,
-      // em silêncio, o que a pessoa tocou enquanto a requisição estava no
-      // ar. Só limpa se ninguém tocou em nada — e aí não há o que perder.
-      if (edicoes.current === edicoesNoEnvio) setMarcas({});
-      setSalvo(false);
-    } catch {
-      // A releitura falhou, e só ela. Diz o que é verdade: está registrado,
-      // e o que está na tela pode estar velho.
-      setErro(
-        "Registrado. Não foi possível atualizar a tela — recarregue para ver " +
-          "o estado atual.",
-      );
-      setReleituraFalhou(true);
-    } finally {
-      setSalvando(false);
-    }
+    await escreverERelear(
+      () => registrarNaoHouveAula(chamada.ocupacaoId),
+      "Não foi possível registrar. Tente de novo.",
+      "Registrado.",
+    );
   }
 
-  const marcados = Object.keys(marcas).length;
-  const total = chamada?.alunos.length ?? 0;
-  const faltamMarcar = total - marcados;
-  /** SPEC-030 — alguém já declarou que esta aula não aconteceu. */
+  async function desfazer() {
+    if (!chamada) return;
+    if (
+      !window.confirm(
+        "Desfazer o registro de que esta aula não aconteceu?\n\n" +
+          "A chamada volta ao que o fechamento automático registra.",
+      )
+    ) {
+      return;
+    }
+    await escreverERelear(
+      () => desfazerNaoHouveAula(chamada.ocupacaoId),
+      "Não foi possível desfazer. Tente de novo.",
+      "Desfeito.",
+    );
+  }
+
   const naoHouve = chamada?.completude === "nao_houve";
-  /**
-   * SPEC-057/TASK-001/D5 — a chamada que nasceu automática tem prazo próprio:
-   * sete dias desde o fechamento. Passado, a tela vira histórico — o servidor
-   * recusaria com `AULA_ANTIGA`, e oferecer a ação seria ensinar pelo erro.
-   */
-  const prazoEncerrado = Boolean(
-    chamada?.corrigivelAte &&
-      new Date(chamada.corrigivelAte).getTime() <= abertaEm,
-  );
-  /** SPEC-057/TASK-001/D5 — fechada pelo job e ainda sem revisão humana. */
-  const automaticaNaoRevisada = chamada?.origem === "automatica";
-  /**
-   * SPEC-031/AC-019b — **modo histórico: a aula cancelada é alcançável e é
-   * somente leitura.**
-   *
-   * Antes, o professor não chegava aqui: `minha-turma-detalhe.tsx` só fazia
-   * link quando `podeLancar`. Quem chegasse por URL antiga encontrava a tela
-   * **editável**, tocava, e levava `422 AULA_CANCELADA` do servidor — ou seja,
-   * o erro era a forma de descobrir a regra.
-   *
-   * **"Não oferece salvar" não bastava, e a 6ª rodada mostrou por quê:** a
-   * primeira versão desta decisão escondia só o botão *Salvar*, e o professor
-   * continuava podendo tocar `Veio`/`Faltou`/`Justificou`, criando rascunho
-   * numa tela declarada somente leitura. O critério é a ausência de **toda**
-   * ação mutadora.
-   */
-  const historico = chamada?.cancelada === true || prazoEncerrado;
-  /**
-   * **SPEC-030 / achado 3 da validação cruzada (MÉDIA).**
-   *
-   * A condição do botão era `marcados === 0`, e `marcados` conta as marcas
-   * LOCAIS. Um toque errado em "Veio" — sem salvar nada — fazia o botão
-   * sumir, e como `marcar()` só adiciona, **não havia como desmarcar**: o
-   * caminho de "a aula não aconteceu" ficava perdido até recarregar a
-   * página, em quadra, com sinal ruim.
-   *
-   * Agora a condição é o SERVIDOR: só some quando há presença de fato
-   * gravada. É também o que o servidor recusa (`CHAMADA_COM_PRESENCA`) — a
-   * tela deixou de esconder por conta própria o que a API ainda aceitaria.
-   */
-  const temPresencaSalva = Boolean(
+  const temPresencaGravada = Boolean(
     chamada?.alunos.some((a) => a.status !== null),
   );
+  const estado: string | undefined = chamada?.estado;
   /**
-   * SPEC-057/TASK-001/D5 — **a exceção estreita.** Presença salva esconde o
-   * botão, menos quando quem salvou foi o fechamento automático e ninguém
-   * revisou: ali as presenças são presunção, e o servidor aceita declarar que
-   * a aula não aconteceu (apagando-as) dentro do prazo.
+   * SPEC-076/AC-018 — **o botão aparece só onde o servidor aceitaria.** As
+   * mesmas guardas do portão (`travarEValidarOcorrencia`), na mesma ordem:
+   * cancelada, aula que não começou, janela (a da automática: o fechamento +
+   * 7 dias; a de qualquer outra: a data da aula + 7 dias) e presença humana
+   * gravada (`CHAMADA_COM_PRESENCA`).
    */
-  const podeDizerQueNaoHouve =
-    !naoHouve && (!temPresencaSalva || automaticaNaoRevisada) && !releituraFalhou;
-  // INV-026: o servidor recusa chamada incompleta. A tela impede antes de a
-  // pessoa tentar, porque descobrir isso por erro de rede, em quadra, é o
-  // pior momento possível.
-  const completa = total > 0 && faltamMarcar === 0;
+  const dentroDaJanela = chamada
+    ? chamada.origem === "automatica" && chamada.corrigivelAte
+      ? new Date(chamada.corrigivelAte).getTime() > abertaEm
+      : chamada.data >= isoDeOffsetNoClube(-JANELA_RETROATIVA_DIAS, new Date(abertaEm))
+    : false;
+  const podeDizerQueNaoHouve = Boolean(
+    chamada &&
+      !chamada.cancelada &&
+      !naoHouve &&
+      estado !== "futura" &&
+      dentroDaJanela &&
+      (!temPresencaGravada || chamada.origem === "automatica") &&
+      !releituraFalhou,
+  );
+  /**
+   * SPEC-076/D3 e D12 — o "Desfazer" existe **só** com o campo. O servidor o
+   * manda não nulo apenas com `nao_houve` gravado e dentro do prazo; o Back
+   * anterior à SPEC-076 não o manda, e aí o botão não aparece.
+   */
+  const desfazerAte =
+    naoHouve && !releituraFalhou ? chamada?.desfazerNaoHouveAte : null;
 
   return (
     <div className="app-screen flex min-h-full flex-col bg-[var(--color-background)]">
       <TopAppBar />
 
-      <main className="flex flex-1 flex-col gap-5 px-4 pt-1 pb-40">
+      <main className="flex flex-1 flex-col gap-5 px-4 pt-1 pb-10">
         <Button
           type="button"
           variant="ghost"
@@ -472,7 +240,7 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
                 </span>
                 <span className="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-2">
                   <Users className="size-4" aria-hidden="true" />
-                  {marcados}/{total} marcados
+                  {chamada.alunos.length} {chamada.alunos.length === 1 ? "aluno" : "alunos"}
                 </span>
               </div>
             ) : null}
@@ -485,270 +253,86 @@ export function ChamadaView({ ocupacaoId }: { ocupacaoId: string }) {
           </p>
         ) : null}
 
-        {/* DEF-002: chamada gravada antes da correção pode estar pela
-            metade, e ninguém sabe quem faltou. A tela diz isso em vez de
-            apresentar uma lista incompleta como se fosse o registro. */}
-        {chamada?.completude === "desconhecida" && !historico ? (
-          <p className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-high)] p-3 text-sm">
-            Esta chamada foi lançada antes de o app exigir a lista completa,
-            então pode estar pela metade. Confira todos os alunos e salve de
-            novo para deixá-la fechada.
-          </p>
-        ) : null}
-
-        {/* SPEC-031/AC-019b — o rótulo, e ele diz o que a tela É, não só o
-            que aconteceu com a aula: "somente leitura" é a instrução.
-
-            **Os dois blocos abaixo são silenciados no modo histórico**, e isso
-            é conserto de achado (auditoria de 2026-09-05). Os dois terminam
-            mandando *"marque os alunos abaixo e salve"* — instrução impossível
-            numa tela onde os botões estão `disabled` e a barra de Salvar não
-            existe. O professor tocaria, nada aconteceria, e não haveria nada
-            explicando por quê.
-
-            Eles são pré-existentes, mas só ficaram alcançáveis por navegação
-            normal porque este mesmo PR criou o link para a aula cancelada — o
-            link expôs uma contradição que já morava aqui. */}
-        {historico && chamada?.cancelada ? (
+        {chamada?.cancelada ? (
           <p
             role="status"
             className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-high)] p-3 text-sm"
           >
-            <strong>Aula cancelada — histórico somente leitura.</strong> O
-            registro fica aqui, inclusive quem avisou que ia faltar
-            {naoHouve ? " e o registro de que ela não aconteceu" : ""}. Nada
-            mais pode ser alterado.
+            <strong>Aula cancelada.</strong> O registro fica aqui, inclusive
+            quem avisou que ia faltar
+            {naoHouve ? " e o registro de que ela não aconteceu" : ""}.
           </p>
         ) : null}
-        {prazoEncerrado && !chamada?.cancelada && chamada?.corrigivelAte ? (
+
+        {chamada && !chamada.cancelada ? (
           <p
             role="status"
             className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-high)] p-3 text-sm"
           >
-            <strong>Prazo de correção encerrado.</strong> Esta chamada foi
-            fechada automaticamente e podia ser corrigida até{" "}
-            {formatarPrazo(chamada.corrigivelAte)}. Agora é histórico somente
-            leitura.
+            <strong>{origemDoRegistro(chamada)}</strong> A presença não é
+            lançada à mão: quem avisou falta pelo app fica como Faltou.
           </p>
         ) : null}
 
-        {/* SPEC-057/TASK-001/D1/D5 — de onde veio o que está salvo. Sem isso,
-            "todos vieram" gravado pelo job e "todos vieram" dito pelo
-            professor seriam a mesma tela. */}
-        {chamada && !historico && chamada.origem === "automatica" && chamada.corrigivelAte ? (
-          <p
-            role="status"
-            className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-high)] p-3 text-sm"
-          >
-            <strong>Fechada automaticamente.</strong> Presenças automáticas são
-            presumidas; faltas devem ser corrigidas pelo professor. Marque quem
-            faltou e salve até {formatarPrazo(chamada.corrigivelAte)}.
-          </p>
-        ) : null}
-        {chamada &&
-        !historico &&
-        chamada.origemInicial === "automatica" &&
-        chamada.origem !== "automatica" &&
-        chamada.corrigivelAte ? (
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            Fechada automaticamente e revisada. Correções até{" "}
-            {formatarPrazo(chamada.corrigivelAte)}.
-          </p>
-        ) : null}
-        {chamada?.origem === "legada_humana" ? (
-          <p className="text-sm text-[var(--color-text-secondary)]">
-            Registro humano anterior à automação.
-          </p>
-        ) : null}
-
-        {/* SPEC-030 — o estado, e o caminho de volta junto com ele. Dizer
-            "não aconteceu" sem dizer como desfazer transformaria um engano
-            de toque em um dia perdido. */}
-        {naoHouve && !historico ? (
-          <p className="rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-high)] p-3 text-sm">
-            <strong>Esta aula está registrada como não realizada.</strong> Ela
-            não aparece mais como chamada pendente e não conta na frequência
-            de ninguém. Se foi engano, marque os alunos abaixo e salve — a
-            chamada normal volta a valer.
-          </p>
-        ) : null}
-
-        {conflito ? (
-          <div
-            role="alert"
-            className="flex flex-col gap-2 rounded-lg border border-[var(--color-error)] p-3 text-sm"
-          >
-            {/* SPEC-057/TASK-001/D2 — a frase genérica não diz "outro
-                aparelho": quem mudou pode ter sido o fechamento automático,
-                outra pessoa ou esta mesma conta noutra aba. */}
-            <span>
-              {conflito.fechamentoAutomatico
-                ? "Esta aula foi fechada automaticamente e a chamada mudou desde sua leitura. Revise a versão atual."
-                : "Esta chamada mudou desde sua leitura. Revise a versão atual."}{" "}
-              Suas marcações continuam aqui e nada foi salvo.
-            </span>
-            <Button
-              type="button"
-              variant="outline"
-              className="self-start"
-              disabled={revisando}
-              onClick={() => void revisarVersaoAtual()}
-            >
-              {revisando ? "Carregando..." : "Revisar versão atual"}
-            </Button>
-          </div>
-        ) : null}
-
-        {revisao ? (
-          <div
-            role="status"
-            className="flex flex-col gap-1 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface-container-high)] p-3 text-sm"
-          >
-            <strong>Versão atual carregada — confira antes de salvar.</strong>
-            <span>Suas marcações foram mantidas para quem continua na chamada.</span>
-            {revisao.divergentes.map((d) => (
-              <span key={`d-${d.nome}`}>
-                {d.nome}: salvo “{d.salvo}”, seu rascunho “{d.rascunho}”.
-              </span>
-            ))}
-            {revisao.novos.length > 0 ? (
-              <span>Entraram e precisam ser marcados: {revisao.novos.join(", ")}.</span>
+        {podeDizerQueNaoHouve || desfazerAte ? (
+          <div className="flex flex-col gap-2">
+            {podeDizerQueNaoHouve ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-11 w-full"
+                disabled={enviando}
+                onClick={() => void naoHouveAula()}
+              >
+                A aula não aconteceu
+              </Button>
             ) : null}
-            {revisao.removidos.length > 0 ? (
-              <span>Não estão mais nesta chamada: {revisao.removidos.join(", ")}.</span>
+            {desfazerAte ? (
+              <Button
+                type="button"
+                variant="outline"
+                className="min-h-11 w-full"
+                disabled={enviando}
+                onClick={() => void desfazer()}
+              >
+                Desfazer (até {formatarPrazo(desfazerAte)})
+              </Button>
             ) : null}
           </div>
         ) : null}
 
-        {chamada ? (
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-extrabold">Alunos</h2>
-            <span className="text-xs font-bold text-[var(--color-text-secondary)]">{faltamMarcar > 0 ? `${faltamMarcar} pendentes` : "Completa"}</span>
-          </div>
-        ) : null}
+        {chamada ? <h2 className="text-lg font-extrabold">Alunos</h2> : null}
 
         <ul className="flex flex-col gap-3">
           {chamada?.alunos.map((aluno) => (
             <li key={aluno.alunoId}>
               <Card className="border-0 shadow-[var(--shadow-low)] ring-1 ring-border">
-                <CardContent className="flex flex-col gap-3 py-4">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">{aluno.nome}</span>
-                    {/* AC-010: quem saiu da turma continua no histórico, e a
-                        tela diz por que ele ainda aparece aqui. */}
-                    {!aluno.naTurmaHoje ? (
-                      <span className="rounded-full bg-[var(--color-surface-container-high)] px-2 py-0.5 text-xs text-[var(--color-text-secondary)]">
-                        {aluno.reposicao ? "repondo aula" : "não está mais na turma"}
-                      </span>
-                    ) : null}
-                    {marcas[aluno.alunoId] === "justificado" ? (
-                      <JustificadoLegado />
-                    ) : null}
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {OPCOES.map(({ valor, label, Icon }) => {
-                      const ativo = marcas[aluno.alunoId] === valor;
-                      return (
-                        <button
-                          key={valor}
-                          type="button"
-                          aria-pressed={ativo}
-                          disabled={historico}
-                          onClick={() => marcar(aluno.alunoId, valor)}
-                          className={`flex min-h-12 items-center justify-center gap-1.5 rounded-lg border text-xs font-bold transition-colors ${
-                            ativo && valor === "presente"
-                              ? "border-[var(--color-primary-strong)] bg-[var(--color-primary-strong)] text-white"
-                              : ativo && valor === "ausente"
-                                ? "border-[var(--color-tertiary)] bg-[var(--color-tertiary)] text-white"
-                                : ativo
-                                  ? "border-[var(--color-warning)] bg-[var(--color-warning)] text-white"
-                                  : "border-border bg-[var(--color-surface-container)] text-[var(--color-text-secondary)]"
-                          }`}
-                        >
-                          <Icon className="size-4" aria-hidden="true" />
-                          {label}
-                        </button>
-                      );
-                    })}
-                  </div>
+                <CardContent className="flex flex-wrap items-center gap-2 py-4">
+                  <span className="font-medium">{aluno.nome}</span>
+                  {/* AC-010: quem saiu da turma continua no histórico, e a
+                      tela diz por que ele ainda aparece aqui. */}
+                  {!aluno.naTurmaHoje ? (
+                    <span className="rounded-full bg-[var(--color-surface-container-high)] px-2 py-0.5 text-xs text-[var(--color-text-secondary)]">
+                      {aluno.reposicao ? "repondo aula" : "não está mais na turma"}
+                    </span>
+                  ) : null}
+                  {/* SPEC-076/D1 — o aviso de falta nunca tinha aparecido
+                      nesta tela (fato 10), e é ele que decide o "Faltou". */}
+                  {aluno.faltaAvisada ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-surface-container-high)] px-2 py-0.5 text-xs text-[var(--color-text-secondary)]">
+                      <BellOff className="size-3" aria-hidden="true" />
+                      avisou que ia faltar
+                    </span>
+                  ) : null}
+                  <span className="ml-auto text-sm font-bold text-[var(--color-text-secondary)]">
+                    {aluno.status ? ROTULO[aluno.status] ?? aluno.status : "sem registro"}
+                  </span>
                 </CardContent>
               </Card>
             </li>
           ))}
         </ul>
       </main>
-
-      {/* Barra fixa: em quadra a pessoa rola a lista, e o botão de salvar não
-          pode exigir que ela role de volta até o fim. */}
-      {/* AC-019b: a barra inteira sai — Salvar, "Todos vieram" e "A aula não
-          aconteceu" são as três ações mutadoras daqui. Deixar qualquer uma
-          `disabled` mas visível ainda ofereceria o que seria recusado. */}
-      {chamada && !historico ? (
-        <div className="fixed bottom-0 left-1/2 z-20 flex w-full max-w-[430px] -translate-x-1/2 flex-col gap-2 border-t border-border bg-surface/95 p-4 shadow-[0_-8px_24px_rgba(18,20,15,0.08)] backdrop-blur">
-          <div className="flex items-center gap-3">
-            {/* O contador dizia o estado ("2/10 marcados"); agora diz a
-                pendência. Estado é informação; pendência é instrução, e em
-                quadra a segunda vale mais. */}
-            <span className="text-sm text-[var(--color-text-secondary)]">
-              {completa
-                ? `${total} de ${total} marcados`
-                : `Faltam ${faltamMarcar} de ${total}`}
-            </span>
-            <Button
-              type="button"
-              className="ml-auto min-h-11"
-              disabled={salvando || !completa}
-              onClick={() => void salvar()}
-            >
-              {salvando ? "Salvando..." : salvo ? "Salvo" : "Salvar chamada"}
-            </Button>
-          </div>
-          {!completa ? (
-            <Button
-              type="button"
-              variant="outline"
-              className="min-h-11 w-full"
-              onClick={marcarTodosPresentes}
-            >
-              Todos vieram
-            </Button>
-          ) : null}
-          {/* SPEC-030 — some quando a aula JÁ está marcada como não
-              realizada: repetir a ação não faria nada, e um botão que não
-              faz nada ensina a desconfiar dos outros. Some também quando há
-              presença **salva**, porque aí o servidor recusaria com
-              `CHAMADA_COM_PRESENCA`. Marca local não conta: ela é
-              reversível, e sumir com o botão por causa dela deixava o
-              professor sem saída (achado 3 da validação cruzada). */}
-          {podeDizerQueNaoHouve ? (
-            <Button
-              type="button"
-              variant="ghost"
-              className="min-h-11 w-full text-[var(--color-text-secondary)]"
-              disabled={salvando}
-              onClick={() => void naoHouveAula()}
-            >
-              A aula não aconteceu
-            </Button>
-          ) : null}
-        </div>
-      ) : null}
     </div>
-  );
-}
-
-/**
- * SPEC-057/TASK-001/D7 — a marca antiga que a tela não oferece mais.
- *
- * Sem este selo, o aluno marcado `justificado` apareceria com os dois botões
- * apagados, e a tela contaria como "marcado" alguém que o professor não vê
- * marcado. Tocar em Veio ou Faltou troca a marca; não tocar mantém.
- */
-function JustificadoLegado() {
-  return (
-    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--color-surface-container-high)] px-2 py-0.5 text-xs text-[var(--color-text-secondary)]">
-      <CircleSlash className="size-3" aria-hidden="true" />
-      Justificou (registro antigo)
-    </span>
   );
 }

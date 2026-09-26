@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Circle, Users } from "lucide-react";
+import { ChevronLeft, ChevronRight, Users } from "lucide-react";
 import {
   ApiError,
   getAgendaDoProfessor,
@@ -18,10 +18,10 @@ import { hojeNoClube } from "@/lib/fuso";
  * O pedido do Israel era *"Calendário → Turma → Alunos → Presença"*, e as
  * três últimas já existiam. Esta tela é a primeira: a **entrada pelo dia**.
  *
- * **O que faz ela valer não é o calendário, é a bolinha.** Um calendário que
- * só diz "tem aula terça" repete o que o professor já sabe de cabeça. O que
- * ele não sabe é **em quais dias ficou faltando registrar presença** — e é
- * isso que o ponto vermelho responde de longe.
+ * **SPEC-076/D4 — a bolinha vermelha saiu.** Ela respondia "em quais dias
+ * ficou faltando registrar presença", e desde a SPEC-076 ninguém registra
+ * presença à mão: o fechamento automático registra. Cobrar do professor o
+ * que ele não tem como fazer seria acusá-lo de esquecimento.
  *
  * **Escrito do zero, não importado.** O Admin tem um `agenda-view`, mas são
  * repositórios separados (ADR-001, poly-repo). E este é outro problema: o do
@@ -88,10 +88,9 @@ function tiposDoDia(
  */
 function rotuloDoDia(dia: number, d: DiaDaAgendaDoProfessor | undefined): string {
   if (!d) return `${dia}, sem aula`;
-  const pendencia = d.pendentes > 0 ? `, ${d.pendentes} sem chamada` : "";
   const tipos = tiposDoDia(d);
   if (tipos === null) {
-    return `${dia}: ${d.aulas} ${d.aulas === 1 ? "aula" : "aulas"}${pendencia}`;
+    return `${dia}: ${d.aulas} ${d.aulas === 1 ? "aula" : "aulas"}`;
   }
   const partes: string[] = [];
   if (tipos.turmas > 0) {
@@ -104,7 +103,7 @@ function rotuloDoDia(dia: number, d: DiaDaAgendaDoProfessor | undefined): string
       `${tipos.particulares} ${tipos.particulares === 1 ? "aula particular" : "aulas particulares"}`,
     );
   }
-  return `${dia}: ${partes.join(", ")}${pendencia}`;
+  return `${dia}: ${partes.join(", ")}`;
 }
 
 /**
@@ -348,18 +347,6 @@ export function AgendaDoProfessor() {
                     {tipos.particulares > 0 && <Marcador tipo="particular" />}
                   </span>
                 )}
-                {/*
-                  A bolinha é o ponto inteiro da tela: dia com chamada
-                  pendente. Sem ela, o calendário só repetiria a grade que o
-                  professor já conhece.
-                */}
-                {doDia && doDia.pendentes > 0 && (
-                  <Circle
-                    data-pendencia=""
-                    className={`absolute bottom-1.5 size-1.5 fill-current ${selecionado ? "text-white" : "text-[var(--color-error)]"}`}
-                    aria-hidden="true"
-                  />
-                )}
               </button>
             );
           })}
@@ -540,9 +527,15 @@ function EstadoDaChamada({ estado }: { estado: string | null }) {
       classe:
         "bg-[var(--color-secondary)]/25 text-[var(--color-primary-strong)]",
     },
+    /*
+      SPEC-076/D4 — terminou depois da ativação e o fechamento automático
+      ainda não passou. **Neutro:** é o sistema que vai fechar, não o
+      professor que esqueceu.
+    */
     pendente: {
-      texto: "Chamada pendente",
-      classe: "bg-[var(--color-error)]/10 text-[var(--color-error)]",
+      texto: "Aguardando fechamento",
+      classe:
+        "bg-[var(--color-surface-container-high)] text-[var(--color-text-secondary)]",
     },
     feita: {
       texto: "Chamada feita",
@@ -576,6 +569,15 @@ function EstadoDaChamada({ estado }: { estado: string | null }) {
     */
     sem_participantes: {
       texto: "Sem participantes",
+      classe:
+        "bg-[var(--color-surface-container-high)] text-[var(--color-text-secondary)]",
+    },
+    /*
+      SPEC-076/D5 — anterior à presença automática, sem registro. Não é
+      pendência: não há o que fazer nela.
+    */
+    sem_registro: {
+      texto: "Sem registro",
       classe:
         "bg-[var(--color-surface-container-high)] text-[var(--color-text-secondary)]",
     },
