@@ -26,6 +26,15 @@ vi.mock("next/navigation", () => ({
 }));
 
 const listar = vi.hoisted(() => vi.fn());
+/**
+ * SPEC-077/TASK-000 — uma data FUTURA relativa a hoje. Era `2099-…`, que vira
+ * passado em 2099 e faz o caso mudar de resposta sem nada mudar no código
+ * (medido: a sonda com o relógio em 2099-09-01 derrubava o caso).
+ */
+const DIA_DO_AVISO = new Date(Date.now() + 45 * 24 * 60 * 60 * 1000)
+  .toISOString()
+  .slice(0, 10);
+
 const disponibilidade = vi.hoisted(() => vi.fn());
 const reservar = vi.hoisted(() => vi.fn());
 const configDePagamento = vi.hoisted(() => vi.fn());
@@ -422,11 +431,11 @@ describe("SPEC-074 — o horário ocupado, e o aviso de que ele vagou", () => {
     pedirAviso.mockResolvedValue({
       id: "av-1",
       quadraId: QUADRA,
-      data: "2099-01-01",
+      data: DIA_DO_AVISO,
       horaInicio: "11:00",
       horaFim: "12:00",
       estado: "aguardando",
-      criadaEm: "2099-01-01T00:00:00.000Z",
+      criadaEm: new Date().toISOString(),
     });
     render(<CourtBooking id={QUADRA} />);
 
@@ -464,14 +473,14 @@ describe("SPEC-074 — o horário ocupado, e o aviso de que ele vagou", () => {
       {
         id: "av-7",
         quadraId: QUADRA,
-        data: "2099-03-15",
+        data: DIA_DO_AVISO,
         horaInicio: "11:00",
         horaFim: "12:00",
         estado: "aguardando",
-        criadaEm: "2099-01-01T00:00:00.000Z",
+        criadaEm: new Date().toISOString(),
       },
     ]);
-    render(<CourtBooking id={QUADRA} dataInicial="2099-03-15" />);
+    render(<CourtBooking id={QUADRA} dataInicial={DIA_DO_AVISO} />);
 
     const slot = (await screen.findByText("Aviso ativo")).closest(
       "button",
@@ -517,10 +526,10 @@ describe("SPEC-074 — o horário ocupado, e o aviso de que ele vagou", () => {
   });
 
   it("AC-019 — a data da URL abre naquele dia", async () => {
-    render(<CourtBooking id={QUADRA} dataInicial="2099-03-15" />);
+    render(<CourtBooking id={QUADRA} dataInicial={DIA_DO_AVISO} />);
 
     await waitFor(() => expect(disponibilidade).toHaveBeenCalled());
-    expect(disponibilidade.mock.calls[0]).toEqual([QUADRA, "2099-03-15"]);
+    expect(disponibilidade.mock.calls[0]).toEqual([QUADRA, DIA_DO_AVISO]);
   });
 });
 

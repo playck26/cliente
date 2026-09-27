@@ -16,6 +16,16 @@ import type { MyClass } from "@/lib/api-client";
  * diferença de INSTANTES e os dias da diferença de DATAS, e por isso estes
  * testes fixam as duas na fronteira.
  */
+/**
+ * SPEC-077/TASK-000 — uma data FUTURA relativa a hoje. Era `2099-01-01`, que
+ * vira passado em 2099: dois casos caem (medido: a sonda com o relógio em
+ * 2099-09-01), e o da aula que não aconteceu passaria a ficar verde pelo
+ * motivo errado — uma aula passada também não é a próxima.
+ */
+const DIA_FUTURO = new Date(Date.now() + 45 * 24 * 60 * 60 * 1000)
+  .toISOString()
+  .slice(0, 10);
+
 const aula = (over: Partial<MyClass> = {}): MyClass =>
   ({
     ocupacaoId: "o1",
@@ -118,7 +128,7 @@ describe("proximaAula", () => {
 
   it("aula que não aconteceu não é próxima aula", () => {
     const escolhida = proximaAula(
-      [aula({ ocupacaoId: "cancelada", naoRealizada: true, data: "2099-01-01" })],
+      [aula({ ocupacaoId: "cancelada", naoRealizada: true, data: DIA_FUTURO })],
       VINTE_HORAS,
     );
     expect(escolhida).toBeNull();
@@ -127,7 +137,7 @@ describe("proximaAula", () => {
 
 describe("CartaoDaProximaAula", () => {
   it("mostra turma e horário — e NÃO a quadra", () => {
-    render(<CartaoDaProximaAula aulas={[aula({ data: "2099-01-01" })]} />);
+    render(<CartaoDaProximaAula aulas={[aula({ data: DIA_FUTURO })]} />);
 
     expect(screen.getByText("Turma Intermediário")).toBeInTheDocument();
     expect(screen.getByText(/19:00–20:00/)).toBeInTheDocument();
@@ -149,7 +159,7 @@ describe("CartaoDaProximaAula", () => {
   it("quem avisou que vai faltar lê isso no cartão", () => {
     render(
       <CartaoDaProximaAula
-        aulas={[aula({ data: "2099-01-01", faltaAvisada: true })]}
+        aulas={[aula({ data: DIA_FUTURO, faltaAvisada: true })]}
       />,
     );
 
