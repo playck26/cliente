@@ -36,6 +36,26 @@ vi.mock("@/lib/api-client", async () => {
   };
 });
 
+/**
+ * **Sem rede neste teste** (2026-09-29). O `AvisoDePrazo`, dentro da lista,
+ * pede `/me/company/operacao` por `lerCapacidadeOperacao` — e esse módulo não
+ * estava simulado: cada render fazia um pedido de verdade, que terminava quando
+ * terminava. Às vezes DEPOIS do fim do arquivo, e o `setState` da resposta
+ * encontrava o `window` já desmontado ("window is not defined" — o que derrubou
+ * o CI do `main` do Cliente em 2026-09-29, com 835/835 verdes). `ausente` não
+ * renderiza nada, como o estado de antes da resposta, que era o que estes
+ * testes viam.
+ */
+vi.mock("@/lib/capacidade-operacao", async () => {
+  const real = await vi.importActual<
+    typeof import("@/lib/capacidade-operacao")
+  >("@/lib/capacidade-operacao");
+  return {
+    ...real,
+    lerCapacidadeOperacao: () => Promise.resolve({ estado: "ausente" }),
+  };
+});
+
 function turma(patch: Record<string, unknown> = {}) {
   return {
     id: "t1",
