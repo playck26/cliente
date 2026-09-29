@@ -30,7 +30,14 @@ vi.mock("@/lib/api-client", async () => {
     await vi.importActual<typeof import("@/lib/api-client")>(
       "@/lib/api-client",
     );
-  return { ...real, logout, getMinhaEmpresa };
+  // **Sem rede neste teste** (2026-09-29). Estas funções chegavam à rede de
+  // verdade — o `vi.mock` acima espalha o módulo real —, e o pedido terminava
+  // quando terminava: às vezes DEPOIS do fim do arquivo, e o `setState` da
+  // resposta encontrava o `window` já desmontado ("window is not defined", o que
+  // derrubou o CI do `main` do Cliente em 2026-09-29). Sem API no teste, o pedido
+  // real falhava; a rejeição imediata é o MESMO caminho, sem a espera.
+  const semRede = () => Promise.reject(new TypeError("sem rede no teste"));
+  return { ...real, logout, getMinhaEmpresa, getAvisosNaoLidos: semRede };
 });
 
 beforeEach(() => {
