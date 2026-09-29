@@ -41,7 +41,8 @@ const TURMA: MinhaTurma = {
   nome: "Infantil A",
   encontros: [{ diaSemana: 2, horaInicio: "18:00", horaFim: "19:00" }],
   quadraNome: "Quadra 1",
-  nivelNome: null,
+  // SPEC-079 — toda turma tem nível, e o contrato deixou de aceitar nulo aqui.
+  nivelNome: "Iniciante",
   capacidade: 6,
   totalAlunos: 4,
   status: "ativa",
