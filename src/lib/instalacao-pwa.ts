@@ -255,3 +255,29 @@ export function limparDispensa(): void {
   }
   avisar();
 }
+
+/**
+ * SPEC-084 (I1) — **as telas onde o convite não aparece.**
+ *
+ * Até a SPEC-084 o convite flutuava em toda tela sem barra, inclusive no
+ * login, e isso era deliberado (SPEC-050): a alternativa era o componente
+ * global adivinhar, rota a rota, se havia barra. No login fotográfico ele
+ * cairia sobre o botão "Entrar" e o "Cadastre-se" no iPhone, e o Israel
+ * decidiu tirá-lo de lá (I1, 2026-10-02). **Revogação parcial da SPEC-050,
+ * só para o login.**
+ *
+ * É uma lista explícita, e não "toda rota pública": as demais telas sem
+ * barra (`/cadastro`, `/primeiro-acesso`) ficam como estavam (LIM-084m).
+ *
+ * Esconder aqui **não é dispensar**: nada é gravado e o evento guardado não é
+ * consumido. A pessoa entra, a home abre por navegação do cliente, e o
+ * convite aparece lá, no modo do aparelho.
+ *
+ * `null` é o caminho fora do roteador do Next (testes de componente): ali o
+ * convite se comporta como antes.
+ */
+export const ROTAS_SEM_CONVITE: readonly string[] = ["/login"];
+
+export function conviteCabeNaRota(caminho: string | null): boolean {
+  return caminho === null || !ROTAS_SEM_CONVITE.includes(caminho);
+}
