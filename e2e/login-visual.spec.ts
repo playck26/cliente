@@ -703,11 +703,26 @@ for (const [nome, viewport] of Object.entries(VIEWPORTS)) {
               }
             }
           }
-          return { fora, rolagem: document.documentElement.scrollWidth, largura: window.innerWidth };
+          // A palavra da marca inteira: “Play” e “CK” sem quebra no meio e na
+          // MESMA linha. Sem isto, um `break-words` que partisse “PlayC/K”
+          // passaria nas duas checagens de cima (achado pela sabotagem O1).
+          const pecas = [...document.querySelectorAll("main p span")]
+            .filter((s) => s.textContent === "Play" || s.textContent === "CK")
+            .map((s) => {
+              const faixa = document.createRange();
+              faixa.selectNodeContents(s);
+              const linhas = [...faixa.getClientRects()].filter((r) => r.width > 0);
+              return { texto: s.textContent, linhas: linhas.length, topo: Math.round(linhas[0]?.top ?? -1) };
+            });
+          return { fora, pecas, rolagem: document.documentElement.scrollWidth, largura: window.innerWidth };
         });
         // Nenhum texto passa da coluna, e a página não rola para o lado.
         expect(medida.fora).toEqual([]);
         expect(medida.rolagem).toBeLessThanOrEqual(medida.largura + 1);
+        // “PlayCK” é uma palavra só: cada pedaço numa linha, os dois na mesma.
+        expect(medida.pecas.map((p) => p.texto)).toEqual(["Play", "CK"]);
+        expect(medida.pecas.map((p) => p.linhas)).toEqual([1, 1]);
+        expect(Math.abs(medida.pecas[0].topo - medida.pecas[1].topo)).toBeLessThanOrEqual(1);
 
         const main = page.locator("main");
         const resultados = await medirTextos(page, [
