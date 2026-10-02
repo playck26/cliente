@@ -17,6 +17,12 @@ import { LoginForm } from "./login-form";
  * navegador e o gerenciador de senhas usam. Texto de tela e layout ficam no
  * `login-form.test.tsx`, que pode mudar.
  *
+ * **Única mudança depois de congelado (I5, 2026-10-02):** saiu a asserção do
+ * link "Cadastre-se" → `/cadastro`. Não foi para acompanhar regressão: o
+ * Israel decidiu tirar o cadastro do login, porque o aluno não se cadastra
+ * sozinho. Hash do conteúdo em LF: `363bdb58…0590` (a234c3b) → o deste
+ * arquivo, registrado no EVD-084-003. Todo o resto ficou igual.
+ *
  * Os mocks são os mesmos da base: `next/navigation` só com `useRouter`. Um
  * hook novo dessa biblioteca dentro do `LoginForm` derruba este arquivo — e
  * isso é deliberado: o aviso pós-ativação mora FORA do formulário (D7).
@@ -137,7 +143,7 @@ describe("caracterização — atributos que o navegador e o gerenciador de senh
     expect(senha.minLength).toBe(8);
   });
 
-  it("botões com tipo e nome acessível, ajuda fechada, cadastro em /cadastro", () => {
+  it("botões com tipo e nome acessível, ajuda fechada", () => {
     servidor(sucesso());
     render(<LoginForm />);
 
@@ -148,7 +154,6 @@ describe("caracterização — atributos que o navegador e o gerenciador de senh
     expect(ajuda).toHaveAttribute("type", "button");
     expect(ajuda).toHaveAttribute("aria-expanded", "false");
 
-    expect(screen.getByRole("link", { name: "Cadastre-se" })).toHaveAttribute("href", "/cadastro");
     expect(screen.queryByRole("alert")).toBeNull();
   });
 });
