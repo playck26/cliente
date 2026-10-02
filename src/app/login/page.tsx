@@ -101,7 +101,7 @@ export default function LoginPage() {
               <span className={`${VEU} ${VEU_DE_LINHA} block before:bg-[linear-gradient(90deg,rgba(8,13,16,0.48)_0,rgba(8,13,16,0.48)_calc(1.5rem_+_7em),rgba(8,13,16,0.1)_calc(1.5rem_+_9.5em))]`}>Mais esporte,</span>{" "}
               <span className={`${VEU} ${VEU_DE_LINHA} block before:bg-[linear-gradient(90deg,rgba(8,13,16,0.48)_0,rgba(8,13,16,0.48)_calc(1.5rem_+_8.5em),rgba(8,13,16,0.1)_calc(1.5rem_+_10.5em))]`}>mais conexões.</span>
             </h1>
-            <p className={`${VEU} ${VEU_DE_BLOCO} mt-3 max-w-[22rem] text-base leading-normal font-medium text-[#D9DED6] before:bg-[rgba(8,13,16,0.72)]`}>
+            <p className={`${VEU} ${VEU_DE_BLOCO} mt-3 max-w-[22rem] text-base leading-normal font-medium text-[#D9DED6] before:bg-[linear-gradient(90deg,rgba(8,13,16,0.72)_0,rgba(8,13,16,0.72)_calc(100%_-_1.5rem),rgba(8,13,16,0)_100%)]`}>
               Reserve sua quadra, acompanhe suas aulas e aproveite cada momento no seu clube.
             </p>
           </div>
