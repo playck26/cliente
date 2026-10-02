@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DIAS_DE_SILENCIO,
+  ROTAS_SEM_CONVITE,
   assinarInstalacao,
+  conviteCabeNaRota,
   consumirEvento,
   dispensaAtiva,
   ehIOS,
@@ -310,5 +312,22 @@ describe("assinarInstalacao — o subscribe do store", () => {
     window.dispatchEvent(eventoFalso());
 
     expect(aoMudar).not.toHaveBeenCalled();
+  });
+});
+
+describe("conviteCabeNaRota — SPEC-084 (I1): o login fica sem convite", () => {
+  it("a lista é só o login", () => {
+    expect(ROTAS_SEM_CONVITE).toEqual(["/login"]);
+  });
+
+  it.each([
+    ["/login", false],
+    ["/home", true],
+    ["/cadastro", true],
+    ["/primeiro-acesso", true],
+    ["/login-antigo", true],
+    [null, true],
+  ])("%s → convite cabe? %s", (caminho, esperado) => {
+    expect(conviteCabeNaRota(caminho)).toBe(esperado);
   });
 });

@@ -75,6 +75,23 @@ export default defineConfig({
         viewport: { width: 320, height: 640 },
       },
     },
+    /**
+     * SPEC-084/TEST-006 — o convite fora do login também no motor do iPhone.
+     *
+     * Projeto próprio porque o Playwright não troca de navegador dentro de um
+     * `describe`. **Opcional, ligado por `PLAYCK_WEBKIT=1`:** o CI só instala o
+     * Chromium (`test:navegador:instalar`), e um projeto que exige o WebKit
+     * quebraria o CI de todo mundo. É prova local, e não é aparelho real.
+     */
+    ...(process.env.PLAYCK_WEBKIT
+      ? [
+          {
+            name: "webkit-iphone",
+            testMatch: /login-install\.spec\.ts$/,
+            use: { ...devices["iPhone 13"] },
+          },
+        ]
+      : []),
   ],
   webServer: {
     command: `pnpm run build && pnpm exec next start --port ${PORTA}`,
