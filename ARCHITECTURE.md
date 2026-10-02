@@ -2,7 +2,7 @@
 
 **Fonte: análise direta do código.** Data: **2026-10-02** (era 2026-09-25).
 **Conferido por comando nesta data, na branch da SPEC-084
-(`spec084/login-fotografico`):** **77** arquivos de teste, **911** casos,
+(`spec084/login-fotografico`):** **77** arquivos de teste, **912** casos,
 **54** componentes e **23** módulos em `lib/` (`vitest run --pool=threads`, em
 série, uma rodada só, zero vermelho; `.tsx` de `src/components`, sem subpastas
 e sem os `.test.tsx`; `.ts`/`.tsx` de `src/lib` sem os testes). **Mais 6
@@ -12,12 +12,12 @@ test:navegador`), e 6 casos a mais no WebKit com `PLAYCK_WEBKIT=1`.
 *A conta da SPEC-084:* a `main` (`d61d55f`) tinha 72 arquivos, 53
 componentes, 21 módulos e 3/11 de navegador (contados por `git ls-tree` e pela
 suíte de navegador). Os casos de unidade da `main` **não foram rodados à
-parte**: 835 é derivado (911 − 76) e bate com o "835/835" que o
+parte**: 835 é derivado (911 − 76, na contagem anterior à I5) e bate com o "835/835" que o
 `vitest.setup.ts` registra no CI de 2026-09-29. A SPEC-084
 somou 5 arquivos e 76 casos (caracterização 16, foto 11, protocolo 12, aviso
 6, medidor 17, e 14 em arquivos que já existiam), 1 componente
 (`aviso-de-ativacao`), 2 módulos (`login-appearance`, `ativacao-navigation`) e
-3 arquivos / 85 casos de navegador. **835 + 76 = 911.**
+3 arquivos / 85 casos de navegador. **835 + 76 = 911**, e a I5 somou 1 caso (o login sem cadastro): **912**.
 
 *Registro de 2026-09-25 (SPEC-074):* 72 arquivos, 834 casos, 53 componentes, 21
 módulos, 3 arquivos / 11 casos de navegador.
@@ -113,7 +113,7 @@ page.tsx (server component, fino)
 
 | Rota | Componente | Papel |
 |---|---|---|
-| `/login` | página (foto, marca, texto) → `aviso-de-ativacao` + `login-form` | entrada; leva a `/primeiro-acesso` se a senha for temporária. **DEF-003**: "Cadastre-se" virou link real para `/cadastro` (era `<span>` morto desde a SPEC-007) e "Esqueceu a senha?" passou a dizer o caminho que existe hoje. **SPEC-084 — o login fotográfico** (seção 9, "O login fotográfico"): a página saiu do `app-screen` e virou uma coluna de até 480 px com a foto de quadra atrás; o `login-form` ficou só com o formulário, e o comportamento dele é o da base, congelado em `login-form.caracterizacao.test.tsx`. **O convite de instalação não aparece aqui** (I1) |
+| `/login` | página (foto, marca, texto) → `aviso-de-ativacao` + `login-form` | entrada; leva a `/primeiro-acesso` se a senha for temporária. **DEF-003**: "Cadastre-se" virou link real para `/cadastro` (era `<span>` morto desde a SPEC-007) e "Esqueceu a senha?" passou a dizer o caminho que existe hoje. **SPEC-084 — o login fotográfico** (seção 9, "O login fotográfico"): a página saiu do `app-screen` e virou uma coluna de até 480 px com a foto de quadra atrás; o `login-form` ficou só com o formulário, e o comportamento dele é o da base, congelado em `login-form.caracterizacao.test.tsx`. **O convite de instalação não aparece aqui** (I1), **nem a chamada para cadastro** (I5: o aluno não se cadastra sozinho; a rota `/cadastro` continua existindo, só o login deixou de apontar para ela) |
 | `/primeiro-acesso` | `primeiro-acesso-form` | troca obrigatória da senha temporária (INV-008) |
 | `/cadastro` | `escolher-clube-form` | **DEF-003**: pede o código do clube e redireciona para `/cadastro/<slug>`. Existe porque o login não sabe de qual clube a pessoa é; não valida o código aqui (o limite de 10/15min do endpoint público trancaria quem errasse duas vezes) |
 | `/cadastro/[slug]` | `cadastro-publico-form` | auto-cadastro pelo link público da empresa |
@@ -733,9 +733,14 @@ causa de um avatar seria a decisão errada. O cache é limpo em
 **A composição.** `app/login/page.tsx` monta uma coluna de até 480 px,
 centralizada, com `#080D10` dos lados (I3): a foto de quadra numa camada
 decorativa (`aria-hidden`, `alt=""`), a marca e o texto no alto, um respiro onde
-a raquete aparece e o formulário embaixo. Cada bloco de texto tem um **véu
-escuro próprio** (≥ 70% sob as letras, desfeito em degradê nas bordas), e é ele
-que garante o contraste: a foto nunca decide a legibilidade. Os tokens são
+a raquete aparece e o formulário embaixo. **Cada texto do topo tem o próprio
+véu** (pseudo-elemento escuro atrás dele, desfeito em cima, embaixo e, para a
+direita, logo depois do fim da linha), e o formulário tem um véu de bloco. São
+eles que garantem o contraste: a foto nunca decide a legibilidade. Cada véu tem
+só a força de que o texto precisa sobre um fundo TODO BRANCO — o título, texto
+grande, fica com 0,48; selo e apoio, com 0,76 e 0,72 —, e por isso o céu e o
+sol aparecem entre e ao lado dos textos (I6: a primeira versão, com um véu único
+de 0,74–0,90, deixava o céu escuro demais). Os tokens são
 locais do login e estão no `DESIGN.md` ("Login fotográfico"), como valores
 arbitrários do Tailwind, porque o `globals.css` não muda por causa de uma tela.
 
@@ -765,9 +770,11 @@ nasce com conteúdo costuma não ser anunciada.
 **O comportamento do login está congelado.**
 `login-form.caracterizacao.test.tsx` foi escrito contra o componente ANTIGO
 (16 casos: atributos, pedidos, armazenamento, destino por papel, erros,
-carregamento, senha visível, ajuda, cadastro), viu 20 mutações do antigo
-ficarem vermelhas e passou sem nenhuma mudança contra o novo. Mexer no
-`login-form.tsx` é passar por aquele arquivo sem editá-lo.
+carregamento, senha visível, ajuda), viu 20 mutações do antigo ficarem
+vermelhas e passou sem nenhuma mudança contra o novo. **Mudou uma vez só**,
+por decisão de produto e não para acompanhar regressão: a I5 tirou a asserção
+do link de cadastro (hash do conteúdo em LF `363bdb58…` → `b35887f4…`). Mexer
+no `login-form.tsx` é passar por aquele arquivo sem editá-lo.
 
 **As provas de navegador.**
 - `e2e/login-visual.spec.ts`: composição nos quatro viewports, copy aprovada,
