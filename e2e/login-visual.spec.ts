@@ -662,3 +662,71 @@ test.describe("AC-006 — zoom de 200% (simulado) e fonte aumentada", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// LIM-084o — os textos do topo dentro da coluna e sob o véu, em 4 viewports
+// × fonte 100% e 200%, sobre fundo TODO BRANCO
+// ---------------------------------------------------------------------------
+
+/**
+ * A validação do delta I5/I6 achou o que esta suíte não olhava: a 320 px com
+ * a fonte do sistema a 200%, “PlayCK” passava ~13 px da coluna e o “CK”
+ * ficava fora do véu (1,38:1). A prova de fonte aumentada era só a 390. Aqui
+ * ficam as oito combinações que o validador mediu por conta própria.
+ */
+const PASTA_DE_FONTE = join(EVIDENCIAS, "fonte");
+mkdirSync(PASTA_DE_FONTE, { recursive: true });
+
+for (const [nome, viewport] of Object.entries(VIEWPORTS)) {
+  for (const fonte of [100, 200] as const) {
+    test.describe(`LIM-084o — ${nome}, fonte ${fonte}%, fundo branco`, () => {
+      test.use({ viewport, deviceScaleFactor: 1 });
+
+      test("marca, selo, título e apoio dentro da coluna e legíveis", async ({ browser, page }) => {
+        await gerarSolidos(browser);
+        await usarFundo(page, "branco");
+        await page.goto("/login");
+        if (fonte === 200) await page.addStyleTag({ content: "html { font-size: 200% !important; }" });
+        await esperarPintura(page);
+
+        const medida = await page.evaluate(() => {
+          const coluna = document.querySelector("[data-coluna-do-login]")!.getBoundingClientRect();
+          const fora: string[] = [];
+          const andarilho = document.createTreeWalker(document.querySelector("main")!, NodeFilter.SHOW_TEXT);
+          for (let no = andarilho.nextNode(); no; no = andarilho.nextNode()) {
+            if (!no.textContent || !no.textContent.trim()) continue;
+            const faixa = document.createRange();
+            faixa.selectNodeContents(no);
+            for (const r of faixa.getClientRects()) {
+              if (r.width > 0 && (r.right > coluna.right + 1 || r.left < coluna.left - 1)) {
+                fora.push(`${no.textContent.trim().slice(0, 24)} ${Math.round(r.left)}..${Math.round(r.right)}`);
+              }
+            }
+          }
+          return { fora, rolagem: document.documentElement.scrollWidth, largura: window.innerWidth };
+        });
+        // Nenhum texto passa da coluna, e a página não rola para o lado.
+        expect(medida.fora).toEqual([]);
+        expect(medida.rolagem).toBeLessThanOrEqual(medida.largura + 1);
+
+        const main = page.locator("main");
+        const resultados = await medirTextos(page, [
+          { rotulo: "marca", alvo: main.locator("p", { hasText: "Play" }).first() },
+          { rotulo: "selo", alvo: page.getByText("SEU ESPORTE, SEU MOMENTO") },
+          { rotulo: "título", alvo: page.getByRole("heading", { level: 1 }) },
+          { rotulo: "apoio", alvo: page.getByText("Reserve sua quadra", { exact: false }) },
+        ]);
+        expect(resultados.length).toBeGreaterThanOrEqual(6);
+        writeFileSync(
+          join(PASTA_DE_FONTE, `${nome}-fonte${fonte}.json`),
+          JSON.stringify({ viewport: nome, fonte, textos: resultados }, null, 2),
+        );
+        if (fonte === 200) {
+          await page.screenshot({ path: join(EVIDENCIAS, "capturas", `${nome}-fonte-200-branco.png`), fullPage: true });
+        }
+        const ruins = resultados.filter((r) => !r.passou);
+        expect(ruins, JSON.stringify(ruins, null, 1)).toEqual([]);
+      });
+    });
+  }
+}

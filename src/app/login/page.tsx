@@ -40,6 +40,12 @@ import { COR_DE_FUNDO_DO_LOGIN, FUNDO_DO_LOGIN } from "@/lib/login-appearance";
  * selo (texto pequeno, 4,5:1), com 0,72 e 0,76. E o véu se desfaz para a
  * direita logo depois do fim de cada linha (paradas em `em`, que acompanham o
  * tamanho da fonte): é ali, ao lado do título, que fica o sol.
+ *
+ * A linha da marca QUEBRA (`flex-wrap`): com a fonte do sistema a 200% num
+ * celular de 320 px, logo + “PlayCK” não cabem lado a lado, e a palavra
+ * passava ~13 px da coluna, com o “CK” fora do véu (1,38:1 sobre branco —
+ * ressalva da validação do delta, LIM-084o). Agora ela desce para baixo do
+ * logo, dentro da coluna e do véu.
  */
 const VEU =
   "relative before:pointer-events-none before:absolute before:-inset-x-6 before:-z-10 before:content-[''] max-[340px]:before:-inset-x-5";
@@ -79,7 +85,7 @@ export default function LoginPage() {
 
         <div className="relative isolate px-5 pt-[max(env(safe-area-inset-top),1.5rem)] pb-4 min-[341px]:px-6">
           <div>
-            <div className={`${VEU} ${VEU_DE_BLOCO} flex items-center gap-3 before:bg-[linear-gradient(90deg,rgba(8,13,16,0.66)_0,rgba(8,13,16,0.66)_12rem,rgba(8,13,16,0.12)_17rem)]`}>
+            <div className={`${VEU} ${VEU_DE_BLOCO} flex flex-wrap items-center gap-3 before:bg-[linear-gradient(90deg,rgba(8,13,16,0.66)_0,rgba(8,13,16,0.66)_12rem,rgba(8,13,16,0.12)_17rem)]`}>
               <Image
                 src="/playck-logo.png"
                 alt="Logo PlayCK"
@@ -88,7 +94,7 @@ export default function LoginPage() {
                 loading="eager"
                 className="size-12 object-contain"
               />
-              <p className="text-2xl leading-none font-extrabold">
+              <p className="min-w-0 text-2xl leading-none font-extrabold break-words">
                 <span className="text-white">Play</span>
                 <span className="text-[#B9E52B]">CK</span>
               </p>
