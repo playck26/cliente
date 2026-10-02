@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, CircleAlert, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,8 +18,11 @@ import { lerNomesDeTipo } from "@/lib/nomes-de-tipo";
  *
  * O comportamento é o da base e está congelado em
  * `login-form.caracterizacao.test.tsx`: pedidos, armazenamento, destino por
- * papel, erros, carregamento, senha visível, ajuda e cadastro. Mexer aqui é
- * passar por aquele arquivo sem mudá-lo.
+ * papel, erros, carregamento, senha visível e ajuda. Mexer aqui é passar por
+ * aquele arquivo sem mudá-lo.
+ *
+ * **Sem "Ainda não tem conta? Cadastre-se" (I5, 2026-10-02):** o aluno não se
+ * cadastra sozinho, e o Israel pediu para tirar o convite ao cadastro do login.
  *
  * As cores são locais do login (DESIGN.md, “Login fotográfico”), e cada uma
  * foi escolhida pelo contraste medido sobre foto, branco, preto e foto
@@ -119,9 +121,6 @@ export function LoginForm() {
         {loading ? "Entrando..." : "Entrar"}
         {!loading ? <ArrowRight className="size-5" aria-hidden="true" /> : null}
       </Button>
-      <p className="text-center text-sm font-medium text-[#D9DED6]">
-        Ainda não tem conta? <Link href="/cadastro" className={`inline-flex min-h-11 items-center rounded-lg px-1 font-extrabold text-[#B9E52B] ${FOCO}`}>Cadastre-se</Link>
-      </p>
     </form>
   );
 }

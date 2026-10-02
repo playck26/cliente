@@ -19,16 +19,36 @@ import { COR_DE_FUNDO_DO_LOGIN, FUNDO_DO_LOGIN } from "@/lib/login-appearance";
  *
  * ## Quem garante a leitura é o véu, não a foto (D2)
  *
- * O texto do topo e o formulário têm cada um um véu escuro próprio, opaco a
- * pelo menos 70% sob as letras, que se desfaz em degradê nas bordas. É ele que
- * segura o contraste — o TEST-002 mede tudo também sobre uma foto toda branca,
- * toda preta e ausente. A foto pode ser trocada sem refazer nenhum texto
- * (REQ-003). O véu global sobre a foto é só acabamento.
+ * Cada texto do topo tem o próprio véu escuro (ver `VEU`), e o formulário
+ * tem um véu de bloco. São eles que seguram o contraste — o TEST-002 mede tudo
+ * também sobre uma foto toda branca, toda preta e ausente —, e por isso a foto
+ * pode ser trocada sem refazer nenhum texto (REQ-003). O véu global sobre a
+ * foto é só acabamento.
  *
  * A foto é decorativa: `alt=""` e camada `aria-hidden`. Vem crua de
  * `public/` (`unoptimized`), sem passar pelo `/_next/image`, para que o
  * arquivo publicado seja byte a byte o do manifesto.
  */
+/**
+ * O véu de cada texto do topo (I6, 2026-10-02): um pseudo-elemento escuro
+ * atrás do próprio texto, da largura da coluna, desfeito em cima e embaixo.
+ * Antes era um véu único de 0,74–0,90 sobre o bloco inteiro, e o Israel achou
+ * o céu escuro demais — o sol quase sumia.
+ *
+ * Cada texto recebe só o véu de que precisa para passar no medidor sobre um
+ * fundo TODO BRANCO: o título (texto grande, 3:1) fica com 0,48; o apoio e o
+ * selo (texto pequeno, 4,5:1), com 0,72 e 0,76. E o véu se desfaz para a
+ * direita logo depois do fim de cada linha (paradas em `em`, que acompanham o
+ * tamanho da fonte): é ali, ao lado do título, que fica o sol.
+ */
+const VEU =
+  "relative before:pointer-events-none before:absolute before:-inset-x-6 before:-z-10 before:content-[''] max-[340px]:before:-inset-x-5";
+const VEU_DE_BLOCO =
+  "before:-inset-y-4 before:[mask-image:linear-gradient(to_bottom,transparent,#000_1rem,#000_calc(100%_-_1rem),transparent)]";
+/** Por linha do título: a borda desfeita fica FORA da caixa do texto (0,5em > 0,3em). */
+const VEU_DE_LINHA =
+  "before:-inset-y-[0.5em] before:[mask-image:linear-gradient(to_bottom,transparent,#000_0.3em,#000_calc(100%_-_0.3em),transparent)]";
+
 export default function LoginPage() {
   return (
     <main
@@ -54,16 +74,12 @@ export default function LoginPage() {
             className="object-cover"
             style={{ objectPosition: FUNDO_DO_LOGIN.posicao }}
           />
-          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,13,16,0.35)_0%,rgba(8,13,16,0.05)_45%,rgba(8,13,16,0.25)_62%,rgba(8,13,16,0.6)_100%)]" />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(8,13,16,0.12)_0%,rgba(8,13,16,0)_40%,rgba(8,13,16,0.25)_62%,rgba(8,13,16,0.6)_100%)]" />
         </div>
 
-        <div className="relative px-5 pt-[max(env(safe-area-inset-top),1.5rem)] pb-4 min-[341px]:px-6">
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 top-0 -bottom-10 bg-[linear-gradient(180deg,rgba(8,13,16,0.9)_0%,rgba(8,13,16,0.74)_100%)] [mask-image:linear-gradient(to_bottom,#000_calc(100%_-_2.5rem),transparent)]"
-          />
-          <div className="relative">
-            <div className="flex items-center gap-3">
+        <div className="relative isolate px-5 pt-[max(env(safe-area-inset-top),1.5rem)] pb-4 min-[341px]:px-6">
+          <div>
+            <div className={`${VEU} ${VEU_DE_BLOCO} flex items-center gap-3 before:bg-[linear-gradient(90deg,rgba(8,13,16,0.66)_0,rgba(8,13,16,0.66)_12rem,rgba(8,13,16,0.12)_17rem)]`}>
               <Image
                 src="/playck-logo.png"
                 alt="Logo PlayCK"
@@ -78,14 +94,14 @@ export default function LoginPage() {
               </p>
             </div>
 
-            <p className="mt-8 text-xs font-extrabold tracking-[0.16em] text-[#B9E52B]">
+            <p className={`${VEU} ${VEU_DE_BLOCO} mt-8 text-xs font-extrabold tracking-[0.16em] text-[#B9E52B] before:bg-[linear-gradient(90deg,rgba(8,13,16,0.76)_0,rgba(8,13,16,0.76)_calc(1.5rem_+_20em),rgba(8,13,16,0.12)_calc(1.5rem_+_27em))]`}>
               SEU ESPORTE, SEU MOMENTO
             </p>
             <h1 className="mt-3 text-[1.875rem] leading-[1.08] font-extrabold break-words hyphens-auto text-white min-[360px]:text-[2rem] min-[400px]:text-[2.5rem]">
-              <span className="block">Mais esporte,</span>{" "}
-              <span className="block">mais conexões.</span>
+              <span className={`${VEU} ${VEU_DE_LINHA} block before:bg-[linear-gradient(90deg,rgba(8,13,16,0.48)_0,rgba(8,13,16,0.48)_calc(1.5rem_+_7em),rgba(8,13,16,0.1)_calc(1.5rem_+_9.5em))]`}>Mais esporte,</span>{" "}
+              <span className={`${VEU} ${VEU_DE_LINHA} block before:bg-[linear-gradient(90deg,rgba(8,13,16,0.48)_0,rgba(8,13,16,0.48)_calc(1.5rem_+_8.5em),rgba(8,13,16,0.1)_calc(1.5rem_+_10.5em))]`}>mais conexões.</span>
             </h1>
-            <p className="mt-3 max-w-[22rem] text-base leading-normal font-medium text-[#D9DED6]">
+            <p className={`${VEU} ${VEU_DE_BLOCO} mt-3 max-w-[22rem] text-base leading-normal font-medium text-[#D9DED6] before:bg-[rgba(8,13,16,0.72)]`}>
               Reserve sua quadra, acompanhe suas aulas e aproveite cada momento no seu clube.
             </p>
           </div>

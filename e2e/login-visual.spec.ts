@@ -84,7 +84,16 @@ async function esperarPintura(page: Page) {
             img.addEventListener("error", r, { once: true });
           }),
     );
+  // `load` não basta: a imagem pode ter chegado e ainda não ter sido
+  // decodificada e pintada — e aí a medida "sobre a foto" mediria o fundo
+  // liso. Foi o que uma captura feita só com `load` mostrou em 2026-10-02.
+  await page
+    .locator("[data-camada-da-foto] img")
+    .evaluate((img: HTMLImageElement) => (img.naturalWidth ? img.decode().catch(() => undefined) : undefined));
   await page.evaluate(() => document.fonts.ready.then(() => undefined));
+  await page.evaluate(
+    () => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))),
+  );
 }
 
 /** Espera a hidratação: o olho só alterna depois dela. */
@@ -158,7 +167,6 @@ function alvosDeTexto(page: Page, estado: Estado) {
     { rotulo: "campo senha", alvo: page.getByLabel("Senha", { exact: true }) },
     { rotulo: "esqueceu a senha", alvo: page.getByRole("button", { name: "Esqueceu a senha?" }) },
     { rotulo: "botão", alvo: main.locator("button[type=submit]") },
-    { rotulo: "cadastro", alvo: page.getByRole("link", { name: "Cadastre-se" }).locator("xpath=..") },
   ];
   if (estado === "ajuda") alvos.push({ rotulo: "ajuda", alvo: page.getByText("Ainda não enviamos", { exact: false }) });
   if (estado === "erro") alvos.push({ rotulo: "erro", alvo: page.locator("main").getByRole("alert") });
@@ -325,7 +333,6 @@ for (const [nome, viewport] of Object.entries(VIEWPORTS)) {
         page.getByRole("button", { name: "Mostrar senha" }),
         page.getByRole("button", { name: "Esqueceu a senha?" }),
         page.getByRole("button", { name: "Entrar" }),
-        page.getByRole("link", { name: "Cadastre-se" }),
       ]) {
         const caixa = (await alvo.boundingBox())!;
         expect(caixa.width, await alvo.evaluate((e) => e.outerHTML.slice(0, 60))).toBeGreaterThanOrEqual(44);
@@ -343,7 +350,6 @@ for (const [nome, viewport] of Object.entries(VIEWPORTS)) {
         page.getByLabel("E-mail", { exact: true }),
         page.getByLabel("Senha", { exact: true }),
         page.getByRole("button", { name: "Entrar" }),
-        page.getByRole("link", { name: "Cadastre-se" }),
       ]) {
         await alvo.evaluate((el) => el.scrollIntoView({ block: "center" }));
         expect(
@@ -420,9 +426,11 @@ test.describe("AC-002 — copy", () => {
       page.getByText("Reserve sua quadra, acompanhe suas aulas e aproveite cada momento no seu clube."),
     ).toBeVisible();
     await expect(page.getByRole("button", { name: "Entrar" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Cadastre-se" })).toBeVisible();
+    // I5: o login não oferece cadastro.
+    await expect(page.getByRole("link", { name: /cadastr/i })).toHaveCount(0);
+    await expect(page.locator('main a[href^="/cadastro"]')).toHaveCount(0);
     const texto = await page.locator("main").innerText();
-    expect(texto).toContain("Ainda não tem conta?");
+    expect(texto).not.toContain("Ainda não tem conta?");
     expect(texto).not.toContain("Gerencie seu clube");
     expect(texto).not.toContain("CLUBES DE TÊNIS");
   });
@@ -474,7 +482,6 @@ for (const nome of ["320x568", "390x844"] as const) {
           { rotulo: "foco olho", alvo: page.getByRole("button", { name: "Mostrar senha" }) },
           { rotulo: "foco esqueceu", alvo: page.getByRole("button", { name: "Esqueceu a senha?" }) },
           { rotulo: "foco botão", alvo: page.getByRole("button", { name: "Entrar" }) },
-          { rotulo: "foco cadastro", alvo: page.getByRole("link", { name: "Cadastre-se" }) },
         ];
         await page.evaluate(() => window.scrollTo(0, 0));
         await page.locator("body").click({ position: { x: 1, y: 1 } });
@@ -526,7 +533,6 @@ test.describe("AC-007 — foto bloqueada, leitores de tela, ordem e anúncio", (
       await page.locator("[data-camada-da-foto] img").evaluate((i: HTMLImageElement) => i.naturalWidth),
     ).toBe(0);
     await page.screenshot({ path: join(EVIDENCIAS, "capturas", "390x844-normal-ausente.png"), fullPage: true });
-    await expect(page.getByRole("link", { name: "Cadastre-se" })).toHaveAttribute("href", "/cadastro");
     await page.getByLabel("E-mail", { exact: true }).fill("a@b.com");
     await page.getByLabel("Senha", { exact: true }).fill("senha-secreta");
     await page.getByRole("button", { name: "Entrar" }).click();
@@ -554,7 +560,7 @@ test.describe("AC-007 — foto bloqueada, leitores de tela, ordem e anúncio", (
     await esperarHidratacao(page);
     await page.locator("body").click({ position: { x: 1, y: 1 } });
     const nomes: string[] = [];
-    for (let i = 0; i < 6; i++) {
+    for (let i = 0; i < 5; i++) {
       await page.keyboard.press("Tab");
       nomes.push(
         await page.evaluate(() => {
@@ -563,7 +569,7 @@ test.describe("AC-007 — foto bloqueada, leitores de tela, ordem e anúncio", (
         }) || (await page.evaluate(() => (document.activeElement as HTMLElement).innerText.trim())),
       );
     }
-    expect(nomes).toEqual(["email", "senha", "Mostrar senha", "Esqueceu a senha?", "Entrar", "Cadastre-se"]);
+    expect(nomes).toEqual(["email", "senha", "Mostrar senha", "Esqueceu a senha?", "Entrar"]);
   });
 });
 
@@ -601,7 +607,7 @@ test.describe("AC-006 — zoom de 200% (simulado) e fonte aumentada", () => {
   test.describe("zoom: 1440×900 a 200% = 720×450 com DPR 2", () => {
     test.use({ viewport: { width: 720, height: 450 }, deviceScaleFactor: 2 });
 
-    test("sem corte e sem rolagem lateral; botão e cadastro alcançáveis", async ({ page }) => {
+    test("sem corte e sem rolagem lateral; botão alcançável", async ({ page }) => {
       await simularLogin(page, "erro");
       await page.goto("/login");
       await esperarHidratacao(page);
@@ -613,8 +619,8 @@ test.describe("AC-006 — zoom de 200% (simulado) e fonte aumentada", () => {
       const m = await nadaCortado(page);
       expect(m.cortados).toEqual([]);
       expect(m.rolagem).toBeLessThanOrEqual(m.largura + 1);
-      await page.getByRole("link", { name: "Cadastre-se" }).scrollIntoViewIfNeeded();
-      await expect(page.getByRole("link", { name: "Cadastre-se" })).toBeInViewport();
+      await page.getByRole("button", { name: "Entrar" }).scrollIntoViewIfNeeded();
+      await expect(page.getByRole("button", { name: "Entrar" })).toBeInViewport();
       await page.screenshot({ path: join(EVIDENCIAS, "capturas", "zoom-720x450-dpr2.png"), fullPage: true });
     });
   });
@@ -622,7 +628,7 @@ test.describe("AC-006 — zoom de 200% (simulado) e fonte aumentada", () => {
   test.describe("fonte aumentada: html a 200% em 390×844", () => {
     test.use({ viewport: VIEWPORTS["390x844"] });
 
-    test("ajuda, erro e cadastro continuam visíveis e inteiros", async ({ page }) => {
+    test("ajuda, erro e botão continuam visíveis e inteiros", async ({ page }) => {
       await simularLogin(page, "erro");
       await page.goto("/login");
       await page.addStyleTag({ content: "html { font-size: 200% !important; }" });
@@ -647,7 +653,7 @@ test.describe("AC-006 — zoom de 200% (simulado) e fonte aumentada", () => {
       for (const alvo of [
         page.getByText("Ainda não enviamos", { exact: false }),
         page.locator("main").getByRole("alert"),
-        page.getByRole("link", { name: "Cadastre-se" }),
+        page.getByRole("button", { name: "Entrar" }),
       ]) {
         await alvo.scrollIntoViewIfNeeded();
         await expect(alvo).toBeInViewport();

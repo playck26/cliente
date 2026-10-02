@@ -71,7 +71,7 @@ describe("LoginPage — SPEC-084", () => {
     vi.stubGlobal("fetch", vi.fn());
   });
 
-  it("AC-002: a mensagem ao aluno, o botão e o cadastro, com o texto aprovado", () => {
+  it("AC-002: a mensagem ao aluno e o botão, com o texto aprovado", () => {
     render(<LoginPage />);
     expect(screen.getByText("SEU ESPORTE, SEU MOMENTO")).toBeInTheDocument();
     expect(
@@ -83,9 +83,14 @@ describe("LoginPage — SPEC-084", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Entrar" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Cadastre-se" }).closest("p")).toHaveTextContent(
-      "Ainda não tem conta? Cadastre-se",
-    );
+  });
+
+  it("I5: o login não oferece cadastro — nem o texto, nem link para /cadastro", () => {
+    const { container } = render(<LoginPage />);
+    expect(screen.queryByRole("link", { name: /cadastr/i })).toBeNull();
+    expect(container.querySelector('a[href^="/cadastro"]')).toBeNull();
+    expect(container.textContent).not.toContain("Ainda não tem conta?");
+    expect(container.textContent).not.toContain("Cadastre-se");
   });
 
   it("AC-002: não fala em gerir clube, e o texto antigo saiu", () => {

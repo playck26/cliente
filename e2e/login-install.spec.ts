@@ -117,7 +117,6 @@ async function conferirLogin(page: Page, modo: Modo) {
   for (const alvo of [
     page.getByRole("button", { name: "Entrar" }),
     page.getByRole("button", { name: "Esqueceu a senha?" }),
-    page.getByRole("link", { name: "Cadastre-se" }),
   ]) {
     await alvo.evaluate((el) => el.scrollIntoView({ block: "center" }));
     expect(
