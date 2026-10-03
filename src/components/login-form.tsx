@@ -34,6 +34,15 @@ import { lerNomesDeTipo } from "@/lib/nomes-de-tipo";
  *   reparte a linha em duas a meia intensidade. Com 2 px sempre sobra uma
  *   linha inteira. Texto branco a 16 px em toda largura — abaixo disso o
  *   Safari do iPhone dá zoom no foco;
+ * - o rótulo mora DENTRO da caixa, no alto, e o texto digitado logo abaixo
+ *   (I10, 2026-10-02: o Israel pediu para economizar a linha que o rótulo
+ *   ocupava em cima). Continua um `<label for>` visível, não placeholder, e
+ *   altura e posições em `rem` acompanham a fonte aumentada do sistema;
+ * - o preenchimento automático do navegador pinta o campo de azul-claro com
+ *   texto escuro (o print do Israel no computador): com o rótulo branco dentro
+ *   da caixa, ele sumiria. A sombra interna opaca cobre esse fundo, e o
+ *   `-webkit-text-fill-color` devolve o texto branco — o `color` do navegador
+ *   ali é `!important` e não se sobrescreve;
  * - verde-lima `#B9E52B` para ícones, links e o botão, com texto `#12160F`;
  * - erro e ajuda em superfície opaca escura: o vermelho `#ED0040` do tema dá
  *   4,35:1 sobre o fundo escuro e ficou de fora;
@@ -42,7 +51,10 @@ import { lerNomesDeTipo } from "@/lib/nomes-de-tipo";
  *   legível.
  */
 const CAMPO =
-  "h-[52px] rounded-2xl border-2 border-white/45 bg-black/45 text-base text-white placeholder:text-white/60 md:text-base focus-visible:border-[#B9E52B] focus-visible:ring-2 focus-visible:ring-[#B9E52B] disabled:bg-black/45 disabled:opacity-100";
+  "h-[3.75rem] rounded-2xl border-2 border-white/45 bg-black/45 pt-6 pb-1 text-base text-white placeholder:text-white/60 md:text-base focus-visible:border-[#B9E52B] focus-visible:ring-2 focus-visible:ring-[#B9E52B] disabled:bg-black/45 disabled:opacity-100 autofill:shadow-[inset_0_0_0_100rem_#15191B] autofill:[-webkit-text-fill-color:#fff] autofill:caret-white";
+
+const ROTULO =
+  "pointer-events-none absolute top-[0.625rem] left-[calc(3rem_+_2px)] text-xs leading-4 font-bold text-white/75";
 
 const FOCO =
   "outline-none focus-visible:ring-2 focus-visible:ring-[#B9E52B] focus-visible:ring-offset-2 focus-visible:ring-offset-[#080D10]";
@@ -83,18 +95,16 @@ export function LoginForm() {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="email" className="text-sm font-bold text-white">E-mail</Label>
-        <div className="relative">
-          <Mail className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-[#B9E52B]" aria-hidden="true" />
-          <Input id="email" type="email" autoComplete="email" placeholder="seu@email.com" required value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading} className={`${CAMPO} pl-12`} />
-        </div>
+      <div className="relative">
+        <Mail className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-[#B9E52B]" aria-hidden="true" />
+        <Label htmlFor="email" className={ROTULO}>E-mail</Label>
+        <Input id="email" type="email" autoComplete="email" placeholder="seu@email.com" required value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading} className={`${CAMPO} pl-12`} />
       </div>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="senha" className="text-sm font-bold text-white">Senha</Label>
         <div className="relative">
           <Lock className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-[#B9E52B]" aria-hidden="true" />
+          <Label htmlFor="senha" className={ROTULO}>Senha</Label>
           <Input id="senha" type={mostrarSenha ? "text" : "password"} autoComplete="current-password" required minLength={8} value={senha} onChange={(e) => setSenha(e.target.value)} disabled={loading} className={`${CAMPO} pr-14 pl-12`} />
           <button type="button" onClick={() => setMostrarSenha((v) => !v)} className={`absolute top-1/2 right-1 flex size-11 -translate-y-1/2 items-center justify-center rounded-xl text-white/85 hover:text-white ${FOCO}`} aria-label={mostrarSenha ? "Ocultar senha" : "Mostrar senha"}>
             {mostrarSenha ? <EyeOff className="size-5" /> : <Eye className="size-5" />}

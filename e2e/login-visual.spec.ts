@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { expect, test, type Browser, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { LOGIN_APOS_ATIVACAO } from "../src/lib/ativacao-navigation";
 import { FUNDO_DO_LOGIN } from "../src/lib/login-appearance";
 import {
@@ -28,48 +28,33 @@ const MENSAGEM_LONGA =
 
 const VIEWPORTS = {
   "320x568": { width: 320, height: 568 },
+  "360x800": { width: 360, height: 800 },
   "390x844": { width: 390, height: 844 },
+  "412x915": { width: 412, height: 915 },
   "768x1024": { width: 768, height: 1024 },
   "1440x900": { width: 1440, height: 900 },
 } as const;
 
-type Fundo = "foto" | "branco" | "preto" | "ausente";
-const FUNDOS: Fundo[] = ["foto", "branco", "preto", "ausente"];
-
-/** PNGs sólidos do tamanho da foto, gerados por canvas: nada de arquivo novo. */
-const solidos: Partial<Record<"branco" | "preto", Buffer>> = {};
-
-async function gerarSolidos(browser: Browser) {
-  if (solidos.branco && solidos.preto) return;
-  const pagina = await browser.newPage();
-  for (const [nome, cor] of [
-    ["branco", "#ffffff"],
-    ["preto", "#000000"],
-  ] as const) {
-    const b64 = await pagina.evaluate(
-      ([c, w, h]) => {
-        const canvas = document.createElement("canvas");
-        canvas.width = w as number;
-        canvas.height = h as number;
-        const ctx = canvas.getContext("2d")!;
-        ctx.fillStyle = c as string;
-        ctx.fillRect(0, 0, w as number, h as number);
-        return canvas.toDataURL("image/png").split(",")[1];
-      },
-      [cor, FUNDO_DO_LOGIN.largura, FUNDO_DO_LOGIN.altura] as const,
-    );
-    solidos[nome] = Buffer.from(b64, "base64");
-  }
-  await pagina.close();
-}
+/**
+ * Os fundos da matriz de contraste (I10, 2026-10-02): a foto CONFIGURADA e a
+ * foto ausente (a cor de fallback).
+ *
+ * Até a I10 a matriz incluía uma foto toda branca e uma toda preta, e cada véu
+ * era o mínimo que passava sobre o BRANCO. Isso fazia a foto nunca decidir a
+ * legibilidade — e deixava o topo e o pé da tela escuros sobre qualquer foto.
+ * O Israel pediu, duas vezes (I6 e I10), menos preto. Sobre o branco o véu já
+ * estava no piso: clarear exigia trocar o fundo de referência.
+ *
+ * A garantia que o branco dava (trocar a foto não estraga a leitura) continua,
+ * por outro caminho: a matriz mede SEMPRE a foto de `FUNDO_DO_LOGIN`. Uma foto
+ * nova mais clara reprova aqui até os véus serem refeitos.
+ */
+type Fundo = "foto" | "ausente";
 
 /** Troca a foto pelo fundo pedido, no caminho configurado. */
 async function usarFundo(page: Page, fundo: Fundo) {
   if (fundo === "foto") return;
-  await page.route(`**${FUNDO_DO_LOGIN.src}`, async (rota) => {
-    if (fundo === "ausente") return rota.abort("failed");
-    await rota.fulfill({ status: 200, contentType: "image/png", body: solidos[fundo] });
-  });
+  await page.route(`**${FUNDO_DO_LOGIN.src}`, (rota) => rota.abort("failed"));
 }
 
 /** A foto terminou (carregou ou falhou) e as fontes também. */
@@ -345,6 +330,32 @@ for (const [nome, viewport] of Object.entries(VIEWPORTS)) {
         expect((await page.locator(rotulo).boundingBox())!.height).toBeGreaterThan(10);
       }
 
+      // I10: o rótulo mora DENTRO da caixa do campo, acima de onde o texto
+      // digitado começa — é o que economiza a linha que ele ocupava em cima.
+      for (const [rotulo, campo] of [
+        ["label[for=email]", "#email"],
+        ["label[for=senha]", "#senha"],
+      ]) {
+        const r = (await page.locator(rotulo).boundingBox())!;
+        const c = (await page.locator(campo).boundingBox())!;
+        expect(r.x).toBeGreaterThanOrEqual(c.x);
+        expect(r.y).toBeGreaterThanOrEqual(c.y);
+        expect(r.x + r.width).toBeLessThanOrEqual(c.x + c.width);
+        const topoDoTexto = await page.locator(campo).evaluate((i) => {
+          const s = getComputedStyle(i);
+          return i.getBoundingClientRect().top + parseFloat(s.borderTopWidth) + parseFloat(s.paddingTop);
+        });
+        expect(r.y + r.height).toBeLessThanOrEqual(topoDoTexto + 0.5);
+      }
+
+      // I10: o apoio em exatamente três linhas, em toda largura.
+      const linhasDoApoio = await page.getByText("Reserve sua quadra", { exact: false }).evaluate((p) => {
+        const faixa = document.createRange();
+        faixa.selectNodeContents(p);
+        return new Set([...faixa.getClientRects()].filter((r) => r.width > 0).map((r) => Math.round(r.top))).size;
+      });
+      expect(linhasDoApoio).toBe(3);
+
       // Campos e botão alcançáveis por rolagem: no centro de cada um está ele mesmo.
       for (const alvo of [
         page.getByLabel("E-mail", { exact: true }),
@@ -440,65 +451,78 @@ test.describe("AC-002 — copy", () => {
 // NFR-001 — a matriz de contraste: estado × fundo × viewport
 // ---------------------------------------------------------------------------
 
-for (const nome of ["320x568", "390x844"] as const) {
-  for (const fundo of FUNDOS) {
-    test.describe(`NFR-001 — contraste, ${nome}, fundo ${fundo}`, () => {
-      test.use({ viewport: VIEWPORTS[nome], deviceScaleFactor: 1 });
+/**
+ * A foto em cinco larguras: cada uma põe os textos sobre um pedaço diferente
+ * dela (a 412 px, o celular do Israel, o apoio cruza a luz das palmeiras; a
+ * 1440, a coluna corta a foto por cima e por baixo). A foto ausente basta em
+ * duas: o fundo é liso.
+ */
+const MATRIZ: [keyof typeof VIEWPORTS, Fundo][] = [
+  ["320x568", "foto"],
+  ["360x800", "foto"],
+  ["390x844", "foto"],
+  ["412x915", "foto"],
+  ["1440x900", "foto"],
+  ["320x568", "ausente"],
+  ["390x844", "ausente"],
+];
 
-      test.beforeEach(async ({ browser, page }) => {
-        await gerarSolidos(browser);
-        await usarFundo(page, fundo);
-      });
+for (const [nome, fundo] of MATRIZ) {
+  test.describe(`NFR-001 — contraste, ${nome}, fundo ${fundo}`, () => {
+    test.use({ viewport: VIEWPORTS[nome], deviceScaleFactor: 1 });
 
-      for (const estado of ESTADOS) {
-        test(`textos — ${estado}`, async ({ page }) => {
-          await prepararEstado(page, estado);
-          test.setTimeout(90_000);
-          const resultados = await medirTextos(page, alvosDeTexto(page, estado));
-          expect(resultados.length).toBeGreaterThan(10);
-          gravarMedidas(`${nome}-${fundo}-${estado}`, { textos: resultados, viewport: nome, fundo, estado });
-          if (fundo === "foto" && nome === "390x844") {
-            await page.evaluate(() => window.scrollTo(0, 0));
-            await page.screenshot({ path: join(EVIDENCIAS, "capturas", `${nome}-${estado}-foto.png`), fullPage: true });
-          }
-          const ruins = resultados.filter((r) => !r.passou);
-          expect(ruins, JSON.stringify(ruins, null, 1)).toEqual([]);
-        });
-      }
+    test.beforeEach(async ({ page }) => {
+      await usarFundo(page, fundo);
+    });
 
-      test("bordas dos campos e anéis de foco", async ({ page }) => {
-        test.setTimeout(180_000);
-        await prepararEstado(page, "preenchido");
-        const bordas = await medirFaixas(page, [
-          { rotulo: "borda e-mail", alvo: page.getByLabel("E-mail", { exact: true }) },
-          { rotulo: "borda senha", alvo: page.getByLabel("Senha", { exact: true }) },
-        ]);
-
-        // Foco por TECLADO, na ordem natural (AC-007): é o que liga o
-        // `:focus-visible` dos botões.
-        const ordem = [
-          { rotulo: "foco e-mail", alvo: page.getByLabel("E-mail", { exact: true }) },
-          { rotulo: "foco senha", alvo: page.getByLabel("Senha", { exact: true }) },
-          { rotulo: "foco olho", alvo: page.getByRole("button", { name: "Mostrar senha" }) },
-          { rotulo: "foco esqueceu", alvo: page.getByRole("button", { name: "Esqueceu a senha?" }) },
-          { rotulo: "foco botão", alvo: page.getByRole("button", { name: "Entrar" }) },
-        ];
-        await page.evaluate(() => window.scrollTo(0, 0));
-        await page.locator("body").click({ position: { x: 1, y: 1 } });
-        const aneis: ResultadoDeFaixa[] = [];
-        for (const { rotulo, alvo } of ordem) {
-          await page.keyboard.press("Tab");
-          await expect(alvo).toBeFocused();
-          await alvo.evaluate((el) => el.scrollIntoView({ block: "center" }));
-          const [anel] = await medirFaixas(page, [{ rotulo, alvo }]);
-          aneis.push(anel);
+    for (const estado of ESTADOS) {
+      test(`textos — ${estado}`, async ({ page }) => {
+        await prepararEstado(page, estado);
+        test.setTimeout(90_000);
+        const resultados = await medirTextos(page, alvosDeTexto(page, estado));
+        expect(resultados.length).toBeGreaterThan(10);
+        gravarMedidas(`${nome}-${fundo}-${estado}`, { textos: resultados, viewport: nome, fundo, estado });
+        if (fundo === "foto" && nome === "390x844") {
+          await page.evaluate(() => window.scrollTo(0, 0));
+          await page.screenshot({ path: join(EVIDENCIAS, "capturas", `${nome}-${estado}-foto.png`), fullPage: true });
         }
-        gravarMedidas(`${nome}-${fundo}-bordas-e-foco`, { faixas: [...bordas, ...aneis], viewport: nome, fundo, estado: "foco" });
-        const ruins = [...bordas, ...aneis].filter((r) => !r.passou);
+        const ruins = resultados.filter((r) => !r.passou);
         expect(ruins, JSON.stringify(ruins, null, 1)).toEqual([]);
       });
+    }
+
+    test("bordas dos campos e anéis de foco", async ({ page }) => {
+      test.setTimeout(180_000);
+      await prepararEstado(page, "preenchido");
+      const bordas = await medirFaixas(page, [
+        { rotulo: "borda e-mail", alvo: page.getByLabel("E-mail", { exact: true }) },
+        { rotulo: "borda senha", alvo: page.getByLabel("Senha", { exact: true }) },
+      ]);
+
+      // Foco por TECLADO, na ordem natural (AC-007): é o que liga o
+      // `:focus-visible` dos botões.
+      const ordem = [
+        { rotulo: "foco e-mail", alvo: page.getByLabel("E-mail", { exact: true }) },
+        { rotulo: "foco senha", alvo: page.getByLabel("Senha", { exact: true }) },
+        { rotulo: "foco olho", alvo: page.getByRole("button", { name: "Mostrar senha" }) },
+        { rotulo: "foco esqueceu", alvo: page.getByRole("button", { name: "Esqueceu a senha?" }) },
+        { rotulo: "foco botão", alvo: page.getByRole("button", { name: "Entrar" }) },
+      ];
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await page.locator("body").click({ position: { x: 1, y: 1 } });
+      const aneis: ResultadoDeFaixa[] = [];
+      for (const { rotulo, alvo } of ordem) {
+        await page.keyboard.press("Tab");
+        await expect(alvo).toBeFocused();
+        await alvo.evaluate((el) => el.scrollIntoView({ block: "center" }));
+        const [anel] = await medirFaixas(page, [{ rotulo, alvo }]);
+        aneis.push(anel);
+      }
+      gravarMedidas(`${nome}-${fundo}-bordas-e-foco`, { faixas: [...bordas, ...aneis], viewport: nome, fundo, estado: "foco" });
+      const ruins = [...bordas, ...aneis].filter((r) => !r.passou);
+      expect(ruins, JSON.stringify(ruins, null, 1)).toEqual([]);
     });
-  }
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -679,12 +703,10 @@ mkdirSync(PASTA_DE_FONTE, { recursive: true });
 
 for (const [nome, viewport] of Object.entries(VIEWPORTS)) {
   for (const fonte of [100, 200] as const) {
-    test.describe(`LIM-084o — ${nome}, fonte ${fonte}%, fundo branco`, () => {
+    test.describe(`LIM-084o — ${nome}, fonte ${fonte}%, sobre a foto`, () => {
       test.use({ viewport, deviceScaleFactor: 1 });
 
-      test("marca, selo, título e apoio dentro da coluna e legíveis", async ({ browser, page }) => {
-        await gerarSolidos(browser);
-        await usarFundo(page, "branco");
+      test("marca, selo, título e apoio dentro da coluna e legíveis", async ({ page }) => {
         await page.goto("/login");
         if (fonte === 200) await page.addStyleTag({ content: "html { font-size: 200% !important; }" });
         await esperarPintura(page);
@@ -737,7 +759,7 @@ for (const [nome, viewport] of Object.entries(VIEWPORTS)) {
           JSON.stringify({ viewport: nome, fonte, textos: resultados }, null, 2),
         );
         if (fonte === 200) {
-          await page.screenshot({ path: join(EVIDENCIAS, "capturas", `${nome}-fonte-200-branco.png`), fullPage: true });
+          await page.screenshot({ path: join(EVIDENCIAS, "capturas", `${nome}-fonte-200-foto.png`), fullPage: true });
         }
         const ruins = resultados.filter((r) => !r.passou);
         expect(ruins, JSON.stringify(ruins, null, 1)).toEqual([]);

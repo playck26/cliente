@@ -6,7 +6,7 @@
 **54** componentes e **23** módulos em `lib/` (`vitest run --pool=threads`, em
 série, uma rodada só, zero vermelho; `.tsx` de `src/components`, sem subpastas
 e sem os `.test.tsx`; `.ts`/`.tsx` de `src/lib` sem os testes). **Mais 6
-arquivos de prova de NAVEGADOR, 104 casos no Chromium** (`pnpm run
+arquivos de prova de NAVEGADOR, 103 casos no Chromium** (`pnpm run
 test:navegador`), e 6 casos a mais no WebKit com `PLAYCK_WEBKIT=1`.
 
 *A conta da SPEC-084:* a `main` (`d61d55f`) tinha 72 arquivos, 53
@@ -17,7 +17,7 @@ parte**: 835 é derivado (911 − 76, na contagem anterior à I5) e bate com o "
 somou 5 arquivos e 76 casos (caracterização 16, foto 11, protocolo 12, aviso
 6, medidor 17, e 14 em arquivos que já existiam), 1 componente
 (`aviso-de-ativacao`), 2 módulos (`login-appearance`, `ativacao-navigation`) e
-3 arquivos / 85 casos de navegador. **835 + 76 = 911**, e a I5 somou 1 caso (o login sem cadastro): **912**. A LIM-084o somou 8 casos de navegador (4 viewports × fonte 100/200%): **11 + 93 = 104**.
+3 arquivos / 85 casos de navegador. **835 + 76 = 911**, e a I5 somou 1 caso (o login sem cadastro): **912**. A LIM-084o somou 8 casos de navegador (4 viewports × fonte 100/200%): **11 + 93 = 104**. A I10 (2026-10-02, branch `spec084/ajustes-israel`) trocou a matriz de contraste (2 larguras × 4 fundos × 7 = 56 → 5 larguras com foto + 2 sem foto, × 7 = 49) e levou composição e LIM-084o a 6 larguras (+2 e +4): **104 − 7 + 2 + 4 = 103**, conferido pelo `[n/103]` do Playwright.
 
 *Registro de 2026-09-25 (SPEC-074):* 72 arquivos, 834 casos, 53 componentes, 21
 módulos, 3 arquivos / 11 casos de navegador.
@@ -735,12 +735,19 @@ centralizada, com `#080D10` dos lados (I3): a foto de quadra numa camada
 decorativa (`aria-hidden`, `alt=""`), a marca e o texto no alto, um respiro onde
 a raquete aparece e o formulário embaixo. **Cada texto do topo tem o próprio
 véu** (pseudo-elemento escuro atrás dele, desfeito em cima, embaixo e, para a
-direita, logo depois do fim da linha), e o formulário tem um véu de bloco. São
-eles que garantem o contraste: a foto nunca decide a legibilidade. Cada véu tem
-só a força de que o texto precisa sobre um fundo TODO BRANCO — o título, texto
-grande, fica com 0,48; selo e apoio, com 0,76 e 0,72 —, e por isso o céu e o
-sol aparecem entre e ao lado dos textos (I6: a primeira versão, com um véu único
-de 0,74–0,90, deixava o céu escuro demais). A linha da marca **quebra** (`flex-wrap`): com fonte a 200% num celular de 320 px, “PlayCK” desce inteiro para baixo do logo, em vez de passar da coluna e sair do véu (LIM-084o, achado da validação do delta). Os tokens são
+direita, logo depois do fim da linha), e o formulário tem um véu de bloco.
+**Véu e foto são medidos juntos (I10):** o TEST-002 mede cada texto sobre a
+foto configurada, em cinco larguras (320 a 1440), e sobre a foto ausente. Até a
+I10 ele media também sobre um fundo TODO BRANCO, e cada véu era o mínimo que
+passava ali — o topo e o pé da tela ficavam escuros sobre qualquer foto, e o
+Israel pediu menos preto duas vezes (I6, I10). Trocar a foto, agora, exige o
+TEST-002 de novo: uma foto mais clara reprova até os véus serem refeitos.
+Selo, título e apoio continuam com 0,76, 0,48 e 0,72 (sobre a foto, o mínimo
+medido é 0,70, 0,45 e 0,65: há refletores da quadra atrás das letras); **a marca
+perdeu o véu**, e o do formulário caiu de 0,84 para 0,35 (o limite é a borda
+dos campos, 3,47:1 no pior caso). Os **rótulos E-mail e Senha moram dentro da
+caixa** do campo (I10), e o apoio quebra em **três linhas** (`max-w-[18rem]`).
+A linha da marca **quebra** (`flex-wrap`): com fonte a 200% num celular de 320 px, “PlayCK” desce inteiro para baixo do logo, em vez de passar da coluna (LIM-084o, achado da validação do delta). Os tokens são
 locais do login e estão no `DESIGN.md` ("Login fotográfico"), como valores
 arbitrários do Tailwind, porque o `globals.css` não muda por causa de uma tela.
 
