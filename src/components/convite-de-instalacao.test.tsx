@@ -4,6 +4,13 @@ import { ConviteDeInstalacao } from "./convite-de-instalacao";
 import type { EventoDeInstalacao } from "@/lib/instalacao-pwa";
 
 /**
+ * SPEC-084 — a rota simulada. `null` é o "fora do roteador" dos casos da
+ * SPEC-050, que continuam como eram; os casos do login trocam o valor.
+ */
+const rota = vi.hoisted(() => ({ atual: null as string | null }));
+vi.mock("next/navigation", () => ({ usePathname: () => rota.atual }));
+
+/**
  * SPEC-050 — **o que a pessoa vê, em cada um dos dois mundos.**
  *
  * `instalacao-pwa.test.ts` prova a decisão; este arquivo prova a tela. São
@@ -42,6 +49,7 @@ function eventoFalso(outcome: "accepted" | "dismissed" = "accepted") {
 const CHAVE = "playck_instalacao_dispensada_em";
 
 beforeEach(() => {
+  rota.atual = null;
   window.localStorage.clear();
   delete window.__playckEventoDeInstalacao;
   definirUA("Mozilla/5.0 (Linux; Android 14; Pixel 8) Chrome/120", 5);
@@ -233,5 +241,51 @@ describe("ConviteDeInstalacao — dispensar é definitivo por 15 dias", () => {
 
     await waitFor(() => expect(convite()).toBeNull());
     expect(window.localStorage.getItem(CHAVE)).toBeNull();
+  });
+});
+
+/**
+ * SPEC-084 (I1, AC-009) — **o login fica sem convite, e a home não perde o
+ * dela.** Cada caso mostra o par: nada em `/login`, e o convite aparecendo na
+ * home logo depois, no mesmo `window` — é o que prova que esconder não foi
+ * dispensar nem consumir o evento.
+ */
+describe("ConviteDeInstalacao — fora do login (SPEC-084)", () => {
+  it("Chromium com evento guardado: nada no /login, sem prompt, sem consumir, sem dispensa; botão na home", async () => {
+    const { e, prompt } = eventoFalso();
+    window.__playckEventoDeInstalacao = e;
+
+    rota.atual = "/login";
+    const { rerender } = render(<ConviteDeInstalacao />);
+    expect(convite()).toBeNull();
+    expect(prompt).not.toHaveBeenCalled();
+    expect(window.__playckEventoDeInstalacao).toBe(e);
+    expect(window.localStorage.getItem(CHAVE)).toBeNull();
+
+    rota.atual = "/home";
+    rerender(<ConviteDeInstalacao />);
+    expect(await screen.findByRole("button", { name: "Instalar" })).toBeInTheDocument();
+    expect(prompt).not.toHaveBeenCalled();
+  });
+
+  it("iPhone sem dispensa: nada no /login; a instrução aparece na home", async () => {
+    definirUA("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Safari");
+
+    rota.atual = "/login";
+    const { rerender } = render(<ConviteDeInstalacao />);
+    expect(convite()).toBeNull();
+    expect(window.localStorage.getItem(CHAVE)).toBeNull();
+
+    rota.atual = "/home";
+    rerender(<ConviteDeInstalacao />);
+    expect(await screen.findByText("Compartilhar")).toBeInTheDocument();
+    expect(convite()).toBeInTheDocument();
+  });
+
+  it("as outras telas sem barra continuam com convite (LIM-084m)", async () => {
+    definirUA("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Safari");
+    rota.atual = "/cadastro";
+    render(<ConviteDeInstalacao />);
+    expect(await screen.findByText("Compartilhar")).toBeInTheDocument();
   });
 });

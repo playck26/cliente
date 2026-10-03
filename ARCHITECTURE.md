@@ -1,11 +1,26 @@
 # ARCHITECTURE — `cliente` (PlayCK)
 
-**Fonte: análise direta do código.** Data: **2026-09-25** (era 2026-09-24).
-**Conferido por comando nesta data, na branch da SPEC-074:** **72** arquivos de
-teste, **834** casos, **53** componentes e **21** módulos em `lib/`
-(`vitest run --pool=threads`, em série; `.tsx` de `src/components`, sem
-subpastas e sem os `.test.tsx`). **Mais 3 arquivos de prova de NAVEGADOR, 11
-casos** (`pnpm run test:navegador`).
+**Fonte: análise direta do código.** Data: **2026-10-02** (era 2026-09-25).
+**Conferido por comando nesta data, na branch da SPEC-084
+(`spec084/login-fotografico`):** **77** arquivos de teste, **912** casos,
+**54** componentes e **23** módulos em `lib/` (`vitest run --pool=threads`, em
+série, uma rodada só, zero vermelho; `.tsx` de `src/components`, sem subpastas
+e sem os `.test.tsx`; `.ts`/`.tsx` de `src/lib` sem os testes). **Mais 6
+arquivos de prova de NAVEGADOR, 104 casos no Chromium** (`pnpm run
+test:navegador`), e 6 casos a mais no WebKit com `PLAYCK_WEBKIT=1`.
+
+*A conta da SPEC-084:* a `main` (`d61d55f`) tinha 72 arquivos, 53
+componentes, 21 módulos e 3/11 de navegador (contados por `git ls-tree` e pela
+suíte de navegador). Os casos de unidade da `main` **não foram rodados à
+parte**: 835 é derivado (911 − 76, na contagem anterior à I5) e bate com o "835/835" que o
+`vitest.setup.ts` registra no CI de 2026-09-29. A SPEC-084
+somou 5 arquivos e 76 casos (caracterização 16, foto 11, protocolo 12, aviso
+6, medidor 17, e 14 em arquivos que já existiam), 1 componente
+(`aviso-de-ativacao`), 2 módulos (`login-appearance`, `ativacao-navigation`) e
+3 arquivos / 85 casos de navegador. **835 + 76 = 911**, e a I5 somou 1 caso (o login sem cadastro): **912**. A LIM-084o somou 8 casos de navegador (4 viewports × fonte 100/200%): **11 + 93 = 104**.
+
+*Registro de 2026-09-25 (SPEC-074):* 72 arquivos, 834 casos, 53 componentes, 21
+módulos, 3 arquivos / 11 casos de navegador.
 
 *Os 834 foram contados em DUAS partes, e a soma é a prova:* a suíte inteira
 rodou 654 casos em 65 arquivos e saiu `1` **com zero vermelho** — 7 arquivos não
@@ -98,7 +113,7 @@ page.tsx (server component, fino)
 
 | Rota | Componente | Papel |
 |---|---|---|
-| `/login` | `login-form` | entrada; leva a `/primeiro-acesso` se a senha for temporária. **DEF-003**: "Cadastre-se" virou link real para `/cadastro` (era `<span>` morto desde a SPEC-007) e "Esqueceu a senha?" passou a dizer o caminho que existe hoje |
+| `/login` | página (foto, marca, texto) → `aviso-de-ativacao` + `login-form` | entrada; leva a `/primeiro-acesso` se a senha for temporária. **DEF-003**: "Cadastre-se" virou link real para `/cadastro` (era `<span>` morto desde a SPEC-007) e "Esqueceu a senha?" passou a dizer o caminho que existe hoje. **SPEC-084 — o login fotográfico** (seção 9, "O login fotográfico"): a página saiu do `app-screen` e virou uma coluna de até 480 px com a foto de quadra atrás; o `login-form` ficou só com o formulário, e o comportamento dele é o da base, congelado em `login-form.caracterizacao.test.tsx`. **O convite de instalação não aparece aqui** (I1), **nem a chamada para cadastro** (I5: o aluno não se cadastra sozinho; a rota `/cadastro` continua existindo, só o login deixou de apontar para ela) |
 | `/primeiro-acesso` | `primeiro-acesso-form` | troca obrigatória da senha temporária (INV-008) |
 | `/cadastro` | `escolher-clube-form` | **DEF-003**: pede o código do clube e redireciona para `/cadastro/<slug>`. Existe porque o login não sabe de qual clube a pessoa é; não valida o código aqui (o limite de 10/15min do endpoint público trancaria quem errasse duas vezes) |
 | `/cadastro/[slug]` | `cadastro-publico-form` | auto-cadastro pelo link público da empresa |
@@ -170,6 +185,18 @@ o JS nunca lê.
 **`convite-de-instalacao.tsx`**, com a decisão em `lib/instalacao-pwa.ts`
 (mesma separação de `capacidade-operacao.ts` × `aviso-de-prazo.tsx`: decisão se
 testa sem DOM).
+
+**SPEC-084 — o convite saiu do login (revogação parcial da SPEC-050).** O
+convite continua global, no `layout.tsx`, e continua flutuando a 94 px da borda
+nas telas sem barra, **menos em `/login`**: lá ele cairia sobre o botão
+"Entrar" do login fotográfico, e o Israel decidiu tirá-lo (I1). A regra é uma
+lista explícita (`ROTAS_SEM_CONVITE` / `conviteCabeNaRota` em
+`instalacao-pwa.ts`), lida pelo componente com `usePathname()` — que ignora a
+query, então `/login?ativado=1` também fica sem convite. **Esconder não é
+dispensar:** nada é gravado e o evento guardado não é consumido, e a home, que
+abre por navegação do cliente depois do login, mostra o convite no modo do
+aparelho (`e2e/login-install.spec.ts`). `/cadastro` e `/primeiro-acesso`
+continuam com o convite (LIM-084m).
 
 Até a SPEC-050 existiam só os dois primeiros, e **o app era instalável sem
 nunca convidar ninguém** — não havia `beforeinstallprompt` em nenhum
@@ -700,6 +727,69 @@ o `TopAppBar` aparece em quatro telas e sem isso cada navegação refaria a
 chamada. Não há React Query nem estado global neste projeto, e um store por
 causa de um avatar seria a decisão errada. O cache é limpo em
 `encerrarSessao()`: a próxima pessoa nesta aba pode ser de outro clube.
+
+### O login fotográfico (SPEC-084)
+
+**A composição.** `app/login/page.tsx` monta uma coluna de até 480 px,
+centralizada, com `#080D10` dos lados (I3): a foto de quadra numa camada
+decorativa (`aria-hidden`, `alt=""`), a marca e o texto no alto, um respiro onde
+a raquete aparece e o formulário embaixo. **Cada texto do topo tem o próprio
+véu** (pseudo-elemento escuro atrás dele, desfeito em cima, embaixo e, para a
+direita, logo depois do fim da linha), e o formulário tem um véu de bloco. São
+eles que garantem o contraste: a foto nunca decide a legibilidade. Cada véu tem
+só a força de que o texto precisa sobre um fundo TODO BRANCO — o título, texto
+grande, fica com 0,48; selo e apoio, com 0,76 e 0,72 —, e por isso o céu e o
+sol aparecem entre e ao lado dos textos (I6: a primeira versão, com um véu único
+de 0,74–0,90, deixava o céu escuro demais). A linha da marca **quebra** (`flex-wrap`): com fonte a 200% num celular de 320 px, “PlayCK” desce inteiro para baixo do logo, em vez de passar da coluna e sair do véu (LIM-084o, achado da validação do delta). Os tokens são
+locais do login e estão no `DESIGN.md` ("Login fotográfico"), como valores
+arbitrários do Tailwind, porque o `globals.css` não muda por causa de uma tela.
+
+**A foto mora num lugar só.** `lib/login-appearance.ts` (`FUNDO_DO_LOGIN`) tem
+o caminho, as dimensões e a posição; `lib/login-assets-manifest.json` tem hash,
+bytes e dimensões de cada foto publicada. A foto vem crua de
+`public/images/login/` (`unoptimized`), sem o `/_next/image`, para que o
+publicado seja byte a byte o do manifesto. `login-appearance.test.ts` reprova
+arquivo ausente, formato que não é WebP, mais de 350 KiB, dimensão errada, hash
+divergente, bytes novos num nome que já existia (comparando com o último commit
+e com o `merge-base` de `origin/main`; o segundo pula, com o motivo, no
+checkout raso do CI) e o caminho `/images/login/` repetido fora da
+configuração. O passo a passo da troca está no `README.md`.
+
+**O aviso pós-ativação.** `lib/ativacao-navigation.ts` tem
+`LOGIN_APOS_ATIVACAO = "/login?ativado=1"` e a leitura (`chegouDaAtivacao`);
+fora de testes, é o único arquivo com a chave (`ativacao-navigation.test.ts`
+varre `src/`). A SPEC-084 é dona da constante e do aviso; a SPEC-083, quando
+integrar, só importa a constante no redirecionamento da ativação
+(`COORDENACAO-083-084.md`, na pasta da spec). O aviso
+(`aviso-de-ativacao.tsx`) é irmão do formulário, e não filho: a caracterização
+congelada monta o `LoginForm` com o mock de `next/navigation` só com
+`useRouter`. A região `role="status"` existe **vazia** no HTML do servidor e
+recebe o texto 150 ms depois da montagem, pelo `setTimeout`: região viva que já
+nasce com conteúdo costuma não ser anunciada.
+
+**O comportamento do login está congelado.**
+`login-form.caracterizacao.test.tsx` foi escrito contra o componente ANTIGO
+(16 casos: atributos, pedidos, armazenamento, destino por papel, erros,
+carregamento, senha visível, ajuda), viu 20 mutações do antigo ficarem
+vermelhas e passou sem nenhuma mudança contra o novo. **Mudou uma vez só**,
+por decisão de produto e não para acompanhar regressão: a I5 tirou a asserção
+do link de cadastro (hash do conteúdo em LF `363bdb58…` → `b35887f4…`). Mexer
+no `login-form.tsx` é passar por aquele arquivo sem editá-lo.
+
+**As provas de navegador.**
+- `e2e/login-visual.spec.ts`: composição nos quatro viewports, copy aprovada,
+  foto bloqueada, ordem de tabulação, zoom e fonte aumentada, e a **matriz de
+  contraste** (texto, borda e foco × foto, branco, preto e ausente × 320 e 390).
+  O medidor é `e2e/helpers/login-contrast.ts`: lê pixels, esconde só os glifos
+  e reprova pelo pior pixel. A matemática tem autoteste em
+  `lib/login-contrast.test.ts`; o esconder-glifos, no próprio e2e.
+- `e2e/login-aviso-ativacao.spec.ts`: o HTML do servidor, observado com o
+  JavaScript desligado.
+- `e2e/login-install.spec.ts`: o convite fora do login. Roda também em WebKit
+  com perfil de iPhone, com `PLAYCK_WEBKIT=1` (projeto opcional; o CI só tem o
+  Chromium).
+
+Nada disto é aparelho real.
 
 ## 10. Avisos do clube — push (SPEC-062/TASK-004)
 

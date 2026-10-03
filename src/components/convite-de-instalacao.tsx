@@ -2,10 +2,12 @@
 
 import { useCallback, useSyncExternalStore } from "react";
 import Image from "next/image";
+import { usePathname } from "next/navigation";
 import { Share, SquarePlus, X } from "lucide-react";
 import {
   assinarInstalacao,
   consumirEvento,
+  conviteCabeNaRota,
   eventoDisponivel,
   lerModoDeConvite,
   limparDispensa,
@@ -55,10 +57,17 @@ import {
  * **abaixo** do `z-50` da barra de propósito — se algum dia os dois se
  * cruzarem, quem ganha é a navegação, não a propaganda.
  *
- * Na tela de login não há barra, e aí o convite flutua 94px acima da borda.
- * Ficar assim é deliberado: a alternativa era este componente global
- * adivinhar, a cada rota, se a página renderizou barra — um acoplamento que
- * erra em silêncio a cada tela nova.
+ * Nas telas sem barra o convite flutua 94px acima da borda. Ficar assim é
+ * deliberado: a alternativa era este componente global adivinhar, a cada
+ * rota, se a página renderizou barra — um acoplamento que erra em silêncio a
+ * cada tela nova.
+ *
+ * **A exceção é o login (SPEC-084, I1).** Lá o convite cairia sobre o botão
+ * "Entrar" e o "Cadastre-se" da composição fotográfica, e o Israel decidiu
+ * tirá-lo da tela. A exceção é uma lista explícita de rotas em
+ * `conviteCabeNaRota` — não um palpite sobre barra — e esconder não é
+ * dispensar: nada é gravado, o evento não é consumido, e o convite aparece na
+ * home logo depois do login.
  */
 export function ConviteDeInstalacao() {
   const modo = useSyncExternalStore(
@@ -66,6 +75,10 @@ export function ConviteDeInstalacao() {
     lerModoDeConvite,
     modoNoServidor,
   );
+
+  // Hook incondicional, antes de qualquer retorno: a rota só decide o que
+  // desenha, nunca se os hooks rodam.
+  const caminho = usePathname();
 
   const dispensar = useCallback(() => registrarDispensa(), []);
 
@@ -92,7 +105,7 @@ export function ConviteDeInstalacao() {
     }
   }, []);
 
-  if (modo === "oculto") return null;
+  if (modo === "oculto" || !conviteCabeNaRota(caminho)) return null;
 
   return (
     <div

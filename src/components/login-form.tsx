@@ -1,11 +1,8 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
-import Image from "next/image";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Eye, EyeOff, Lock, Mail } from "lucide-react";
-import { CourtLines } from "@/components/court-lines";
+import { ArrowRight, CircleAlert, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,6 +10,42 @@ import { ApiError, login } from "@/lib/api-client";
 import { rotaInicial } from "@/lib/rota-inicial";
 import { saveAccessToken, savePapel } from "@/lib/auth-storage";
 import { lerNomesDeTipo } from "@/lib/nomes-de-tipo";
+
+/**
+ * SPEC-084 — **os campos do login fotográfico.** A foto, a marca, o texto e o
+ * aviso pós-ativação moram na página (`app/login/page.tsx`); aqui fica só o
+ * formulário, com o comportamento de sempre.
+ *
+ * O comportamento é o da base e está congelado em
+ * `login-form.caracterizacao.test.tsx`: pedidos, armazenamento, destino por
+ * papel, erros, carregamento, senha visível e ajuda. Mexer aqui é passar por
+ * aquele arquivo sem mudá-lo.
+ *
+ * **Sem "Ainda não tem conta? Cadastre-se" (I5, 2026-10-02):** o aluno não se
+ * cadastra sozinho, e o Israel pediu para tirar o convite ao cadastro do login.
+ *
+ * As cores são locais do login (DESIGN.md, “Login fotográfico”), e cada uma
+ * foi escolhida pelo contraste medido sobre foto, branco, preto e foto
+ * ausente (TEST-002), não pela aparência:
+ *
+ * - campos: superfície preta translúcida e borda de 2 px, branca a 45%
+ *   (≥ 3:1 contra o que está dentro e fora dela). A primeira versão tinha 1 px
+ *   a 55% e o medidor reprovou (2,81:1): numa posição fracionária o navegador
+ *   reparte a linha em duas a meia intensidade. Com 2 px sempre sobra uma
+ *   linha inteira. Texto branco a 16 px em toda largura — abaixo disso o
+ *   Safari do iPhone dá zoom no foco;
+ * - verde-lima `#B9E52B` para ícones, links e o botão, com texto `#12160F`;
+ * - erro e ajuda em superfície opaca escura: o vermelho `#ED0040` do tema dá
+ *   4,35:1 sobre o fundo escuro e ficou de fora;
+ * - nada some por opacidade enquanto carrega: o primitivo `Input`/`Button`
+ *   aplica `opacity-50` no desabilitado, e o "Entrando..." precisa continuar
+ *   legível.
+ */
+const CAMPO =
+  "h-[52px] rounded-2xl border-2 border-white/45 bg-black/45 text-base text-white placeholder:text-white/60 md:text-base focus-visible:border-[#B9E52B] focus-visible:ring-2 focus-visible:ring-[#B9E52B] disabled:bg-black/45 disabled:opacity-100";
+
+const FOCO =
+  "outline-none focus-visible:ring-2 focus-visible:ring-[#B9E52B] focus-visible:ring-offset-2 focus-visible:ring-offset-[#080D10]";
 
 export function LoginForm() {
   const router = useRouter();
@@ -49,79 +82,45 @@ export function LoginForm() {
   }
 
   return (
-    <div className="w-full">
-      <section className="relative overflow-hidden rounded-3xl bg-[var(--color-primary-strong)] p-5 pb-14 text-white shadow-[var(--shadow-lift)]">
-        <CourtLines className="opacity-35" />
-        <div className="relative z-10">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="flex size-16 shrink-0 items-center justify-center">
-                <Image
-                  src="/playck-logo.png"
-                  alt="Logo PlayCK"
-                  width={64}
-                  height={64}
-                  className="size-16 object-contain drop-shadow-[0_6px_12px_rgba(0,0,0,0.25)]"
-                  priority
-                />
-              </span>
-              <div>
-                <p className="text-[11px] font-bold tracking-[0.16em] text-white/65 uppercase">PlayCK Club</p>
-                <p className="text-2xl leading-none font-extrabold">PlayCK</p>
-              </div>
-            </div>
-            <span className="rounded-full bg-white/12 px-3 py-1.5 text-[11px] font-extrabold tracking-[0.1em] text-white/80 uppercase ring-1 ring-white/15">Aluno</span>
-          </div>
-          <h1 className="mt-8 max-w-[280px] text-[34px] leading-[1.02] font-extrabold">Entre em quadra com tudo organizado.</h1>
-          <p className="mt-3 max-w-[310px] text-sm font-semibold text-white/72">Aulas, reservas e horários do seu clube em um só lugar.</p>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="email" className="text-sm font-bold text-white">E-mail</Label>
+        <div className="relative">
+          <Mail className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-[#B9E52B]" aria-hidden="true" />
+          <Input id="email" type="email" autoComplete="email" placeholder="seu@email.com" required value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading} className={`${CAMPO} pl-12`} />
         </div>
-      </section>
+      </div>
 
-      <section className="relative z-20 -mt-8 rounded-3xl bg-surface p-5 shadow-[var(--shadow-lift)] ring-1 ring-border">
-        <div className="mb-5">
-          <p className="text-[11px] font-extrabold tracking-[0.14em] text-[var(--color-primary-strong)] uppercase">Bem-vindo de volta</p>
-          <h2 className="mt-1 text-2xl font-extrabold text-[var(--color-text-primary)]">Acesse sua conta</h2>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="senha" className="text-sm font-bold text-white">Senha</Label>
+        <div className="relative">
+          <Lock className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-[#B9E52B]" aria-hidden="true" />
+          <Input id="senha" type={mostrarSenha ? "text" : "password"} autoComplete="current-password" required minLength={8} value={senha} onChange={(e) => setSenha(e.target.value)} disabled={loading} className={`${CAMPO} pr-14 pl-12`} />
+          <button type="button" onClick={() => setMostrarSenha((v) => !v)} className={`absolute top-1/2 right-1 flex size-11 -translate-y-1/2 items-center justify-center rounded-xl text-white/85 hover:text-white ${FOCO}`} aria-label={mostrarSenha ? "Ocultar senha" : "Mostrar senha"}>
+            {mostrarSenha ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
+          </button>
         </div>
-
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4" noValidate>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="email" className="text-sm font-bold">E-mail</Label>
-            <div className="relative">
-              <Mail className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-[var(--color-text-secondary)]" aria-hidden="true" />
-              <Input id="email" type="email" autoComplete="email" placeholder="seu@email.com" required value={email} onChange={(e) => setEmail(e.target.value)} disabled={loading} className="h-12 rounded-2xl bg-[var(--color-surface-container)] pl-12" />
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="senha" className="text-sm font-bold">Senha</Label>
-            <div className="relative">
-              <Lock className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-[var(--color-text-secondary)]" aria-hidden="true" />
-              <Input id="senha" type={mostrarSenha ? "text" : "password"} autoComplete="current-password" required minLength={8} value={senha} onChange={(e) => setSenha(e.target.value)} disabled={loading} className="h-12 rounded-2xl bg-[var(--color-surface-container)] pr-12 pl-12" />
-              <button type="button" onClick={() => setMostrarSenha((v) => !v)} className="absolute top-1/2 right-3 flex size-9 -translate-y-1/2 items-center justify-center rounded-xl text-[var(--color-text-secondary)] hover:text-[var(--color-primary-strong)]" aria-label={mostrarSenha ? "Ocultar senha" : "Mostrar senha"}>
-                {mostrarSenha ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
-              </button>
-            </div>
-            <button type="button" onClick={() => setAjudaSenha((v) => !v)} aria-expanded={ajudaSenha} className="min-h-11 self-end px-1 text-xs font-extrabold text-[var(--color-primary-strong)]">
-              Esqueceu a senha?
-            </button>
-            {ajudaSenha ? (
-              <p className="rounded-2xl bg-[var(--color-primary-container)]/55 p-3 text-xs font-medium text-[var(--color-text-secondary)]">
-                Ainda não enviamos e-mail de recuperação. Peça ao seu clube para gerar uma senha nova; ela chega por WhatsApp e você troca no primeiro acesso.
-              </p>
-            ) : null}
-          </div>
-
-          {error ? <p role="alert" className="text-sm font-semibold text-[var(--color-error)]">{error}</p> : null}
-
-          <Button type="submit" disabled={loading} className="h-12 rounded-2xl text-[15px] font-extrabold shadow-[var(--shadow-glow)]">
-            {loading ? "Entrando..." : "Entrar"}
-            {!loading ? <ArrowRight className="size-5" aria-hidden="true" /> : null}
-          </Button>
-          <p className="text-center text-sm font-medium text-[var(--color-text-secondary)]">
-            Ainda não tem conta? <Link href="/cadastro" className="font-extrabold text-[var(--color-primary-strong)]">Cadastre-se</Link>
+        <button type="button" onClick={() => setAjudaSenha((v) => !v)} aria-expanded={ajudaSenha} className={`min-h-11 self-end rounded-lg px-1 text-sm font-extrabold text-[#B9E52B] ${FOCO}`}>
+          Esqueceu a senha?
+        </button>
+        {ajudaSenha ? (
+          <p className="rounded-2xl bg-[#161A1D] p-3 text-sm leading-snug font-medium break-words text-[#E6EAE3] ring-1 ring-white/20">
+            Ainda não enviamos e-mail de recuperação. Peça ao seu clube para gerar uma senha nova; ela chega por WhatsApp e você troca no primeiro acesso.
           </p>
-        </form>
-      </section>
-    </div>
+        ) : null}
+      </div>
+
+      {error ? (
+        <p role="alert" className="flex items-start gap-3 rounded-2xl bg-[#1E1517] p-3 text-sm leading-snug font-semibold break-words text-white ring-1 ring-[#FF9AAE]/60">
+          <CircleAlert className="mt-px size-5 shrink-0 text-[#FF9AAE]" aria-hidden="true" />
+          <span className="min-w-0">{error}</span>
+        </p>
+      ) : null}
+
+      <Button type="submit" disabled={loading} className={`h-[52px] w-full rounded-2xl bg-[#B9E52B] text-base font-extrabold text-[#12160F] hover:bg-[#C6EF3F] disabled:opacity-100 ${FOCO} focus-visible:ring-[3px] focus-visible:ring-white`}>
+        {loading ? "Entrando..." : "Entrar"}
+        {!loading ? <ArrowRight className="size-5" aria-hidden="true" /> : null}
+      </Button>
+    </form>
   );
 }
