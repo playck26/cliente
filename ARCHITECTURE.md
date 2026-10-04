@@ -1,14 +1,23 @@
 # ARCHITECTURE — `cliente` (PlayCK)
 
 **Fonte: análise direta do código.** Data: **2026-10-04** (era 2026-10-02).
-**Conferido por comando nesta data, na branch da SPEC-083
-(`spec083/ativacao`, TASK-008):** **79** arquivos de teste, **944** casos,
-**55** componentes e **23** módulos em `lib/` (`vitest run --pool=threads`, em
-série, uma rodada só). **Um caso vermelho, e ele não é regressão de código:** a
-varredura da SPEC-084 (`ativacao-navigation.test.ts`) acha a palavra `ativado`
-em `lib/api-types.ts`, no valor `situacao: "ativado"` do
-`SituacaoDoConviteResponseDto` que o contrato do `back` passou a ter — ver o
-gap 8 da seção 11. **Mais 7 arquivos de prova de NAVEGADOR**: os 103 casos
+**Estado atual, no head `c263a45` da branch da SPEC-083 (`spec083/ativacao`,
+TASK-008), sem push:** **79** arquivos de teste, **944** casos, **todos
+verdes**, **55** componentes e **23** módulos em `lib/` (`vitest run
+--pool=threads`, em série; 79/944 verde também na execução independente da
+validação da implementação, 1ª rodada, em 2026-10-04). O `c263a45` fez a
+varredura da SPEC-084 (`ativacao-navigation.test.ts`) deixar de fora
+**exatamente** `lib/api-types.ts`, o contrato gerado, pelo delta de
+2026-10-04 do `COORDENACAO-083-084.md`; `lib/api-client.ts` e o emissor
+`ativar-conta-form.tsx` continuam varridos, e o job `contrato` do CI é o que
+barra edição à mão no arquivo gerado. Mesma contagem de casos: o conserto
+mudou o que a varredura lê, e não o número de casos.
+
+*Registro do `1041241` (2026-10-04, antes do conserto):* a mesma contagem,
+com **um caso vermelho que não era regressão de código** — a varredura achava
+a palavra `ativado` em `lib/api-types.ts`, no valor `situacao: "ativado"` do
+`SituacaoDoConviteResponseDto` que o contrato do `back` passou a ter (o gap 8
+da seção 11, hoje fechado). **Mais 7 arquivos de prova de NAVEGADOR**: os 103 casos
 anteriores no Chromium mais os 7 de `e2e/ativacao-login.spec.ts` = **110**
 (somados, não rodados juntos: esta tarefa rodou em série só os arquivos
 `ativacao-login`, `login-aviso-ativacao` e `login-install`).
@@ -996,4 +1005,4 @@ mundo muda, em vez de congela-lo.
 | 5 | **A PR-espelho `contrato/sync` não fica mergeável sozinha.** O `workflow_dispatch` que o `sincronizar-contrato.mjs` dispara cria os check runs no **commit**, mas eles **não entram no rollup da PR** — e é o rollup que o ruleset lê. Medido em 2026-09-24 nos três frontends: nenhuma `contrato/sync` jamais foi mergeada. O contorno é um push de **usuário** na mesma branch, que dispara `synchronize`. Conserto: PAT no script, ou outro gatilho | **Alta** |
 | 6 | **O painel de escolha dentro da tela de Aulas não tem prova de geometria** (SPEC-072/`LIM-072g`). A `AC-006` cobre a tela de oportunidades; o painel da `TASK-005` é uma **segunda** superfície com a mesma informação a 320px. Ele nasceu com as classes que a TASK-004 provou, mas **semelhança de código não é medição** | Média |
 | 7 | **O job `navegador` não é obrigatório.** O ruleset exige `build` e `contrato`; um `navegador` vermelho não bloqueia merge. `prova-visual.test.ts` guarda a existência do job, não o veredito | Média |
-| 8 | **A varredura da SPEC-084 reprova o contrato da SPEC-083.** `ativacao-navigation.test.ts` procura a palavra `ativado` em todo `.ts` de produção de `src/`, e `lib/api-types.ts` — gerado do `openapi.json`, que não se edita à mão — passou a trazer `situacao: "ativado"` (o `SituacaoDoConviteResponseDto` da D9 da 083, usado pelo Admin). É o mesmo texto e outro conceito: a situação do convite, e não a chave do endereço. O conserto mora num arquivo da 084 (tirar o arquivo gerado da varredura, ou procurar a chave só em contexto de endereço) e está fora do write-set da TASK-008; fica registrado como pendência da tarefa | **Alta** (o `test` do CI fica vermelho) |
+| 8 | ~~**A varredura da SPEC-084 reprova o contrato da SPEC-083.**~~ — **fechado em `c263a45` (2026-10-04):** a varredura deixa de fora exatamente `lib/api-types.ts`, pelo delta de 2026-10-04 do `COORDENACAO-083-084.md`, e a suíte fica 79/944 verde; o job `contrato`, obrigatório, segue barrando edição à mão no arquivo gerado. *O registro original segue:* `ativacao-navigation.test.ts` procura a palavra `ativado` em todo `.ts` de produção de `src/`, e `lib/api-types.ts` — gerado do `openapi.json`, que não se edita à mão — passou a trazer `situacao: "ativado"` (o `SituacaoDoConviteResponseDto` da D9 da 083, usado pelo Admin). É o mesmo texto e outro conceito: a situação do convite, e não a chave do endereço. O conserto mora num arquivo da 084 (tirar o arquivo gerado da varredura, ou procurar a chave só em contexto de endereço) e está fora do write-set da TASK-008; fica registrado como pendência da tarefa | — (era **Alta**: o `test` do CI ficava vermelho) |
