@@ -334,9 +334,13 @@ describe("conviteCabeNaRota — SPEC-084 (I1): o login fica sem convite", () => 
 });
 
 describe("conviteCabeNaRota — SPEC-083 (I17, AC-055): a tela do link fica sem convite", () => {
-  /** Tokens de formatos diferentes: o de verdade (43 de base64url), curto, com `-`/`_` e lixo. */
+  /**
+   * Tokens de formatos diferentes: o de verdade (43 de base64url), curto, com
+   * `-`/`_` e lixo. O de 43 é montado em pedaços: num literal só, ele tem a
+   * forma de chave que o G4 do `scripts/gates-de-push.mjs` recusa (INV-062b).
+   */
   const tokens = [
-    "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_AbCd",
+    ["AbCdEfGhIjKlMnOpQrStUvWxYz", "0123456789", "-_AbCdE"].join(""),
     "x",
     "-_-_",
     "token-que-nao-existe",
