@@ -1,7 +1,25 @@
 # ARCHITECTURE — `cliente` (PlayCK)
 
-**Fonte: análise direta do código.** Data: **2026-10-02** (era 2026-09-25).
-**Conferido por comando nesta data, na branch da SPEC-084
+**Fonte: análise direta do código.** Data: **2026-10-04** (era 2026-10-02).
+**Conferido por comando nesta data, na branch da SPEC-083
+(`spec083/ativacao`, TASK-008):** **79** arquivos de teste, **944** casos,
+**55** componentes e **23** módulos em `lib/` (`vitest run --pool=threads`, em
+série, uma rodada só). **Um caso vermelho, e ele não é regressão de código:** a
+varredura da SPEC-084 (`ativacao-navigation.test.ts`) acha a palavra `ativado`
+em `lib/api-types.ts`, no valor `situacao: "ativado"` do
+`SituacaoDoConviteResponseDto` que o contrato do `back` passou a ter — ver o
+gap 8 da seção 11. **Mais 7 arquivos de prova de NAVEGADOR**: os 103 casos
+anteriores no Chromium mais os 7 de `e2e/ativacao-login.spec.ts` = **110**
+(somados, não rodados juntos: esta tarefa rodou em série só os arquivos
+`ativacao-login`, `login-aviso-ativacao` e `login-install`).
+
+*A conta da SPEC-083 (TASK-008):* a `main` (`b6da79f`) rodou **77** arquivos e
+**912** casos, zero vermelho (linha de base desta tarefa). A tarefa somou 2
+arquivos e 32 casos — `ativar-conta-form.test.tsx` 12, `banner-do-email.test.ts`
+7 e 13 em `instalacao-pwa.test.ts` —, 1 componente (`ativar-conta-form`) e
+nenhum módulo em `lib/`. **912 + 32 = 944.**
+
+*Registro de 2026-10-02 (SPEC-084).* **Conferido por comando nesta data, na branch da SPEC-084
 (`spec084/login-fotografico`):** **77** arquivos de teste, **912** casos,
 **54** componentes e **23** módulos em `lib/` (`vitest run --pool=threads`, em
 série, uma rodada só, zero vermelho; `.tsx` de `src/components`, sem subpastas
@@ -118,6 +136,7 @@ page.tsx (server component, fino)
 | `/cadastro` | `escolher-clube-form` | **DEF-003**: pede o código do clube e redireciona para `/cadastro/<slug>`. Existe porque o login não sabe de qual clube a pessoa é; não valida o código aqui (o limite de 10/15min do endpoint público trancaria quem errasse duas vezes) |
 | `/cadastro/[slug]` | `cadastro-publico-form` | auto-cadastro pelo link público da empresa |
 | `/convite/[token]` | `aceitar-convite-form` | aceite de convite |
+| `/ativar/[token]` | `ativar-conta-form` | **SPEC-083 — o link do e-mail.** A conta já existe (o gestor a criou na importação ou na ficha) e a pessoa só cria a senha. Lê `GET /public/ativacao/:token` (primeiro nome e clube, e nada mais) e mostra *"Olá, <primeiroNome>. Crie sua senha para entrar no <clube>."*, com senha e confirmação. `410` mostra *"Este link não vale mais. Peça um novo convite ao seu clube."*; falha de rede ao abrir **não** diz que o link morreu. Depois do `204` faz `router.replace(LOGIN_APOS_ATIVACAO)`, com a constante **importada** da SPEC-084 — o login real mostra o aviso. `410`, `400` e rede ficam na tela. A página declara `no-referrer` (`metadata.referrer`, no `<head>`), e as duas chamadas repetem a política no `fetch`. Sem sessão: o termo é aceito no portão do primeiro acesso (I12). Sem convite de instalação (I17). Ver seção 9, "O link de ativação e o banner dos e-mails" |
 | `/home` | `home-view` → `cartao-da-proxima-aula` + `calendario-do-aluno` | **SPEC-058 — o calendário do mês e o cartão de volta.** O Israel usou a home em produção e pediu as duas coisas: um calendário *"parecido com o do professor, só que mais atrativo"* e o cartão de volta, *"trazendo os insights mais importantes"*. O **cartão** não repete a grade: ele diz **quanto falta** ("em 3 horas", "amanhã às 19:00"), que é o que ela não diz — e o insight foi **escolha dele entre quatro** (D3). **Sem aula futura ele não some**, vira convite (AC-007): cartão que some faz a home pular de altura. O **calendário** nasceu do molde de `agenda-do-professor`, **não de abstração comum** — lá o ponto é "faltou registrar presença", aqui é "você avisou que vai faltar", e amarrar as duas agora seria amarrar telas que ainda vão divergir (D1). **Uma requisição só no primeiro desenho**, com janela do 1º do mês até +60 dias: ela alimenta a grade *e* o cartão; trocar de mês troca só a grade, para o cartão não passar a apontar para o mês que o aluno foi espiar. **A semana (`semana-do-aluno`) saiu daqui e continua em `/minhas-aulas`**, onde é uma das duas abas e o aluno escolhe — na home era imposição. Invariantes herdadas que **não** caíram: nenhum link para `/quadras` (SPEC-053/AC-009), a palavra "quadra" ausente da home (AC-001 — a primeira versão do cartão a escrevia, e quem pegou foi o teste plantado pela SPEC-057), aula **não realizada** marcada na lista do dia (SPEC-030, achado ALTA), e o aviso de falha da agenda com lugar próprio (DEF-033) **SPEC-059 — a agenda passou a ter TUDO.** O calendário nascia só com aula de turma, e quem reservava quadra na sexta via sexta vazia: agora ele junta as três origens (`/me/classes` + `/bookings` na mesma janela) e **cada linha diz o que é**, com o termo que o CLUBE deu ao tipo (`nomes-de-tipo`, SPEC-054/D1) — clube que chama de "Espaço" lê "Reserva · Espaço". Cada item traz os **materiais alugados** ("2× Raquete · 1× Toalha"), o valor, a situação de pagamento e as marcas de aula (falta avisada, não realizada). Reserva cancelada aparece **riscada**, não some (SPEC-041/SPEC-056). **Falha de uma origem não derruba a outra:** sem as reservas, a grade mostra as aulas e o aviso ocupa o lugar do que faltou. **O rótulo do tipo revogou em parte a SPEC-053/AC-001** (a home não escrevia "quadra"): o Israel pediu o oposto olhando a tela, e a D3b registra a troca — o gate de redação `redacao-de-reservas.test.ts` continua verde porque o texto agora vem do nome configurado, não de frase fixa **SPEC-073 — a home parou de esperar em fila.** Eram três idas em série (`me` → aulas → reservas), e o professor faz uma. Com o papel guardado no login (`getPapel`, **navegação, nunca autorização**) aulas e reservas saem **junto com** o `getMe()`, num `Promise.allSettled` — a falha de uma continua não derrubando a outra, e a busca adiantada nunca rejeita. **Quem decide o que pinta continua sendo o `getMe()`:** papel guardado de aluno com `getMe` dizendo gestor pede e descarta (LIM-073a). A grade desenha **antes** do dado, como a do professor, com `carregando` no lugar da lista — e durante a carga ela **não diz** "Nenhum compromisso neste mês". Um contador (`pedidoDaAgenda`, o molde do DEF-021) impede resposta velha de pintar o mês da tela; a carga inicial alimenta o cartão sempre |
 | `/minhas-aulas` | `tela-de-aulas` → `my-classes-list` | **SPEC-057/TASK-002/D11 (card 5352) — a agenda é a tela, e o submenu saiu.** As abas "Próximas / Anteriores / Turmas" não existem mais. **A ordem da mudança é a decisão:** aquelas três abas **não eram três vistas do mesmo dado** — "Turmas" era o único lugar do produto onde o aluno entra e sai de turma, e "Anteriores" o único de onde ele avalia aula passada (achado B02 do veredito independente). Os dois ganharam **endereço próprio primeiro**, e só depois a barra saiu. A vista de semana agora **alcança o passado**: ela avisa a janela (`onJanela`) e o pai pede `GET /me/classes?de=&ate=`, somando ao que já tem em vez de substituir — trocar apagaria as próximas aulas da lista ao lado. **`abas-na-url` continua**, porque Reservas usa |
 | `/minhas-aulas/turmas` | `turmas-do-clube` | o catálogo, com o filtro de nível da TASK-004. **Sem a nota** desde a TASK-002/D12: o card manda ocultá-la do aluno, a SPEC-052 já a tinha tirado do professor, e a busca da média saiu junto com o desenho — chamada alimentando estado que ninguém lê é ida à rede por nada |
@@ -197,6 +216,14 @@ dispensar:** nada é gravado e o evento guardado não é consumido, e a home, qu
 abre por navegação do cliente depois do login, mostra o convite no modo do
 aparelho (`e2e/login-install.spec.ts`). `/cadastro` e `/primeiro-acesso`
 continuam com o convite (LIM-084m).
+
+**SPEC-083 (I17) — também fora da tela do link.** `/ativar/<token>` muda a
+cada token, e a lista exata da 084 não o alcança. Entrou uma segunda lista, de
+**prefixos** (`PREFIXOS_SEM_CONVITE = ["/ativar/"]`), consultada pelo mesmo
+`conviteCabeNaRota`; a lista exata ficou intacta. O prefixo termina em `/`:
+`/ativar` sozinho e `/ativarx/...` continuam com convite. Provado em
+`instalacao-pwa.test.ts` e no `e2e/ativacao-login.spec.ts`, com o evento de
+instalação guardado e o controle em `/primeiro-acesso`, onde o convite aparece.
 
 Até a SPEC-050 existiam só os dois primeiros, e **o app era instalável sem
 nunca convidar ninguém** — não havia `beforeinstallprompt` em nenhum
@@ -765,9 +792,10 @@ configuração. O passo a passo da troca está no `README.md`.
 **O aviso pós-ativação.** `lib/ativacao-navigation.ts` tem
 `LOGIN_APOS_ATIVACAO = "/login?ativado=1"` e a leitura (`chegouDaAtivacao`);
 fora de testes, é o único arquivo com a chave (`ativacao-navigation.test.ts`
-varre `src/`). A SPEC-084 é dona da constante e do aviso; a SPEC-083, quando
-integrar, só importa a constante no redirecionamento da ativação
-(`COORDENACAO-083-084.md`, na pasta da spec). O aviso
+varre `src/`). A SPEC-084 é dona da constante e do aviso; a SPEC-083 só
+importa a constante no redirecionamento da ativação
+(`COORDENACAO-083-084.md`, na pasta da spec) — integrada na TASK-008, ver
+"O link de ativação e o banner dos e-mails" abaixo. O aviso
 (`aviso-de-ativacao.tsx`) é irmão do formulário, e não filho: a caracterização
 congelada monta o `LoginForm` com o mock de `next/navigation` só com
 `useRouter`. A região `role="status"` existe **vazia** no HTML do servidor e
@@ -797,6 +825,44 @@ no `login-form.tsx` é passar por aquele arquivo sem editá-lo.
   Chromium).
 
 Nada disto é aparelho real.
+
+### O link de ativação e o banner dos e-mails (SPEC-083)
+
+**A página.** `app/ativar/[token]/page.tsx` (componente de servidor, só a
+moldura `AuthShell` e o `metadata`) → `ativar-conta-form.tsx`. As chamadas são
+`getAtivacao` e `ativarConta` em `api-client.ts`, com os tipos
+`AtivacaoPublicaResponseDto` e `AtivarContaDto` do contrato. O `GET` não
+consome o link; o `POST` responde `204` sem token.
+
+**O emissor do protocolo da SPEC-084.** O sucesso chama
+`router.replace(LOGIN_APOS_ATIVACAO)`, importado de `lib/ativacao-navigation.ts`
+— `replace`, para o "voltar" não devolver a pessoa a um link já gasto. O botão
+fica travado até a navegação. Três provas, cada uma pega o que a outra não vê:
+- `ativar-conta-form.test.tsx`: o módulo do protocolo é trocado por um
+  **sentinela**, e o roteador tem de receber o sentinela — um endereço escrito
+  à mão, com ou sem o parâmetro, não passa;
+- a varredura da 084 (`ativacao-navigation.test.ts`), que pega cópia do literal;
+- `e2e/ativacao-login.spec.ts` (AC-054), que vai de `/ativar/<token>` até o
+  login **real** e confere o aviso em `role="status"`. Com o destino trocado
+  por `"/login"` (sabotagem S17), o caso cai **no aviso** (`Received: ""`), e
+  não na URL nem na varredura. O arquivo bloqueia os service workers, simula
+  `GET` e `POST` por `page.route`, e confere também `410` e rede (sem sair da
+  tela), o `<meta name="referrer" content="no-referrer">` no `<head>` do HTML
+  do servidor e os pedidos sem `Referer`.
+
+**O banner dos e-mails** (D8, I15). `public/email/playck-banner.jpg`, servido
+em `/email/playck-banner.jpg`: é a única imagem dos e-mails do `back`, que
+aponta para `URL_CLIENTE + '/email/playck-banner.jpg'`. JPEG progressivo de
+**1200 × 427** (o dobro dos 600 × 213 do HTML do e-mail), **85.432 bytes**,
+gerado de `banner-email-original.png` (1600 × 569, na pasta da spec) com corte
+`cover` centrado — sem mudar a proporção — e croma 4:4:4, para o amarelo do
+"ck" não borrar sobre o preto. `lib/banner-do-email.test.ts` confere formato,
+dimensões (lidas do segmento SOF, sem biblioteca), tamanho ≤ 150 KB e o
+**SHA-256** `16e01033…409f96` do arquivo revisado. Trocar a imagem deixa o teste
+vermelho até alguém revisar de novo e atualizar o hash. O arquivo é estático:
+a `netlify-ignore` o trata como mudança de site (está em `public/`), e um
+revert do Cliente depois do envio quebra o banner e o link dos e-mails já
+enviados (LIM-083j).
 
 ## 10. Avisos do clube — push (SPEC-062/TASK-004)
 
@@ -930,3 +996,4 @@ mundo muda, em vez de congela-lo.
 | 5 | **A PR-espelho `contrato/sync` não fica mergeável sozinha.** O `workflow_dispatch` que o `sincronizar-contrato.mjs` dispara cria os check runs no **commit**, mas eles **não entram no rollup da PR** — e é o rollup que o ruleset lê. Medido em 2026-09-24 nos três frontends: nenhuma `contrato/sync` jamais foi mergeada. O contorno é um push de **usuário** na mesma branch, que dispara `synchronize`. Conserto: PAT no script, ou outro gatilho | **Alta** |
 | 6 | **O painel de escolha dentro da tela de Aulas não tem prova de geometria** (SPEC-072/`LIM-072g`). A `AC-006` cobre a tela de oportunidades; o painel da `TASK-005` é uma **segunda** superfície com a mesma informação a 320px. Ele nasceu com as classes que a TASK-004 provou, mas **semelhança de código não é medição** | Média |
 | 7 | **O job `navegador` não é obrigatório.** O ruleset exige `build` e `contrato`; um `navegador` vermelho não bloqueia merge. `prova-visual.test.ts` guarda a existência do job, não o veredito | Média |
+| 8 | **A varredura da SPEC-084 reprova o contrato da SPEC-083.** `ativacao-navigation.test.ts` procura a palavra `ativado` em todo `.ts` de produção de `src/`, e `lib/api-types.ts` — gerado do `openapi.json`, que não se edita à mão — passou a trazer `situacao: "ativado"` (o `SituacaoDoConviteResponseDto` da D9 da 083, usado pelo Admin). É o mesmo texto e outro conceito: a situação do convite, e não a chave do endereço. O conserto mora num arquivo da 084 (tirar o arquivo gerado da varredura, ou procurar a chave só em contexto de endereço) e está fora do write-set da TASK-008; fica registrado como pendência da tarefa | **Alta** (o `test` do CI fica vermelho) |
