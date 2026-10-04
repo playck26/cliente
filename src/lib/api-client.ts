@@ -1359,6 +1359,60 @@ export async function aceitarConvite(dto: {
 }
 
 // ---------------------------------------------------------------------------
+// SPEC-083/D11 — o link de ativação que chega por e-mail
+// ---------------------------------------------------------------------------
+
+/**
+ * O que a página do link pode mostrar: **o primeiro nome e o clube**, e nada
+ * mais. Quem tem o link não lê e-mail, telefone nem o resto da conta — o
+ * servidor não devolve, e o tipo vem do contrato para que acrescentar um campo
+ * aqui exija mudar o `back`, e não só esta linha (INV-059).
+ */
+export type AtivacaoPublica = components["schemas"]["AtivacaoPublicaResponseDto"];
+export type AtivarConta = components["schemas"]["AtivarContaDto"];
+
+/**
+ * O token mora no CAMINHO, e por isso estas duas chamadas saem com
+ * `referrerPolicy: "no-referrer"`. A página já declara a mesma política para o
+ * documento inteiro (D11); aqui é a mesma regra dita no lugar do pedido, para
+ * não depender de onde a função for chamada.
+ */
+const SEM_REFERRER: RequestInit = { referrerPolicy: "no-referrer" };
+
+/**
+ * `GET /public/ativacao/:token`. **Não consome o link** (AC-020): a página pode
+ * recarregar à vontade. Link morto, por qualquer dos oito motivos, é sempre o
+ * mesmo `410 LINK_INVALIDO` — quem decide a tela é o `status`.
+ */
+export async function getAtivacao(token: string): Promise<AtivacaoPublica> {
+  const res = await fetch(
+    `${API_URL}/api/v1/public/ativacao/${encodeURIComponent(token)}`,
+    SEM_REFERRER,
+  );
+  if (!res.ok) {
+    throw await parseError(res, "Não foi possível abrir o convite.");
+  }
+  return (await res.json()) as AtivacaoPublica;
+}
+
+/**
+ * `POST /public/ativacao` → `204`, **sem sessão**: a pessoa entra pelo login
+ * com a senha que acabou de criar, e o aceite do termo acontece no portão do
+ * primeiro acesso, como hoje (I12).
+ */
+export async function ativarConta(dto: AtivarConta): Promise<void> {
+  const res = await fetch(`${API_URL}/api/v1/public/ativacao`, {
+    ...SEM_REFERRER,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dto),
+  });
+  if (!res.ok) {
+    throw await parseError(res, "Não foi possível criar sua senha.");
+  }
+}
+
+// ---------------------------------------------------------------------------
 // SPEC-018/TASK-003 — foto de perfil
 // ---------------------------------------------------------------------------
 

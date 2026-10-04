@@ -23,6 +23,15 @@ import {
 
 const SRC = join(__dirname, "..");
 const ESTE_ARQUIVO = "lib/ativacao-navigation.ts";
+/**
+ * SPEC-083 (2026-10-04) — o contrato gerado fica de fora, e **só ele**. O
+ * `api-types.ts` traz `situacao: "ativado" | …` (a D9 da 083, uma situação do
+ * convite, não a chave do protocolo), e ninguém o escreve à mão: o job
+ * `contrato` do CI, obrigatório no merge, reprova o arquivo que não for o
+ * gerado do contrato fixado. Uma cópia da chave ali cai nele, e não aqui.
+ */
+const CONTRATO_GERADO = "lib/api-types.ts";
+const FORA_DA_VARREDURA = [ESTE_ARQUIVO, CONTRATO_GERADO];
 
 function arquivosDeProducao(dir: string): string[] {
   const saida: string[] = [];
@@ -34,7 +43,7 @@ function arquivosDeProducao(dir: string): string[] {
     }
     if (!/\.(tsx?|css|m?js)$/.test(nome)) continue;
     if (/\.test\.(tsx?|m?js)$/.test(nome)) continue;
-    if (relative(SRC, caminho).replace(/\\/g, "/") === ESTE_ARQUIVO) continue;
+    if (FORA_DA_VARREDURA.includes(relative(SRC, caminho).replace(/\\/g, "/"))) continue;
     saida.push(caminho);
   }
   return saida;
@@ -81,6 +90,12 @@ describe("SPEC-084 — a chave da ativação só existe na constante", () => {
     // Contra a vacuidade: a varredura viu o código de verdade.
     expect(arquivos.length).toBeGreaterThan(50);
     expect(arquivos.some((a) => a.replace(/\\/g, "/").endsWith("app/login/page.tsx"))).toBe(true);
+    // A exclusão do contrato gerado não se alarga: o vizinho dele em lib/ e o
+    // emissor da 083 continuam varridos.
+    expect(arquivos.some((a) => a.replace(/\\/g, "/").endsWith("lib/api-client.ts"))).toBe(true);
+    expect(
+      arquivos.some((a) => a.replace(/\\/g, "/").endsWith("components/ativar-conta-form.tsx")),
+    ).toBe(true);
 
     const copias = arquivos
       .filter((a) => citaAChaveDaAtivacao(readFileSync(a, "utf8")))
