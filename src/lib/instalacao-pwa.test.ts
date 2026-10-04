@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DIAS_DE_SILENCIO,
+  PREFIXOS_SEM_CONVITE,
   ROTAS_SEM_CONVITE,
   assinarInstalacao,
   conviteCabeNaRota,
@@ -326,6 +327,40 @@ describe("conviteCabeNaRota — SPEC-084 (I1): o login fica sem convite", () => 
     ["/cadastro", true],
     ["/primeiro-acesso", true],
     ["/login-antigo", true],
+    [null, true],
+  ])("%s → convite cabe? %s", (caminho, esperado) => {
+    expect(conviteCabeNaRota(caminho)).toBe(esperado);
+  });
+});
+
+describe("conviteCabeNaRota — SPEC-083 (I17, AC-055): a tela do link fica sem convite", () => {
+  /** Tokens de formatos diferentes: o de verdade (43 de base64url), curto, com `-`/`_` e lixo. */
+  const tokens = [
+    "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_AbCd",
+    "x",
+    "-_-_",
+    "token-que-nao-existe",
+    "%C3%A9",
+  ];
+
+  it("a lista de prefixos é só a do link, e a lista exata da SPEC-084 não mudou", () => {
+    expect(PREFIXOS_SEM_CONVITE).toEqual(["/ativar/"]);
+    expect(ROTAS_SEM_CONVITE).toEqual(["/login"]);
+  });
+
+  it.each(tokens)("/ativar/%s → sem convite", (token) => {
+    expect(conviteCabeNaRota(`/ativar/${token}`)).toBe(false);
+  });
+
+  it.each([
+    ["/login", false],
+    ["/agenda", true],
+    ["/home", true],
+    // Só o prefixo com a barra: rota vizinha que começa com as mesmas letras
+    // continua com o convite.
+    ["/ativar", true],
+    ["/ativarx/abc", true],
+    ["/x/ativar/abc", true],
     [null, true],
   ])("%s → convite cabe? %s", (caminho, esperado) => {
     expect(conviteCabeNaRota(caminho)).toBe(esperado);

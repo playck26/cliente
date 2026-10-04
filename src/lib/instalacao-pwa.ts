@@ -278,6 +278,21 @@ export function limparDispensa(): void {
  */
 export const ROTAS_SEM_CONVITE: readonly string[] = ["/login"];
 
+/**
+ * SPEC-083 (I17, D11) — **as telas sem convite que mudam com o endereço.**
+ *
+ * A tela do link do e-mail (`/ativar/<token>`) é onde a pessoa cria a senha, e
+ * o Israel decidiu esconder o convite ali também, como no login (I17,
+ * 2026-10-03). A lista exata acima não serve: o caminho muda a cada token.
+ *
+ * Por isso é uma lista à parte, de **prefixos**, e a da SPEC-084 fica como
+ * está. O prefixo termina em `/` de propósito: `/ativar/` pega todo token e
+ * não pega uma rota vizinha que só comece com as mesmas letras.
+ */
+export const PREFIXOS_SEM_CONVITE: readonly string[] = ["/ativar/"];
+
 export function conviteCabeNaRota(caminho: string | null): boolean {
-  return caminho === null || !ROTAS_SEM_CONVITE.includes(caminho);
+  if (caminho === null) return true;
+  if (ROTAS_SEM_CONVITE.includes(caminho)) return false;
+  return !PREFIXOS_SEM_CONVITE.some((prefixo) => caminho.startsWith(prefixo));
 }
