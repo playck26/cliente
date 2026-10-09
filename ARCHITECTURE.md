@@ -1,6 +1,13 @@
 # ARCHITECTURE — `cliente` (PlayCK)
 
-**Fonte: análise direta do código.** Data: **2026-10-04** (era 2026-10-02).
+**Fonte: análise direta do código.** Data: **2026-10-08** (era 2026-10-04).
+**SPEC-086, na branch `spec-086/escolha-de-empresa` (sobre o `main` `bfd4b54`):**
+**81** arquivos de teste, **956** casos, **todos verdes** (`vitest run
+--pool=threads`, em série: 74 arquivos / 776 casos na suíte, e os 7 cujo worker
+não subiu, rodados à parte, 180 casos — nenhum vermelho). Eram 79 / 944; entraram
+`login-escolha.test.tsx` (7) e `escolha-de-empresa.test.tsx` (5). Um componente
+novo, `escolha-de-empresa`; o `login-form` ganhou o ramo do `409
+ESCOLHA_DE_EMPRESA` sem mudar a caracterização congelada.
 **Estado atual, no head `c263a45` da branch da SPEC-083 (`spec083/ativacao`,
 TASK-008), sem push:** **79** arquivos de teste, **944** casos, **todos
 verdes**, **55** componentes e **23** módulos em `lib/` (`vitest run
@@ -140,7 +147,7 @@ page.tsx (server component, fino)
 
 | Rota | Componente | Papel |
 |---|---|---|
-| `/login` | página (foto, marca, texto) → `aviso-de-ativacao` + `login-form` | entrada; leva a `/primeiro-acesso` se a senha for temporária. **DEF-003**: "Cadastre-se" virou link real para `/cadastro` (era `<span>` morto desde a SPEC-007) e "Esqueceu a senha?" passou a dizer o caminho que existe hoje. **SPEC-084 — o login fotográfico** (seção 9, "O login fotográfico"): a página saiu do `app-screen` e virou uma coluna de até 480 px com a foto de quadra atrás; o `login-form` ficou só com o formulário, e o comportamento dele é o da base, congelado em `login-form.caracterizacao.test.tsx`. **O convite de instalação não aparece aqui** (I1), **nem a chamada para cadastro** (I5: o aluno não se cadastra sozinho; a rota `/cadastro` continua existindo, só o login deixou de apontar para ela) |
+| `/login` | página (foto, marca, texto) → `aviso-de-ativacao` + `login-form` | entrada; leva a `/primeiro-acesso` se a senha for temporária. **DEF-003**: "Cadastre-se" virou link real para `/cadastro` (era `<span>` morto desde a SPEC-007) e "Esqueceu a senha?" passou a dizer o caminho que existe hoje. **SPEC-084 — o login fotográfico** (seção 9, "O login fotográfico"): a página saiu do `app-screen` e virou uma coluna de até 480 px com a foto de quadra atrás; o `login-form` ficou só com o formulário, e o comportamento dele é o da base, congelado em `login-form.caracterizacao.test.tsx`. **O convite de instalação não aparece aqui** (I1), **nem a chamada para cadastro** (I5: o aluno não se cadastra sozinho; a rota `/cadastro` continua existindo, só o login deixou de apontar para ela). **SPEC-086 — a escolha do clube:** quando a senha abre mais de uma conta, o login responde `409 ESCOLHA_DE_EMPRESA` e o `login-form` troca o formulário pelo `escolha-de-empresa` (um botão por clube, com `LogoDaEmpresa` num quadro claro, nome inteiro e papel; a conta com senha temporária vencida aparece bloqueada, sem botão). Tocar chama `POST /auth/login/escolher` (`escolherEmpresa`, `escolhaDoErro` em `lib/api-client.ts`) e segue o mesmo pós-login. A caracterização do `login-form` continua intacta: a escolha é um ramo novo no `catch` |
 | `/primeiro-acesso` | `primeiro-acesso-form` | troca obrigatória da senha temporária (INV-008) |
 | `/cadastro` | `escolher-clube-form` | **DEF-003**: pede o código do clube e redireciona para `/cadastro/<slug>`. Existe porque o login não sabe de qual clube a pessoa é; não valida o código aqui (o limite de 10/15min do endpoint público trancaria quem errasse duas vezes) |
 | `/cadastro/[slug]` | `cadastro-publico-form` | auto-cadastro pelo link público da empresa |
