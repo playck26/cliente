@@ -52,6 +52,9 @@ export type MinhaTurmaDetalhe =
   components["schemas"]["TurmaDoProfessorDetalheResponseDto"];
 
 export type LoginResult = components["schemas"]["LoginResponseDto"];
+/** SPEC-086 — a escolha que vem no `409 ESCOLHA_DE_EMPRESA` do login. */
+export type EscolhaDeEmpresa = components["schemas"]["EscolhaDeEmpresaDto"];
+export type OpcaoDeEmpresa = components["schemas"]["OpcaoDeEmpresaDto"];
 
 export interface Paginated<T> {
   data: T[];
@@ -485,6 +488,41 @@ async function authFetch(
   }
 
   return res;
+}
+
+/**
+ * SPEC-086 — a escolha da empresa, quando a senha abriu mais de uma conta.
+ *
+ * O login responde `409 ESCOLHA_DE_EMPRESA` com a escolha no corpo (o
+ * `ApiError.corpo`). `null` para qualquer outro erro: quem chama segue com a
+ * mensagem de sempre.
+ */
+export function escolhaDoErro(erro: unknown): EscolhaDeEmpresa | null {
+  if (!(erro instanceof ApiError) || erro.code !== "ESCOLHA_DE_EMPRESA") {
+    return null;
+  }
+  const escolha = erro.corpo?.escolha as EscolhaDeEmpresa | undefined;
+  return escolha && typeof escolha.token === "string" && Array.isArray(escolha.empresas)
+    ? escolha
+    : null;
+}
+
+/** SPEC-086 — troca a escolha pela sessão da conta escolhida. */
+export async function escolherEmpresa(
+  dto: components["schemas"]["EscolherEmpresaDto"],
+): Promise<LoginResult> {
+  const res = await fetch(`${API_URL}/api/v1/auth/login/escolher`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "include",
+    body: JSON.stringify(dto),
+  });
+
+  if (!res.ok) {
+    throw await parseError(res, "Não foi possível entrar");
+  }
+
+  return (await res.json()) as LoginResult;
 }
 
 export async function login(dto: LoginDto): Promise<LoginResult> {

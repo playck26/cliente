@@ -36,6 +36,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/login/escolher": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["AuthController_escolherEmpresa"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/refresh": {
         parameters: {
             query?: never;
@@ -701,7 +717,7 @@ export interface paths {
         };
         get: operations["CompaniesController_listAdmins"];
         put?: never;
-        post?: never;
+        post: operations["CompaniesController_criarAdmin"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2013,6 +2029,34 @@ export interface components {
             accessToken: string;
             refreshToken: string;
             usuario: components["schemas"]["UsuarioPublicoResponseDto"];
+        };
+        OpcaoDeEmpresaDto: {
+            /** Format: uuid */
+            usuarioId: string;
+            /** @example Smart Tennis */
+            empresaNome: string;
+            logoUrl: string | null;
+            /** @enum {string} */
+            papel: "super_admin" | "company_admin" | "aluno" | "professor";
+            /** @enum {string} */
+            situacao: "disponivel" | "senha_expirada";
+        };
+        EscolhaDeEmpresaDto: {
+            token: string;
+            empresas: components["schemas"]["OpcaoDeEmpresaDto"][];
+        };
+        EscolhaDeEmpresaRespostaDto: {
+            /** @example 409 */
+            statusCode: number;
+            /** @enum {string} */
+            code: "ESCOLHA_DE_EMPRESA";
+            message: string;
+            escolha: components["schemas"]["EscolhaDeEmpresaDto"];
+        };
+        EscolherEmpresaDto: {
+            token: string;
+            /** Format: uuid */
+            usuarioId: string;
         };
         AccessTokenResponseDto: {
             accessToken: string;
@@ -4536,6 +4580,37 @@ export interface operations {
                     "application/json": components["schemas"]["LoginResponseDto"];
                 };
             };
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EscolhaDeEmpresaRespostaDto"];
+                };
+            };
+        };
+    };
+    AuthController_escolherEmpresa: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EscolherEmpresaDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LoginResponseDto"];
+                };
+            };
         };
     };
     AuthController_refresh: {
@@ -5861,6 +5936,31 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminDaEmpresaResponseDto"][];
+                };
+            };
+        };
+    };
+    CompaniesController_criarAdmin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdminInicialDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDaEmpresaResponseDto"];
                 };
             };
         };

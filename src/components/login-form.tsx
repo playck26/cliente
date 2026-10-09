@@ -6,7 +6,15 @@ import { ArrowRight, CircleAlert, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ApiError, login } from "@/lib/api-client";
+import {
+  ApiError,
+  escolhaDoErro,
+  escolherEmpresa,
+  login,
+  type EscolhaDeEmpresa as Escolha,
+  type LoginResult,
+} from "@/lib/api-client";
+import { EscolhaDeEmpresa } from "@/components/escolha-de-empresa";
 import { rotaInicial } from "@/lib/rota-inicial";
 import { saveAccessToken, savePapel } from "@/lib/auth-storage";
 import { lerNomesDeTipo } from "@/lib/nomes-de-tipo";
@@ -67,30 +75,72 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ajudaSenha, setAjudaSenha] = useState(false);
+  // SPEC-086 — a senha abriu mais de uma conta: a escolha do clube.
+  const [escolha, setEscolha] = useState<Escolha | null>(null);
+  const [entrando, setEntrando] = useState<string | null>(null);
+
+  /**
+   * O pós-login de sempre, para o login de uma conta e para a escolha
+   * (AC-014): token e papel salvos, nomes de tipo aquecidos, e o destino.
+   */
+  function entrar(result: LoginResult) {
+    saveAccessToken(result.accessToken);
+    // O papel vai junto do token: é o que permite ao `BottomNav` acertar
+    // a barra na PRIMEIRA pintura, sem esperar o `getMe()`.
+    savePapel(result.usuario.role);
+    // SPEC-059 — **aquece o nome dos tipos de reserva no login.**
+    //
+    // Sem isto, a primeira visita a "Fazer reserva" ainda mostraria
+    // "Quadra" por um quadro antes de virar o nome do clube: o
+    // armazenamento só ajuda a partir da segunda. `void` porque nada nesta
+    // tela depende do resultado, e `lerNomesDeTipo` nunca lança.
+    void lerNomesDeTipo();
+    router.push(result.usuario.senhaTemporaria ? "/primeiro-acesso" : rotaInicial(result.usuario.role));
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
     setLoading(true);
     try {
-      const result = await login({ email, senha });
-      saveAccessToken(result.accessToken);
-      // O papel vai junto do token: é o que permite ao `BottomNav` acertar
-      // a barra na PRIMEIRA pintura, sem esperar o `getMe()`.
-      savePapel(result.usuario.role);
-      // SPEC-059 — **aquece o nome dos tipos de reserva no login.**
-      //
-      // Sem isto, a primeira visita a "Fazer reserva" ainda mostraria
-      // "Quadra" por um quadro antes de virar o nome do clube: o
-      // armazenamento só ajuda a partir da segunda. `void` porque nada nesta
-      // tela depende do resultado, e `lerNomesDeTipo` nunca lança.
-      void lerNomesDeTipo();
-      router.push(result.usuario.senhaTemporaria ? "/primeiro-acesso" : rotaInicial(result.usuario.role));
+      entrar(await login({ email, senha }));
     } catch (err) {
+      const deEscolha = escolhaDoErro(err);
+      if (deEscolha) {
+        setEscolha(deEscolha);
+        return;
+      }
       setError(err instanceof ApiError ? err.message : "Não foi possível entrar. Tente de novo.");
     } finally {
       setLoading(false);
     }
+  }
+
+  async function escolher(usuarioId: string) {
+    if (!escolha) return;
+    setError(null);
+    setEntrando(usuarioId);
+    try {
+      entrar(await escolherEmpresa({ token: escolha.token, usuarioId }));
+    } catch (err) {
+      // AC-015 — volta ao formulário, com a mensagem do servidor e o e-mail
+      // que já estava digitado.
+      setEscolha(null);
+      setError(err instanceof ApiError ? err.message : "Não foi possível entrar. Tente de novo.");
+    } finally {
+      setEntrando(null);
+    }
+  }
+
+  if (escolha) {
+    return (
+      <EscolhaDeEmpresa
+        empresas={escolha.empresas}
+        entrando={entrando}
+        onEscolher={(id) => void escolher(id)}
+        onVoltar={() => setEscolha(null)}
+      />
+    );
   }
 
   return (
