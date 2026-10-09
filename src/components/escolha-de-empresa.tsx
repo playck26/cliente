@@ -50,7 +50,9 @@ export function EscolhaDeEmpresa({
 
   return (
     <section aria-labelledby="titulo-da-escolha" className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
+      {/* A sombra escura atrás do título e do apoio: em 360 px eles passam por
+          cima das bolas amarelas da foto, e o branco perderia contraste ali. */}
+      <div className="flex flex-col gap-1 [text-shadow:0_1px_2px_rgb(0_0_0/0.9),0_0_10px_rgb(0_0_0/0.75)]">
         <h2 id="titulo-da-escolha" className="text-xl leading-tight font-extrabold text-white">
           Em qual clube você quer entrar?
         </h2>

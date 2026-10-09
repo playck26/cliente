@@ -7,7 +7,8 @@
 não subiu, rodados à parte, 180 casos — nenhum vermelho). Eram 79 / 944; entraram
 `login-escolha.test.tsx` (7) e `escolha-de-empresa.test.tsx` (5). Um componente
 novo, `escolha-de-empresa`; o `login-form` ganhou o ramo do `409
-ESCOLHA_DE_EMPRESA` sem mudar a caracterização congelada.
+ESCOLHA_DE_EMPRESA` sem mudar a caracterização congelada. Navegador: **+6 casos**
+(`e2e/escolha-de-empresa.spec.ts`, Chromium, 360 px e desktop — AC-016).
 **Estado atual, no head `c263a45` da branch da SPEC-083 (`spec083/ativacao`,
 TASK-008), sem push:** **79** arquivos de teste, **944** casos, **todos
 verdes**, **55** componentes e **23** módulos em `lib/` (`vitest run
