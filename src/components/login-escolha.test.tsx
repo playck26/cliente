@@ -92,6 +92,29 @@ function servidor(escolher: () => Response) {
   vi.stubGlobal("fetch", fetchMock);
 }
 
+/**
+ * IMP-086-R1-03 — **o aquecimento dos nomes de tipo, provado pelo pedido E
+ * pelo efeito, em cada variante do pós-login.** Conferir só o redirect deixava
+ * passar `if (role !== "professor") void lerNomesDeTipo()`. `nomes-de-tipo.ts`
+ * não tem cache em memória — a única memória é a chave do `localStorage`, que
+ * o `beforeEach` zera; por isso o `null` antes do toque é conferido aqui, para
+ * que um valor herdado de outro teste nunca faça a asserção passar sozinha.
+ */
+async function tocarEConferirAquecimento(botao: string) {
+  expect(window.localStorage.getItem("playck_cliente_nomes_de_tipo")).toBeNull();
+  expect(chamadas.some((c) => c.caminho === "/api/v1/me/company/operacao")).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: botao }));
+  await waitFor(() =>
+    expect(chamadas.filter((c) => c.caminho === "/api/v1/me/company/operacao")).toHaveLength(1),
+  );
+  await waitFor(() =>
+    expect(JSON.parse(window.localStorage.getItem("playck_cliente_nomes_de_tipo") ?? "null")).toEqual({
+      quadra: "Espaço",
+      aula: "Treino",
+    }),
+  );
+}
+
 async function chegarNaEscolha() {
   render(<LoginForm />);
   fireEvent.change(screen.getByLabelText("E-mail"), { target: { value: "mesmo@x.com" } });
@@ -130,12 +153,9 @@ describe("SPEC-086/AC-014 — a escolha do clube", () => {
     servidor(() => sessao("aluno"));
     await chegarNaEscolha();
 
-    fireEvent.click(screen.getByRole("button", { name: "Entrar em Smart Tennis, como Aluno" }));
+    await tocarEConferirAquecimento("Entrar em Smart Tennis, como Aluno");
 
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/home"));
-    await waitFor(() =>
-      expect(window.localStorage.getItem("playck_cliente_nomes_de_tipo")).not.toBeNull(),
-    );
     const escolha = chamadas.find((c) => c.caminho === "/api/v1/auth/login/escolher");
     expect(escolha).toMatchObject({
       metodo: "POST",
@@ -146,21 +166,21 @@ describe("SPEC-086/AC-014 — a escolha do clube", () => {
     expect(Object.values(armazenamento())).toContain("aluno");
   });
 
-  it("professor: o destino é o do papel (as turmas dele)", async () => {
+  it("professor: aquece os nomes de tipo e o destino é o do papel (as turmas dele)", async () => {
     servidor(() => sessao("professor"));
     await chegarNaEscolha();
 
-    fireEvent.click(screen.getByRole("button", { name: "Entrar em Arena Beach, como Professor" }));
+    await tocarEConferirAquecimento("Entrar em Arena Beach, como Professor");
 
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/minhas-turmas"));
     expect(Object.values(armazenamento())).toContain("professor");
   });
 
-  it("senha temporária na conta escolhida: vai para o primeiro acesso", async () => {
+  it("senha temporária na conta escolhida: aquece os nomes de tipo e vai para o primeiro acesso", async () => {
     servidor(() => sessao("aluno", true));
     await chegarNaEscolha();
 
-    fireEvent.click(screen.getByRole("button", { name: "Entrar em Smart Tennis, como Aluno" }));
+    await tocarEConferirAquecimento("Entrar em Smart Tennis, como Aluno");
 
     await waitFor(() => expect(pushMock).toHaveBeenCalledWith("/primeiro-acesso"));
   });

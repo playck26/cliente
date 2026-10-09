@@ -5,7 +5,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
  *
  * O roteiro da spec, automatizado: em 360 px e em desktop, sobre o login
  * fotográfico de verdade (SPEC-084), três clubes — um com logo, um com nome de
- * 40 caracteres e sem logo, e um com a senha temporária vencida. Confere:
+ * mais de 40 caracteres e sem logo, e um com a senha temporária vencida. Confere:
  * nenhum nome cortado e nenhuma rolagem lateral; o cartão vencido sem botão;
  * só o teclado (Tab/Enter) chegando à escolha, com foco visível; e os estados
  * de carregando e de erro. As capturas vão para o `CLI_AUDIT.md`.
@@ -16,7 +16,7 @@ import { expect, test, type Page, type Route } from "@playwright/test";
 
 test.use({ serviceWorkers: "block" });
 
-const NOME_LONGO = "Associação de Tênis do Vale Verde Clube"; // 40 caracteres
+const NOME_LONGO = "Associação de Tênis do Vale Verde Clube Esportivo"; // 49 caracteres (AC-016 pede >= 40; IMP-086-R1-06: o anterior tinha 39)
 const LOGO = "https://cdn.exemplo.test/logo-smart.svg";
 
 const ESCOLHA = {
