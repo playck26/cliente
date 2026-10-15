@@ -17,7 +17,7 @@
  * código de produção e reprova uma segunda cópia em TSX ou CSS.
  */
 export const FUNDO_DO_LOGIN = {
-  src: "/images/login/aluno-background-v1.webp",
+  src: "/images/login/aluno-background-v2.webp",
   /** Dimensões do arquivo, conferidas no cabeçalho do WebP pelo teste. */
   largura: 864,
   altura: 1821,

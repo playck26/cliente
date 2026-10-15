@@ -867,19 +867,21 @@ fica travado até a navegação. Três provas, cada uma pega o que a outra não 
   tela), o `<meta name="referrer" content="no-referrer">` no `<head>` do HTML
   do servidor e os pedidos sem `Referer`.
 
-**O banner dos e-mails** (D8, I15). `public/email/playck-banner.jpg`, servido
-em `/email/playck-banner.jpg`: é a única imagem dos e-mails do `back`, que
-aponta para `URL_CLIENTE + '/email/playck-banner.jpg'`. JPEG progressivo de
-**1200 × 427** (o dobro dos 600 × 213 do HTML do e-mail), **85.432 bytes**,
-gerado de `banner-email-original.png` (1600 × 569, na pasta da spec) com corte
-`cover` centrado — sem mudar a proporção — e croma 4:4:4, para o amarelo do
-"ck" não borrar sobre o preto. `lib/banner-do-email.test.ts` confere formato,
-dimensões (lidas do segmento SOF, sem biblioteca), tamanho ≤ 150 KB e o
-**SHA-256** `16e01033…409f96` do arquivo revisado. Trocar a imagem deixa o teste
-vermelho até alguém revisar de novo e atualizar o hash. O arquivo é estático:
-a `netlify-ignore` o trata como mudança de site (está em `public/`), e um
-revert do Cliente depois do envio quebra o banner e o link dos e-mails já
-enviados (LIM-083j).
+**O banner dos e-mails** (D8, I15; delta D-2026-10-14). `public/email/playck-banner-v2.jpg`,
+servido em `/email/playck-banner-v2.jpg`: é a única imagem dos e-mails do `back`,
+que aponta para `URL_CLIENTE + '/email/playck-banner-v2.jpg'`. JPEG baseline de
+**1200 × 427** (o dobro dos 600 × 213 do HTML do e-mail), **102.395 bytes**,
+croma 4:4:4, copiado sem reprocessar de
+`Docs/imagens-candidatas/email-banner-multiesporte-A.jpg` (governança) — a arte
+multiesporte, com o monograma "CK" num anel dourado neutro. `lib/banner-do-email.test.ts`
+confere formato, dimensões (lidas do segmento SOF, sem biblioteca), tamanho
+≤ 150 KB e o **SHA-256** `d6dfff36…4b51c7` do arquivo revisado. Trocar a imagem
+deixa o teste vermelho até alguém revisar de novo e atualizar o hash. O banner
+anterior, `public/email/playck-banner.jpg` (`16e01033…409f96`), **continua
+publicado** para os e-mails já enviados, e o mesmo teste o protege. Os arquivos
+são estáticos: a `netlify-ignore` os trata como mudança de site (estão em
+`public/`), e um revert do Cliente depois do envio quebra o banner e o link dos
+e-mails já enviados (LIM-083j).
 
 ## 10. Avisos do clube — push (SPEC-062/TASK-004)
 

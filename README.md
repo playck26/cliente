@@ -58,7 +58,7 @@ A tela `/login` mostra uma fotografia atrás do formulário. A foto é só
 cenário: logo, textos, campos e botão são HTML, e trocá-la não mexe em
 nenhum deles.
 
-- Foto atual: `public/images/login/aluno-background-v1.webp` (864×1821, WebP).
+- Foto atual: `public/images/login/aluno-background-v2.webp` (864×1821, WebP).
 - Configuração única: `src/lib/login-appearance.ts` (`FUNDO_DO_LOGIN`).
 - Registro dos arquivos: `src/lib/login-assets-manifest.json`.
 
