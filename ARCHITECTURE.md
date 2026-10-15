@@ -790,7 +790,7 @@ Selo, título e apoio continuam com 0,76, 0,48 e 0,72 (sobre a foto, o mínimo
 medido é 0,70, 0,45 e 0,65: há refletores da quadra atrás das letras); **a marca
 perdeu o véu**, e o do formulário caiu de 0,84 para 0,35 (o limite é a borda
 dos campos, 3,47:1 no pior caso). Os **rótulos E-mail e Senha moram dentro da
-caixa** do campo (I10), e o apoio quebra em **três linhas** (`max-w-[18rem]`).
+caixa** do campo (I10), e o apoio quebra em **três linhas** (`max-w-[15.75rem]`, `text-sm` desde o delta D-2026-10-14).
 A linha da marca **quebra** (`flex-wrap`): com fonte a 200% num celular de 320 px, “PlayCK” desce inteiro para baixo do logo, em vez de passar da coluna (LIM-084o, achado da validação do delta). Os tokens são
 locais do login e estão no `DESIGN.md` ("Login fotográfico"), como valores
 arbitrários do Tailwind, porque o `globals.css` não muda por causa de uma tela.
@@ -869,13 +869,14 @@ fica travado até a navegação. Três provas, cada uma pega o que a outra não 
 
 **O banner dos e-mails** (D8, I15; delta D-2026-10-14). `public/email/playck-banner-v2.jpg`,
 servido em `/email/playck-banner-v2.jpg`: é a única imagem dos e-mails do `back`,
-que aponta para `URL_CLIENTE + '/email/playck-banner-v2.jpg'`. JPEG baseline de
-**1200 × 427** (o dobro dos 600 × 213 do HTML do e-mail), **102.395 bytes**,
-croma 4:4:4, copiado sem reprocessar de
-`Docs/imagens-candidatas/email-banner-multiesporte-A.jpg` (governança) — a arte
-multiesporte, com o monograma "CK" num anel dourado neutro. `lib/banner-do-email.test.ts`
+que aponta para `URL_CLIENTE + '/email/playck-banner-v2.jpg'`. JPEG progressivo de
+**1200 × 427** (o dobro dos 600 × 213 do HTML do e-mail), **111.478 bytes**,
+croma 4:4:4: a arte multiesporte `Docs/imagens-candidatas/email-banner-multiesporte-A.jpg`
+(governança) com o logo oficial (`public/playck-logo.png`, a bola com "CK")
+no lugar do monograma gerado, salva como
+`email-banner-multiesporte-A-logo-oficial.jpg`. `lib/banner-do-email.test.ts`
 confere formato, dimensões (lidas do segmento SOF, sem biblioteca), tamanho
-≤ 150 KB e o **SHA-256** `d6dfff36…4b51c7` do arquivo revisado. Trocar a imagem
+≤ 150 KB e o **SHA-256** `369002ae…0db539` do arquivo revisado. Trocar a imagem
 deixa o teste vermelho até alguém revisar de novo e atualizar o hash. O banner
 anterior, `public/email/playck-banner.jpg` (`16e01033…409f96`), **continua
 publicado** para os e-mails já enviados, e o mesmo teste o protege. Os arquivos

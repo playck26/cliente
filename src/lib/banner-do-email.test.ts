@@ -31,8 +31,8 @@ import { describe, expect, it } from "vitest";
 
 const ARQUIVO = join(__dirname, "..", "..", "public", "email", "playck-banner-v2.jpg");
 
-/** A candidata multiesporte A, revisada a olho em 2026-10-14 (SPEC-083, delta D-2026-10-14). */
-const SHA256_REVISADO = "d6dfff3695f60b6f8388212de752d86a9ca6cac2df38444acc827d4ac04b51c7";
+/** A candidata multiesporte A com o logo oficial, revisada a olho em 2026-10-14 (SPEC-083, delta D-2026-10-14). */
+const SHA256_REVISADO = "369002aea599c8a8edaef40357b62c142ac3e6355fbd82dc69f49815870db539";
 
 /** O banner anterior, que os e-mails já enviados continuam pedindo. */
 const ARQUIVO_ANTERIOR = join(__dirname, "..", "..", "public", "email", "playck-banner.jpg");

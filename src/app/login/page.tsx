@@ -109,12 +109,13 @@ export default function LoginPage() {
             <p className={`${VEU} ${VEU_DE_BLOCO} mt-8 text-xs font-extrabold tracking-[0.16em] text-[#B9E52B] before:bg-[linear-gradient(90deg,rgba(8,13,16,0.76)_0,rgba(8,13,16,0.76)_calc(1.5rem_+_20em),rgba(8,13,16,0)_calc(1.5rem_+_27em))]`}>
               SEU ESPORTE, SEU MOMENTO
             </p>
-            <h1 className="mt-3 text-[1.875rem] leading-[1.08] font-extrabold break-words hyphens-auto text-white min-[360px]:text-[2rem] min-[400px]:text-[2.5rem]">
+            <h1 className="mt-3 text-[1.75rem] leading-[1.08] font-extrabold break-words hyphens-auto text-white min-[360px]:text-[1.875rem] min-[400px]:text-[2.25rem]">
               <span className={`${VEU} ${VEU_DE_LINHA} block before:bg-[linear-gradient(90deg,rgba(8,13,16,0.48)_0,rgba(8,13,16,0.48)_calc(1.5rem_+_7em),rgba(8,13,16,0)_calc(1.5rem_+_9.5em))]`}>Mais esporte,</span>{" "}
               <span className={`${VEU} ${VEU_DE_LINHA} block before:bg-[linear-gradient(90deg,rgba(8,13,16,0.48)_0,rgba(8,13,16,0.48)_calc(1.5rem_+_8.5em),rgba(8,13,16,0)_calc(1.5rem_+_10.5em))]`}>mais conexões.</span>
             </h1>
-            {/* I10: três linhas. A largura em `rem` acompanha a fonte, e o `text-balance` iguala as linhas. */}
-            <p className={`${VEU} ${VEU_DE_BLOCO} mt-3 max-w-[18rem] text-base text-balance leading-normal font-medium text-[#D9DED6] before:bg-[linear-gradient(90deg,rgba(8,13,16,0.72)_0,rgba(8,13,16,0.72)_calc(100%_-_1.5rem),rgba(8,13,16,0)_100%)]`}>
+            {/* I10: três linhas. A largura em `rem` acompanha a fonte, e o `text-balance` iguala as linhas.
+                D-2026-10-14: título e apoio um nível menores, para o bloco caber no escuro da foto v2. */}
+            <p className={`${VEU} ${VEU_DE_BLOCO} mt-3 max-w-[15.75rem] text-sm text-balance leading-normal font-medium text-[#D9DED6] before:bg-[linear-gradient(90deg,rgba(8,13,16,0.72)_0,rgba(8,13,16,0.72)_calc(100%_-_1.5rem),rgba(8,13,16,0)_100%)]`}>
               Reserve sua quadra, acompanhe suas aulas e aproveite cada momento no seu clube.
             </p>
           </div>
