@@ -790,7 +790,9 @@ Selo, título e apoio continuam com 0,76, 0,48 e 0,72 (sobre a foto, o mínimo
 medido é 0,70, 0,45 e 0,65: há refletores da quadra atrás das letras); **a marca
 perdeu o véu**, e o do formulário caiu de 0,84 para 0,35 (o limite é a borda
 dos campos, 3,47:1 no pior caso). Os **rótulos E-mail e Senha moram dentro da
-caixa** do campo (I10), e o apoio quebra em **três linhas** (`max-w-[15.75rem]`, `text-sm` desde o delta D-2026-10-14).
+caixa** do campo (I10), e o apoio quebra em **três linhas** (`max-w-[15.75rem]`, `text-sm` desde o delta D-2026-10-14). Abaixo de 360 px,
+selo, título e apoio sobem 2 rem por `translate` (SPEC-088): por margem a
+coluna encolheria, e a foto subiria junto.
 A linha da marca **quebra** (`flex-wrap`): com fonte a 200% num celular de 320 px, “PlayCK” desce inteiro para baixo do logo, em vez de passar da coluna (LIM-084o, achado da validação do delta). Os tokens são
 locais do login e estão no `DESIGN.md` ("Login fotográfico"), como valores
 arbitrários do Tailwind, porque o `globals.css` não muda por causa de uma tela.
