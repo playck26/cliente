@@ -385,33 +385,43 @@ test.describe("AC-001 — 390×844: raquete e bolas fora dos campos e do botão"
     await page.goto("/login");
     await esperarPintura(page);
     await page.evaluate(() => window.scrollTo(0, 0));
-    // Raquete e bolas em coordenadas da FONTE (864×1821). Vêm dos pontos que a
-    // R1 mediu em 390×844 — (290,371), (282,423), (334,431) — desfeita a
-    // transformação que ela supôs (escala 844/1821, corte lateral de 5,2 px).
-    // Aqui eles são levados à tela pela transformação REAL (LIM-084d): se a
-    // coluna, o recorte ou a posição mudarem, os pontos mudam junto.
+    // Raquete e as duas bolas em coordenadas da FONTE da foto v2 (864×1821),
+    // inspecionadas no bitmap (SPEC-088, IMP-088-03): centro da cabeça da
+    // raquete, bola laranja, bola verde. Eram os da v1 até o delta D-2026-10-14,
+    // e na v2 eles caíam em outras partes da cena. Os pontos valem para ESTA
+    // foto: o teste da foto aprovada (login-appearance.test.ts, AC-088-04)
+    // reprova a troca do arquivo sem revisão.
+    //
+    // Levados à tela pela transformação REAL (LIM-084d). Todos os três são
+    // conferidos, nenhum é só "o primeiro".
+    //
+    // Só o estado NORMAL: com o aviso de ajuda aberto, o formulário sobe e o
+    // campo de e-mail cobre os três (LIM-088-05, aceita pelo Israel).
     const FONTE: [number, number][] = [
-      [636.9, 800.5],
-      [619.6, 912.7],
-      [731.8, 929.9],
+      [408, 1024],
+      [457, 1068],
+      [549, 1068],
     ];
-    const pontos = await page.evaluate((fonte) => {
-      const img = document.querySelector("[data-camada-da-foto] img")!.getBoundingClientRect();
-      const s = Math.max(img.width / 864, img.height / 1821);
-      const ox = img.left + (img.width - 864 * s) / 2;
-      const oy = img.top + (img.height - 1821 * s) / 2;
-      return fonte.map(([fx, fy]) => {
-        const x = ox + fx * s;
-        const y = oy + fy * s;
-        const el = document.elementFromPoint(x, y);
-        return { x, y, em: el ? el.tagName : null, controle: !!el?.closest("input, button, a") };
-      });
-    }, FONTE);
-    // A transformação real é a que a R1 supôs (±2 px)...
+    const pontos = await page.evaluate(
+      ({ fonte, largura, altura }) => {
+        const img = document.querySelector("[data-camada-da-foto] img")!.getBoundingClientRect();
+        const s = Math.max(img.width / largura, img.height / altura);
+        const ox = img.left + (img.width - largura * s) / 2;
+        const oy = img.top + (img.height - altura * s) / 2;
+        return fonte.map(([fx, fy]) => {
+          const x = ox + fx * s;
+          const y = oy + fy * s;
+          const el = document.elementFromPoint(x, y);
+          return { x, y, em: el ? el.tagName : null, controle: !!el?.closest("input, button, a") };
+        });
+      },
+      { fonte: FONTE, largura: FUNDO_DO_LOGIN.largura, altura: FUNDO_DO_LOGIN.altura },
+    );
+    // A transformação real em 390×844 (escala 844/1821, corte lateral de 5,2 px)...
     const esperados = [
-      [290, 371],
-      [282, 423],
-      [334, 431],
+      [183.9, 474.6],
+      [206.6, 495.0],
+      [249.2, 495.0],
     ];
     pontos.forEach((p, i) => {
       expect(Math.abs(p.x - esperados[i][0])).toBeLessThanOrEqual(2);
@@ -421,6 +431,65 @@ test.describe("AC-001 — 390×844: raquete e bolas fora dos campos e do botão"
     for (const p of pontos) expect(p.controle, JSON.stringify(p)).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// SPEC-088 (AC-088-06, IMP-088-02) — a tipografia do topo e onde o bloco acaba
+// ---------------------------------------------------------------------------
+
+/**
+ * O título e o apoio desceram um nível no delta D-2026-10-14 para o bloco de
+ * texto acabar ACIMA da abertura iluminada da foto v2 (linha 662 da fonte). As
+ * asserções antigas (três linhas, título ≥ 60 px a 200%) passavam também com
+ * a fonte de antes. Aqui o contrato é medido em cada largura, com os valores
+ * de cada faixa do Tailwind — mudar só uma faixa (por exemplo, ≥ 400 px)
+ * reprova nas larguras dela.
+ */
+const TOPO_DA_ABERTURA_NA_FONTE = 662;
+
+function tituloEsperado(largura: number): number {
+  if (largura < 360) return 28; // 1.75rem
+  if (largura < 400) return 30; // 1.875rem
+  return 36; // 2.25rem
+}
+
+for (const [nome, viewport] of Object.entries(VIEWPORTS)) {
+  test.describe(`AC-088-06 — tipografia do topo, ${nome}`, () => {
+    test.use({ viewport });
+
+    test("título e apoio nos tamanhos do delta, e o bloco acaba antes da abertura", async ({ page }) => {
+      await page.goto("/login");
+      await esperarPintura(page);
+      await page.evaluate(() => window.scrollTo(0, 0));
+      const m = await page.evaluate(
+        ({ linha, largura, altura }) => {
+          const h1 = document.querySelector("h1")!;
+          const apoio = [...document.querySelectorAll("p")].find((p) =>
+            p.textContent?.startsWith("Reserve sua quadra"),
+          )!;
+          const img = document.querySelector("[data-camada-da-foto] img")!.getBoundingClientRect();
+          const s = Math.max(img.width / largura, img.height / altura);
+          const oy = img.top + (img.height - altura * s) / 2;
+          return {
+            titulo: parseFloat(getComputedStyle(h1).fontSize),
+            apoio: parseFloat(getComputedStyle(apoio).fontSize),
+            larguraMaxima: parseFloat(getComputedStyle(apoio).maxWidth),
+            fimDoApoio: apoio.getBoundingClientRect().bottom,
+            abertura: oy + linha * s,
+          };
+        },
+        { linha: TOPO_DA_ABERTURA_NA_FONTE, largura: FUNDO_DO_LOGIN.largura, altura: FUNDO_DO_LOGIN.altura },
+      );
+      expect(m.titulo, JSON.stringify(m)).toBe(tituloEsperado(viewport.width));
+      expect(m.apoio, JSON.stringify(m)).toBe(14); // 0.875rem
+      expect(m.larguraMaxima, JSON.stringify(m)).toBe(252); // 15.75rem
+      // Em 320×568 a foto escala pela LARGURA numa tela baixa, e a abertura sobe
+      // para y≈254, acima do fim do apoio (≈283): nem a fonte nem a posição da
+      // foto resolvem sem estragar as outras larguras (LIM-088-06). Fica medido
+      // e registrado, sem a asserção.
+      if (nome !== "320x568") expect(m.fimDoApoio, JSON.stringify(m)).toBeLessThan(m.abertura);
+    });
+  });
+}
 
 // ---------------------------------------------------------------------------
 // AC-002 — o texto aprovado na tela de verdade
