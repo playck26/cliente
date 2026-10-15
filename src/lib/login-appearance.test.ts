@@ -205,6 +205,27 @@ describe("SPEC-084 — a foto configurada (AC-003)", () => {
   });
 });
 
+/**
+ * SPEC-088 (AC-088-04, IMP-088-01) — **a foto ATIVA é a aprovada.**
+ *
+ * Os casos acima conferem a foto escolhida contra o manifesto, e o manifesto
+ * guarda também a v1 legítima: apontar o `src` de volta para ela continuava
+ * verde. Aqui a referência é independente da configuração e do manifesto: o
+ * nome e o SHA-256 da foto que o Israel aprovou (delta D-2026-10-14). Trocar a
+ * foto exige revisar e atualizar estes dois valores.
+ */
+const FOTO_APROVADA = {
+  nome: "aluno-background-v2.webp",
+  sha256: "55f8a99fa525dcf91c9d1277285f8a2477859203f86dfe6a5b0bdaea6f390e9b",
+} as const;
+
+describe("SPEC-088 — a foto ativa é a aprovada (AC-088-04)", () => {
+  it("o src aponta para o arquivo aprovado, com o hash aprovado", () => {
+    expect(nomeDoArquivo(FUNDO_DO_LOGIN.src)).toBe(FOTO_APROVADA.nome);
+    expect(sha256(readFileSync(join(PUBLIC, FUNDO_DO_LOGIN.src)))).toBe(FOTO_APROVADA.sha256);
+  });
+});
+
 describe("SPEC-084 — o manifesto (AC-004)", () => {
   it("todo arquivo do manifesto continua publicado, com os bytes registrados", () => {
     // Fotos anteriores ficam em `public/` durante o rollback (D6).

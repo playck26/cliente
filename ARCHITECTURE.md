@@ -790,7 +790,11 @@ Selo, título e apoio continuam com 0,76, 0,48 e 0,72 (sobre a foto, o mínimo
 medido é 0,70, 0,45 e 0,65: há refletores da quadra atrás das letras); **a marca
 perdeu o véu**, e o do formulário caiu de 0,84 para 0,35 (o limite é a borda
 dos campos, 3,47:1 no pior caso). Os **rótulos E-mail e Senha moram dentro da
-caixa** do campo (I10), e o apoio quebra em **três linhas** (`max-w-[18rem]`).
+caixa** do campo (I10), e o apoio quebra em **três linhas** (`max-w-[15.75rem]`, `text-sm` desde o delta D-2026-10-14). Abaixo de 360 px,
+selo, título e apoio sobem 2 rem por `relative`/`-top-8` (SPEC-088): não por
+`translate`, que criava contexto de empilhamento e pintava o véu do selo sobre a
+marca, e não por margem, porque a
+coluna encolheria, e a foto subiria junto.
 A linha da marca **quebra** (`flex-wrap`): com fonte a 200% num celular de 320 px, “PlayCK” desce inteiro para baixo do logo, em vez de passar da coluna (LIM-084o, achado da validação do delta). Os tokens são
 locais do login e estão no `DESIGN.md` ("Login fotográfico"), como valores
 arbitrários do Tailwind, porque o `globals.css` não muda por causa de uma tela.
@@ -867,19 +871,22 @@ fica travado até a navegação. Três provas, cada uma pega o que a outra não 
   tela), o `<meta name="referrer" content="no-referrer">` no `<head>` do HTML
   do servidor e os pedidos sem `Referer`.
 
-**O banner dos e-mails** (D8, I15). `public/email/playck-banner.jpg`, servido
-em `/email/playck-banner.jpg`: é a única imagem dos e-mails do `back`, que
-aponta para `URL_CLIENTE + '/email/playck-banner.jpg'`. JPEG progressivo de
-**1200 × 427** (o dobro dos 600 × 213 do HTML do e-mail), **85.432 bytes**,
-gerado de `banner-email-original.png` (1600 × 569, na pasta da spec) com corte
-`cover` centrado — sem mudar a proporção — e croma 4:4:4, para o amarelo do
-"ck" não borrar sobre o preto. `lib/banner-do-email.test.ts` confere formato,
-dimensões (lidas do segmento SOF, sem biblioteca), tamanho ≤ 150 KB e o
-**SHA-256** `16e01033…409f96` do arquivo revisado. Trocar a imagem deixa o teste
-vermelho até alguém revisar de novo e atualizar o hash. O arquivo é estático:
-a `netlify-ignore` o trata como mudança de site (está em `public/`), e um
-revert do Cliente depois do envio quebra o banner e o link dos e-mails já
-enviados (LIM-083j).
+**O banner dos e-mails** (D8, I15; delta D-2026-10-14). `public/email/playck-banner-v2.jpg`,
+servido em `/email/playck-banner-v2.jpg`: é a única imagem dos e-mails do `back`,
+que aponta para `URL_CLIENTE + '/email/playck-banner-v2.jpg'`. JPEG progressivo de
+**1200 × 427** (o dobro dos 600 × 213 do HTML do e-mail), **111.478 bytes**,
+croma 4:4:4: a arte multiesporte `Docs/imagens-candidatas/email-banner-multiesporte-A.jpg`
+(governança) com o logo oficial (`public/playck-logo.png`, a bola com "CK")
+no lugar do monograma gerado, salva como
+`email-banner-multiesporte-A-logo-oficial.jpg`. `lib/banner-do-email.test.ts`
+confere formato, dimensões (lidas do segmento SOF, sem biblioteca), tamanho
+≤ 150 KB e o **SHA-256** `369002ae…0db539` do arquivo revisado. Trocar a imagem
+deixa o teste vermelho até alguém revisar de novo e atualizar o hash. O banner
+anterior, `public/email/playck-banner.jpg` (`16e01033…409f96`), **continua
+publicado** para os e-mails já enviados, e o mesmo teste o protege. Os arquivos
+são estáticos: a `netlify-ignore` os trata como mudança de site (estão em
+`public/`), e um revert do Cliente depois do envio quebra o banner e o link dos
+e-mails já enviados (LIM-083j).
 
 ## 10. Avisos do clube — push (SPEC-062/TASK-004)
 

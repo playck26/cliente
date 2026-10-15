@@ -378,49 +378,288 @@ for (const [nome, viewport] of Object.entries(VIEWPORTS)) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// SPEC-088 — a composição medida contra uma REFERÊNCIA, e não por propriedade
+// ---------------------------------------------------------------------------
+//
+// As rodadas R1–R3 da validação e um ataque próprio (11 sabotagens) mostraram
+// o mesmo padrão: cada teste que media UMA propriedade (a tag do controle, a
+// caixa do texto, o `::before`) era enganado por outra (um `role="button"`, um
+// `overflow`, um `::after`, um `filter`). Daqui em diante cada teste compara o
+// que está pintado com uma referência construída na própria página:
+//
+// - equipamentos: a tela inteira contra a tela com SÓ a foto visível;
+// - texto do topo: as linhas REAIS do texto (`Range`, que inclui deslocamento e
+//   transform), e não a caixa do elemento;
+// - marca: a marca na tela inteira contra a marca sozinha sobre a foto, mais o
+//   estilo computado dela e dos ancestrais.
+
+/** Esconde tudo o que é pintado na página, menos o que `manter` selecionar. */
+async function soIsto(page: Page, manter: string) {
+  await page.addStyleTag({
+    content: `body * { visibility: hidden !important; } ${manter} { visibility: visible !important; }`,
+  });
+  await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+}
+
+/** Média por canal de um PNG pequeno, decodificado no navegador. */
+async function mediaDoRecorte(page: Page, png: Buffer): Promise<[number, number, number]> {
+  return page.evaluate(async (b64) => {
+    const img = new Image();
+    img.src = `data:image/png;base64,${b64}`;
+    await img.decode();
+    const c = document.createElement("canvas");
+    c.width = img.width;
+    c.height = img.height;
+    const ctx = c.getContext("2d")!;
+    ctx.drawImage(img, 0, 0);
+    const d = ctx.getImageData(0, 0, c.width, c.height).data;
+    const s = [0, 0, 0];
+    for (let i = 0; i < d.length; i += 4) for (let k = 0; k < 3; k++) s[k] += d[i + k];
+    const n = d.length / 4;
+    return [s[0] / n, s[1] / n, s[2] / n] as [number, number, number];
+  }, png.toString("base64"));
+}
+
 test.describe("AC-001 — 390×844: raquete e bolas fora dos campos e do botão", () => {
   test.use({ viewport: VIEWPORTS["390x844"], deviceScaleFactor: 1 });
 
-  test("os pontos da raquete e das bolas não caem em input nem em button", async ({ page }) => {
+  test("nada é pintado sobre a raquete e as bolas, além do véu aprovado", async ({ page }) => {
     await page.goto("/login");
     await esperarPintura(page);
     await page.evaluate(() => window.scrollTo(0, 0));
-    // Raquete e bolas em coordenadas da FONTE (864×1821). Vêm dos pontos que a
-    // R1 mediu em 390×844 — (290,371), (282,423), (334,431) — desfeita a
-    // transformação que ela supôs (escala 844/1821, corte lateral de 5,2 px).
-    // Aqui eles são levados à tela pela transformação REAL (LIM-084d): se a
-    // coluna, o recorte ou a posição mudarem, os pontos mudam junto.
+    // Raquete e as duas bolas em coordenadas da FONTE da foto v2 (864×1821),
+    // inspecionadas no bitmap (IMP-088-03). Valem para ESTA foto: o teste da
+    // foto aprovada (login-appearance.test.ts, AC-088-04) reprova a troca do
+    // arquivo sem revisão. Só o estado NORMAL: com o aviso de ajuda aberto o
+    // campo de e-mail cobre os três (LIM-088-05, aceita pelo Israel).
     const FONTE: [number, number][] = [
-      [636.9, 800.5],
-      [619.6, 912.7],
-      [731.8, 929.9],
+      [408, 1024],
+      [457, 1068],
+      [549, 1068],
     ];
-    const pontos = await page.evaluate((fonte) => {
-      const img = document.querySelector("[data-camada-da-foto] img")!.getBoundingClientRect();
-      const s = Math.max(img.width / 864, img.height / 1821);
-      const ox = img.left + (img.width - 864 * s) / 2;
-      const oy = img.top + (img.height - 1821 * s) / 2;
-      return fonte.map(([fx, fy]) => {
-        const x = ox + fx * s;
-        const y = oy + fy * s;
-        const el = document.elementFromPoint(x, y);
-        return { x, y, em: el ? el.tagName : null, controle: !!el?.closest("input, button, a") };
-      });
-    }, FONTE);
-    // A transformação real é a que a R1 supôs (±2 px)...
+    const pontos = await page.evaluate(
+      ({ fonte, largura, altura }) => {
+        const img = document.querySelector("[data-camada-da-foto] img")!.getBoundingClientRect();
+        const s = Math.max(img.width / largura, img.height / altura);
+        const ox = img.left + (img.width - largura * s) / 2;
+        const oy = img.top + (img.height - altura * s) / 2;
+        return fonte.map(([fx, fy]) => {
+          const x = ox + fx * s;
+          const y = oy + fy * s;
+          const el = document.elementFromPoint(x, y);
+          return { x, y, em: el ? el.tagName : null, clicavel: !!el?.closest("input, button, a, label, select, textarea, [role], [tabindex], [onclick]") };
+        });
+      },
+      { fonte: FONTE, largura: FUNDO_DO_LOGIN.largura, altura: FUNDO_DO_LOGIN.altura },
+    );
+    // A transformação real em 390×844 (escala 844/1821, corte lateral de 5,2 px).
     const esperados = [
-      [290, 371],
-      [282, 423],
-      [334, 431],
+      [183.9, 474.6],
+      [206.6, 495.0],
+      [249.2, 495.0],
     ];
     pontos.forEach((p, i) => {
       expect(Math.abs(p.x - esperados[i][0])).toBeLessThanOrEqual(2);
       expect(Math.abs(p.y - esperados[i][1])).toBeLessThanOrEqual(2);
+      // Quem recebe o ponto não é nada clicável, de nenhuma tag.
+      expect(p.clicavel, JSON.stringify(p)).toBe(false);
     });
-    // ...e nenhum dos pontos está debaixo de campo, botão ou link.
-    for (const p of pontos) expect(p.controle, JSON.stringify(p)).toBe(false);
+
+    // A prova que não depende de tag, caixa ou camada: em volta de cada ponto
+    // (5×5 px), a tela inteira contra a tela com SÓ a foto. A diferença
+    // permitida é a do véu aprovado do formulário, que ali começa a aparecer
+    // (no máximo ~11% de escurecimento, medido); qualquer outra coisa pintada
+    // por cima — dentro ou fora do formulário, opaca, clara ou escura — passa
+    // dela.
+    const recortes = () =>
+      Promise.all(
+        pontos.map((p) =>
+          page.screenshot({ clip: { x: Math.round(p.x) - 2, y: Math.round(p.y) - 2, width: 5, height: 5 } }),
+        ),
+      );
+    const tela = await recortes();
+    await soIsto(page, "[data-camada-da-foto] img");
+    const foto = await recortes();
+    for (let i = 0; i < pontos.length; i++) {
+      const a = await mediaDoRecorte(page, tela[i]);
+      const b = await mediaDoRecorte(page, foto[i]);
+      const razao = (a[0] + a[1] + a[2] + 1) / (b[0] + b[1] + b[2] + 1);
+      const desvioDeCor = Math.max(...[0, 1, 2].map((k) => Math.abs(a[k] - b[k] * razao)));
+      const medida = { ponto: pontos[i], tela: a, foto: b, razao, desvioDeCor };
+      expect(razao, JSON.stringify(medida)).toBeGreaterThanOrEqual(0.85);
+      expect(razao, JSON.stringify(medida)).toBeLessThanOrEqual(1.02);
+      // O véu escurece por igual: a cor da foto continua a mesma.
+      expect(desvioDeCor, JSON.stringify(medida)).toBeLessThanOrEqual(6);
+    }
   });
 });
+
+// ---------------------------------------------------------------------------
+// SPEC-088 (AC-088-06) — a tipografia do topo e onde o texto acaba
+// ---------------------------------------------------------------------------
+
+/** O topo da abertura iluminada da foto v2, em linhas da fonte (medido no bitmap). */
+const TOPO_DA_ABERTURA_NA_FONTE = 662;
+
+function tituloEsperado(largura: number): number {
+  if (largura < 360) return 28; // 1.75rem
+  if (largura < 400) return 30; // 1.875rem
+  return 36; // 2.25rem
+}
+
+for (const [nome, viewport] of Object.entries(VIEWPORTS)) {
+  test.describe(`AC-088-06 — tipografia do topo, ${nome}`, () => {
+    test.use({ viewport });
+
+    test("título e apoio nos tamanhos do delta, e o TEXTO acaba antes da abertura", async ({ page }) => {
+      await page.goto("/login");
+      await esperarPintura(page);
+      await page.evaluate(() => window.scrollTo(0, 0));
+      const m = await page.evaluate(
+        ({ linha, largura, altura }) => {
+          const achar = (f: (p: Element) => boolean) => [...document.querySelectorAll("p")].find(f)!;
+          const marca = achar((p) => p.textContent === "PlayCK");
+          const selo = achar((p) => !!p.textContent?.includes("SEU ESPORTE"));
+          const apoio = achar((p) => !!p.textContent?.startsWith("Reserve sua quadra"));
+          const h1 = document.querySelector("h1")!;
+          // As linhas REAIS do texto: o Range inclui deslocamento relativo,
+          // transform e transbordo, que a caixa do elemento não mostra.
+          // Só os nós de TEXTO: o Range de um elemento inteiro traz também as
+          // caixas dos filhos de bloco (as linhas do título são spans).
+          const linhas = (el: Element) => {
+            const andar = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+            const q: DOMRect[] = [];
+            for (let n = andar.nextNode(); n; n = andar.nextNode()) {
+              if (!n.textContent?.trim()) continue;
+              const r = document.createRange();
+              r.selectNodeContents(n);
+              q.push(...[...r.getClientRects()].filter((x) => x.width > 0 && x.height > 0));
+            }
+            return q;
+          };
+          const tops = (q: DOMRect[]) => new Set(q.map((x) => Math.round(x.top))).size;
+          const la = linhas(apoio);
+          const lt = linhas(h1);
+          const ls = linhas(selo);
+          const lm = linhas(marca);
+          const coluna = document.querySelector("[data-coluna-do-login]")!.getBoundingClientRect();
+          const img = document.querySelector("[data-camada-da-foto] img")!.getBoundingClientRect();
+          const s = Math.max(img.width / largura, img.height / altura);
+          const oy = img.top + (img.height - altura * s) / 2;
+          const todas = [...lm, ...ls, ...lt, ...la];
+          return {
+            titulo: parseFloat(getComputedStyle(h1).fontSize),
+            apoio: parseFloat(getComputedStyle(apoio).fontSize),
+            larguraMaxima: parseFloat(getComputedStyle(apoio).maxWidth),
+            linhasDoApoio: tops(la),
+            linhasDoTitulo: tops(lt),
+            alturaDoTitulo: Math.max(...lt.map((q) => q.bottom)) - Math.min(...lt.map((q) => q.top)),
+            fimDoApoio: Math.max(...la.map((q) => q.bottom)),
+            fimDaMarca: Math.max(...lm.map((q) => q.bottom)),
+            topoDoSelo: Math.min(...ls.map((q) => q.top)),
+            fimDoSelo: Math.max(...ls.map((q) => q.bottom)),
+            topoDoTitulo: Math.min(...lt.map((q) => q.top)),
+            fimDoTitulo: Math.max(...lt.map((q) => q.bottom)),
+            topoDoApoio: Math.min(...la.map((q) => q.top)),
+            dentroDaColuna: todas.every((q) => q.left >= coluna.left - 0.5 && q.right <= coluna.right + 0.5),
+            abertura: oy + linha * s,
+          };
+        },
+        { linha: TOPO_DA_ABERTURA_NA_FONTE, largura: FUNDO_DO_LOGIN.largura, altura: FUNDO_DO_LOGIN.altura },
+      );
+      const t = JSON.stringify(m);
+      const esperado = tituloEsperado(viewport.width);
+      expect(m.titulo, t).toBe(esperado);
+      expect(m.apoio, t).toBe(14); // 0.875rem
+      expect(m.larguraMaxima, t).toBe(252); // 15.75rem
+      // As três linhas do apoio (I10) e as duas do título, contadas no texto.
+      expect(m.linhasDoApoio, t).toBe(3);
+      expect(m.linhasDoTitulo, t).toBe(2);
+      // O título PINTADO tem a altura do tamanho declarado (2 linhas a 1.08):
+      // um scale, ou outra fonte por baixo, muda isto.
+      expect(Math.abs(m.alturaDoTitulo - 2 * 1.08 * esperado), t).toBeLessThanOrEqual(esperado * 0.25);
+      // Nenhuma linha de texto sai da coluna (um nowrap, um scale). O
+      // scrollWidth não serve: os véus passam da caixa de propósito.
+      expect(m.dentroDaColuna, t).toBe(true);
+      // O texto acaba antes da abertura iluminada, em toda largura.
+      expect(m.fimDoApoio, t).toBeLessThan(m.abertura);
+      // E os textos do topo não se sobrepõem, medidos nas linhas reais.
+      expect(m.topoDoSelo, t).toBeGreaterThanOrEqual(m.fimDaMarca);
+      expect(m.topoDoTitulo, t).toBeGreaterThanOrEqual(m.fimDoSelo);
+      expect(m.topoDoApoio, t).toBeGreaterThanOrEqual(m.fimDoTitulo);
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// SPEC-088 (IMP-088-R3-02) — a marca não tem véu, nem emprestado
+// ---------------------------------------------------------------------------
+
+/**
+ * O `DESIGN.md` diz "a marca não tem véu" (I10 da 084). Duas provas:
+ *
+ * 1. pixel: a marca na tela inteira é IGUAL à marca sozinha sobre a foto (tudo
+ *    o mais escondido). Qualquer camada de outro elemento — véu, `::after`,
+ *    sombra, overlay — que alcance a marca muda bytes;
+ * 2. estilo: a própria marca e os ancestrais dela até a coluna não pintam nada
+ *    por cima nem por baixo (fundo, filtro, sombra, opacidade, mistura,
+ *    pseudo-elementos com fundo ou sombra) — a única coisa que a prova 1 não
+ *    vê, porque a marca vai junto para a referência.
+ */
+const CASOS_DA_MARCA: { nome: string; viewport: { width: number; height: number }; fonte: 100 | 200 }[] = [
+  ...Object.entries(VIEWPORTS).map(([nome, viewport]) => ({ nome, viewport, fonte: 100 as const })),
+  { nome: "320x568", viewport: VIEWPORTS["320x568"], fonte: 200 },
+  { nome: "390x844", viewport: VIEWPORTS["390x844"], fonte: 200 },
+];
+
+for (const caso of CASOS_DA_MARCA) {
+  test.describe(`IMP-088-R3-02 — a marca sem véu, ${caso.nome}, fonte ${caso.fonte}%`, () => {
+    test.use({ viewport: caso.viewport, deviceScaleFactor: 1 });
+
+    test("a marca é a mesma da referência, e nada nela ou acima dela pinta", async ({ page }) => {
+      await page.goto("/login");
+      if (caso.fonte === 200) await page.addStyleTag({ content: "html { font-size: 200% !important; }" });
+      await esperarPintura(page);
+      await page.evaluate(() => window.scrollTo(0, 0));
+
+      const estilo = await page.evaluate(() => {
+        const marca = [...document.querySelectorAll("p")].find((p) => p.textContent === "PlayCK")!;
+        const coluna = document.querySelector("[data-coluna-do-login]")!;
+        const problemas: string[] = [];
+        const transparente = (c: string) => c === "transparent" || /rgba\(.*,\s*0\)$/.test(c);
+        for (let el: Element | null = marca; el && el !== coluna.parentElement; el = el.parentElement) {
+          const e = getComputedStyle(el);
+          const nome = el === coluna ? "coluna" : el.tagName;
+          // A coluna é o fundo da página: o fundo dela pode existir (é o
+          // `#080D10` atrás da foto), o resto não.
+          if (el !== coluna && (!transparente(e.backgroundColor) || e.backgroundImage !== "none"))
+            problemas.push(`${nome}: fundo`);
+          if (e.filter !== "none" || e.backdropFilter !== "none") problemas.push(`${nome}: filtro`);
+          if (e.boxShadow !== "none" || e.textShadow !== "none") problemas.push(`${nome}: sombra`);
+          if (parseFloat(e.opacity) < 1) problemas.push(`${nome}: opacidade`);
+          if (e.mixBlendMode !== "normal") problemas.push(`${nome}: mistura`);
+          for (const pseudo of ["::before", "::after"]) {
+            const p = getComputedStyle(el, pseudo);
+            if (p.content === "none" || p.content === "normal") continue;
+            if (!transparente(p.backgroundColor) || p.backgroundImage !== "none" || p.boxShadow !== "none")
+              problemas.push(`${nome}${pseudo}: pinta`);
+          }
+        }
+        return problemas;
+      });
+      expect(estilo, "a marca ou um ancestral dela pinta").toEqual([]);
+
+      const marca = page.locator("p", { hasText: /^PlayCK$/ });
+      const caixa = (await marca.boundingBox())!;
+      const clip = { x: Math.floor(caixa.x), y: Math.floor(caixa.y), width: Math.ceil(caixa.width), height: Math.ceil(caixa.height) };
+      const tela = await page.screenshot({ clip });
+      await soIsto(page, '[data-camada-da-foto] img, p:has(> span) , p:has(> span) *');
+      const referencia = await page.screenshot({ clip });
+      expect(tela.equals(referencia), "alguma camada alcança a marca").toBe(true);
+    });
+  });
+}
 
 // ---------------------------------------------------------------------------
 // AC-002 — o texto aprovado na tela de verdade

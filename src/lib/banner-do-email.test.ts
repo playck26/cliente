@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 /**
  * SPEC-083 (D8, I15, AC-044) — **o banner que todo e-mail da PlayCK carrega.**
  *
- * O e-mail aponta para `URL_CLIENTE + '/email/playck-banner.jpg'`, e quem serve
+ * O e-mail aponta para `URL_CLIENTE + '/email/playck-banner-v2.jpg'`, e quem serve
  * o arquivo é este repositório (`public/email/`). O Back só conhece o endereço:
  * se o arquivo sumir, mudar de tamanho ou de formato, o e-mail continua saindo
  * e o defeito só aparece na caixa de entrada de quem recebeu.
@@ -16,20 +16,29 @@ import { describe, expect, it } from "vitest";
  * - **JPEG de 1200 × 427 px:** o dobro dos `600 × 213` que o HTML do e-mail
  *   declara (tela de alta densidade), na proporção do original de 1600 × 569.
  * - **Até 150 KB:** é a primeira coisa que a pessoa baixa ao abrir o convite.
- * - **O SHA-256 do arquivo revisado:** a versão otimizada foi comparada com
- *   `banner-email-original.png` uma vez (registro no `CLI_AUDIT.md` da spec).
- *   Daí em diante quem garante a identidade é o hash: trocar a imagem, mesmo
- *   por outra do mesmo tamanho, deixa este teste vermelho até alguém revisar de
- *   novo e atualizar o valor aqui.
+ * - **O SHA-256 do arquivo revisado:** a versão multiesporte (delta
+ *   D-2026-10-14) foi revisada a olho uma vez (registro no `CLI_AUDIT.md` da
+ *   spec). Daí em diante quem garante a identidade é o hash: trocar a imagem,
+ *   mesmo por outra do mesmo tamanho, deixa este teste vermelho até alguém
+ *   revisar de novo e atualizar o valor aqui.
+ * - **O banner anterior continua no ar, intacto:** os e-mails já enviados
+ *   apontam para `/email/playck-banner.jpg` (LIM-083j). Apagá-lo ou
+ *   sobrescrevê-lo quebra a imagem na caixa de entrada de quem já recebeu.
  *
  * As dimensões vêm do cabeçalho do próprio JPEG (o segmento SOF), e não de
  * biblioteca de imagem: o repositório não tem uma, e não ganha uma por isto.
  */
 
-const ARQUIVO = join(__dirname, "..", "..", "public", "email", "playck-banner.jpg");
+const ARQUIVO = join(__dirname, "..", "..", "public", "email", "playck-banner-v2.jpg");
 
-/** O arquivo revisado contra o original em 2026-10-04 (SPEC-083, TASK-008). */
-const SHA256_REVISADO = "16e01033b4fba39056433821f194fd38b990c98845c02be9d58282faaf409f96";
+/** A candidata multiesporte A com o logo oficial, revisada a olho em 2026-10-14 (SPEC-083, delta D-2026-10-14). */
+const SHA256_REVISADO = "369002aea599c8a8edaef40357b62c142ac3e6355fbd82dc69f49815870db539";
+
+/** O banner anterior, que os e-mails já enviados continuam pedindo. */
+const ARQUIVO_ANTERIOR = join(__dirname, "..", "..", "public", "email", "playck-banner.jpg");
+
+/** O mesmo valor que este teste fixava até o delta D-2026-10-14. */
+const SHA256_ANTERIOR = "16e01033b4fba39056433821f194fd38b990c98845c02be9d58282faaf409f96";
 
 const LIMITE_EM_BYTES = 150 * 1000;
 
@@ -85,8 +94,13 @@ describe("SPEC-083 (AC-044) — o banner dos e-mails servido pelo Cliente", () =
     expect(bytes.length).toBeLessThanOrEqual(LIMITE_EM_BYTES);
   });
 
-  it("é o arquivo revisado contra o original (SHA-256)", () => {
+  it("é o arquivo revisado (SHA-256)", () => {
     expect(createHash("sha256").update(bytes).digest("hex")).toBe(SHA256_REVISADO);
+  });
+
+  it("o banner anterior continua publicado e intacto, para os e-mails já enviados", () => {
+    const anterior = readFileSync(ARQUIVO_ANTERIOR);
+    expect(createHash("sha256").update(anterior).digest("hex")).toBe(SHA256_ANTERIOR);
   });
 });
 
