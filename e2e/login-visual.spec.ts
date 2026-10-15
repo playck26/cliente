@@ -408,11 +408,32 @@ test.describe("AC-001 — 390×844: raquete e bolas fora dos campos e do botão"
         const s = Math.max(img.width / largura, img.height / altura);
         const ox = img.left + (img.width - largura * s) / 2;
         const oy = img.top + (img.height - altura * s) / 2;
+        // Duas perguntas, porque cada uma sozinha tem furo (IMP-088-R2-01):
+        // quem recebe o ponto (um label por cima do campo respondia "LABEL" e
+        // passava), e se o ponto cai DENTRO da caixa desenhada de algum controle
+        // visível — o que não depende de eventos de ponteiro nem de quem está
+        // por cima.
+        const controles = [...document.querySelectorAll("input, button, a, label, select, textarea")]
+          .filter((c) => {
+            const e = getComputedStyle(c);
+            return e.visibility !== "hidden" && e.display !== "none" && parseFloat(e.opacity) > 0;
+          })
+          .map((c) => ({ tag: c.tagName, r: c.getBoundingClientRect() }))
+          .filter(({ r }) => r.width > 0 && r.height > 0);
         return fonte.map(([fx, fy]) => {
           const x = ox + fx * s;
           const y = oy + fy * s;
           const el = document.elementFromPoint(x, y);
-          return { x, y, em: el ? el.tagName : null, controle: !!el?.closest("input, button, a") };
+          const sob = controles
+            .filter(({ r }) => x >= r.left && x <= r.right && y >= r.top && y <= r.bottom)
+            .map(({ tag }) => tag);
+          return {
+            x,
+            y,
+            em: el ? el.tagName : null,
+            controle: !!el?.closest("input, button, a, label, select, textarea") || sob.length > 0,
+            sob,
+          };
         });
       },
       { fonte: FONTE, largura: FUNDO_DO_LOGIN.largura, altura: FUNDO_DO_LOGIN.altura },
@@ -466,10 +487,16 @@ for (const [nome, viewport] of Object.entries(VIEWPORTS)) {
           const apoio = [...document.querySelectorAll("p")].find((p) =>
             p.textContent?.startsWith("Reserve sua quadra"),
           )!;
+          const marca = [...document.querySelectorAll("p")].find((p) => p.textContent === "PlayCK")!;
+          const selo = [...document.querySelectorAll("p")].find((p) =>
+            p.textContent?.includes("SEU ESPORTE"),
+          )!;
           const img = document.querySelector("[data-camada-da-foto] img")!.getBoundingClientRect();
           const s = Math.max(img.width / largura, img.height / altura);
           const oy = img.top + (img.height - altura * s) / 2;
           return {
+            fimDaMarca: marca.getBoundingClientRect().bottom,
+            topoDoSelo: selo.getBoundingClientRect().top,
             titulo: parseFloat(getComputedStyle(h1).fontSize),
             apoio: parseFloat(getComputedStyle(apoio).fontSize),
             larguraMaxima: parseFloat(getComputedStyle(apoio).maxWidth),
@@ -482,11 +509,12 @@ for (const [nome, viewport] of Object.entries(VIEWPORTS)) {
       expect(m.titulo, JSON.stringify(m)).toBe(tituloEsperado(viewport.width));
       expect(m.apoio, JSON.stringify(m)).toBe(14); // 0.875rem
       expect(m.larguraMaxima, JSON.stringify(m)).toBe(252); // 15.75rem
-      // Em 320×568 a foto escala pela LARGURA numa tela baixa, e a abertura sobe
-      // para y≈254, acima do fim do apoio (≈283): nem a fonte nem a posição da
-      // foto resolvem sem estragar as outras larguras (LIM-088-06). Fica medido
-      // e registrado, sem a asserção.
-      if (nome !== "320x568") expect(m.fimDoApoio, JSON.stringify(m)).toBeLessThan(m.abertura);
+      // Em toda largura, inclusive 320×568 (o selo cola na marca abaixo de 360 px;
+      // IMP-088-R2-02 derrubou a exceção que existia aqui).
+      expect(m.fimDoApoio, JSON.stringify(m)).toBeLessThan(m.abertura);
+      // O translate de < 360 px sobe o selo para perto da marca: ele não pode
+      // passar por cima dela.
+      expect(m.topoDoSelo, JSON.stringify(m)).toBeGreaterThanOrEqual(m.fimDaMarca);
     });
   });
 }
