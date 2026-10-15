@@ -791,7 +791,9 @@ medido é 0,70, 0,45 e 0,65: há refletores da quadra atrás das letras); **a ma
 perdeu o véu**, e o do formulário caiu de 0,84 para 0,35 (o limite é a borda
 dos campos, 3,47:1 no pior caso). Os **rótulos E-mail e Senha moram dentro da
 caixa** do campo (I10), e o apoio quebra em **três linhas** (`max-w-[15.75rem]`, `text-sm` desde o delta D-2026-10-14). Abaixo de 360 px,
-selo, título e apoio sobem 2 rem por `translate` (SPEC-088): por margem a
+selo, título e apoio sobem 2 rem por `relative`/`-top-8` (SPEC-088): não por
+`translate`, que criava contexto de empilhamento e pintava o véu do selo sobre a
+marca, e não por margem, porque a
 coluna encolheria, e a foto subiria junto.
 A linha da marca **quebra** (`flex-wrap`): com fonte a 200% num celular de 320 px, “PlayCK” desce inteiro para baixo do logo, em vez de passar da coluna (LIM-084o, achado da validação do delta). Os tokens são
 locais do login e estão no `DESIGN.md` ("Login fotográfico"), como valores
