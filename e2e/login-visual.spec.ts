@@ -408,12 +408,14 @@ test.describe("AC-001 — 390×844: raquete e bolas fora dos campos e do botão"
         const s = Math.max(img.width / largura, img.height / altura);
         const ox = img.left + (img.width - largura * s) / 2;
         const oy = img.top + (img.height - altura * s) / 2;
-        // Duas perguntas, porque cada uma sozinha tem furo (IMP-088-R2-01):
-        // quem recebe o ponto (um label por cima do campo respondia "LABEL" e
-        // passava), e se o ponto cai DENTRO da caixa desenhada de algum controle
-        // visível — o que não depende de eventos de ponteiro nem de quem está
-        // por cima.
-        const controles = [...document.querySelectorAll("input, button, a, label, select, textarea")]
+        // Não é lista de tags (IMP-088-R2-01 e R3-01: um label, depois um
+        // role="button", ficavam de fora): é TODO elemento pintado do bloco do
+        // formulário, de qualquer tag, menos o véu decorativo dele. Duas
+        // perguntas: quem recebe o ponto, e se o ponto cai dentro da caixa de
+        // algum desses elementos — a segunda não depende de eventos de ponteiro.
+        const bloco = document.querySelector("[data-bloco-do-formulario]")!;
+        const pintados = [bloco, ...bloco.querySelectorAll("*")]
+          .filter((c) => !c.closest("[data-veu-do-formulario]"))
           .filter((c) => {
             const e = getComputedStyle(c);
             return e.visibility !== "hidden" && e.display !== "none" && parseFloat(e.opacity) > 0;
@@ -424,16 +426,11 @@ test.describe("AC-001 — 390×844: raquete e bolas fora dos campos e do botão"
           const x = ox + fx * s;
           const y = oy + fy * s;
           const el = document.elementFromPoint(x, y);
-          const sob = controles
+          const sob = pintados
             .filter(({ r }) => x >= r.left && x <= r.right && y >= r.top && y <= r.bottom)
             .map(({ tag }) => tag);
-          return {
-            x,
-            y,
-            em: el ? el.tagName : null,
-            controle: !!el?.closest("input, button, a, label, select, textarea") || sob.length > 0,
-            sob,
-          };
+          const recebidoPeloBloco = !!el?.closest("[data-bloco-do-formulario]") && !el?.closest("[data-veu-do-formulario]");
+          return { x, y, em: el ? el.tagName : null, controle: recebidoPeloBloco || sob.length > 0, sob };
         });
       },
       { fonte: FONTE, largura: FUNDO_DO_LOGIN.largura, altura: FUNDO_DO_LOGIN.altura },
@@ -450,6 +447,26 @@ test.describe("AC-001 — 390×844: raquete e bolas fora dos campos e do botão"
     });
     // ...e nenhum dos pontos está debaixo de campo, botão ou link.
     for (const p of pontos) expect(p.controle, JSON.stringify(p)).toBe(false);
+
+    // Terceira pergunta, de PIXEL: sombra, contorno e pseudo-elemento pintam
+    // fora de qualquer caixa. Em volta de cada ponto (5×5 px), a tela tem de ser
+    // a mesma com o bloco do formulário visível e escondido (ele mesmo, os
+    // filhos e os pseudo-elementos) — só o véu decorativo fica, porque ele é
+    // parte da composição aprovada.
+    const recortes = async () =>
+      Promise.all(
+        pontos.map((p) =>
+          page.screenshot({ clip: { x: Math.round(p.x) - 2, y: Math.round(p.y) - 2, width: 5, height: 5 } }),
+        ),
+      );
+    const com = await recortes();
+    await page.addStyleTag({
+      content:
+        "[data-bloco-do-formulario] { visibility: hidden !important; } [data-veu-do-formulario] { visibility: visible !important; }",
+    });
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    const sem = await recortes();
+    com.forEach((b, i) => expect(b.equals(sem[i]), `algo do formulário pinta sobre ${JSON.stringify(pontos[i])}`).toBe(true));
   });
 });
 
@@ -515,6 +532,42 @@ for (const [nome, viewport] of Object.entries(VIEWPORTS)) {
       // O translate de < 360 px sobe o selo para perto da marca: ele não pode
       // passar por cima dela.
       expect(m.topoDoSelo, JSON.stringify(m)).toBeGreaterThanOrEqual(m.fimDaMarca);
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// SPEC-088 (IMP-088-R3-02) — a marca não tem véu, nem emprestado
+// ---------------------------------------------------------------------------
+
+/**
+ * O `DESIGN.md` diz "a marca não tem véu" (I10 da 084). Com o selo subindo
+ * abaixo de 360 px, o véu DELE passou a ser pintado sobre a parte de baixo do
+ * "PlayCK" a 200% — as caixas dos textos não se tocavam, a camada pintada sim.
+ * A prova é de pixel: a captura da marca tem de ser IGUAL com e sem todos os
+ * véus (`::before`) da página. Qualquer véu que alcance a marca muda bytes.
+ */
+const CASOS_DA_MARCA: { nome: string; viewport: { width: number; height: number }; fonte: 100 | 200 }[] = [
+  ...Object.entries(VIEWPORTS).map(([nome, viewport]) => ({ nome, viewport, fonte: 100 as const })),
+  { nome: "320x568", viewport: VIEWPORTS["320x568"], fonte: 200 },
+  { nome: "390x844", viewport: VIEWPORTS["390x844"], fonte: 200 },
+];
+
+for (const caso of CASOS_DA_MARCA) {
+  test.describe(`IMP-088-R3-02 — a marca sem véu, ${caso.nome}, fonte ${caso.fonte}%`, () => {
+    test.use({ viewport: caso.viewport, deviceScaleFactor: 1 });
+
+    test("a marca sai igual, pixel a pixel, com e sem os véus da página", async ({ page }) => {
+      await page.goto("/login");
+      if (caso.fonte === 200) await page.addStyleTag({ content: "html { font-size: 200% !important; }" });
+      await esperarPintura(page);
+      await page.evaluate(() => window.scrollTo(0, 0));
+      const marca = page.locator("p", { hasText: /^PlayCK$/ });
+      const com = await marca.screenshot({ animations: "disabled" });
+      await page.addStyleTag({ content: "*::before { background: none !important; }" });
+      await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+      const sem = await marca.screenshot({ animations: "disabled" });
+      expect(com.equals(sem), "um véu alcança a marca").toBe(true);
     });
   });
 }
