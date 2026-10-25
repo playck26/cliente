@@ -3,14 +3,16 @@
 import { useEffect, useState } from "react";
 import { Check, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { apareceParaMim } from "@/lib/filtro-de-nivel";
+import {
+  apareceParaMim,
+  carregarNivelQueFiltra,
+} from "@/lib/filtro-de-nivel";
 import {
   ApiError,
   entrarNaFilaDeTurma,
   entrarNaTurma,
   listarMinhaFila,
   sairDaFila,
-  getMeuCadastro,
   listTurmasDisponiveis,
   sairDaTurma,
   type TurmaDisponivel,
@@ -115,8 +117,9 @@ export function TurmasDoClube() {
       .finally(() => setCarregando(false));
 
   useEffect(() => {
-    void getMeuCadastro()
-      .then((cadastro) => setMeuNivelId(cadastro.nivelId))
+    // SPEC-089 — o nível do aluno, ou nenhum se o clube não restringe.
+    void carregarNivelQueFiltra()
+      .then(setMeuNivelId)
       .catch(() => undefined);
     void carregar();
     // `carregar` fora das dependencias de proposito: ela e recriada a cada

@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import { acaoDaOportunidade } from "@/lib/acao-da-oportunidade";
-import { apareceParaMim } from "@/lib/filtro-de-nivel";
 import {
-  getMeuCadastro,
+  apareceParaMim,
+  carregarNivelQueFiltra,
+} from "@/lib/filtro-de-nivel";
+import {
   ApiError,
   desmarcarReposicao,
   entrarNaFilaDeAula,
@@ -240,8 +242,9 @@ export function MinhasReposicoes() {
     // Falha tolerada, como na lista de turmas: sem o nível a tela mostra
     // TUDO. Errar mostrando demais é recuperável; esconder uma vaga de um
     // crédito pago não é.
-    void getMeuCadastro()
-      .then((cadastro) => setMeuNivelId(cadastro.nivelId))
+    // SPEC-089 — o nível do aluno, ou nenhum se o clube não restringe.
+    void carregarNivelQueFiltra()
+      .then(setMeuNivelId)
       .catch(() => undefined);
     let ativo = true;
     getMeuCreditoDeReposicao()

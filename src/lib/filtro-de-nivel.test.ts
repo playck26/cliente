@@ -3,6 +3,7 @@ import {
   apareceParaMim,
   escondidosPeloFiltro,
   filtroFazSentido,
+  nivelQueFiltra,
 } from "./filtro-de-nivel";
 
 /**
@@ -86,5 +87,26 @@ describe("escondidosPeloFiltro — para o vazio dizer a verdade", () => {
 
   it("aluno sem nível: não esconde nada", () => {
     expect(escondidosPeloFiltro([daA, daB], null, false)).toBe(0);
+  });
+});
+
+describe("SPEC-089 — nivelQueFiltra: a chave do clube", () => {
+  it("`false`: nenhum nível filtra (o aluno vê tudo)", () => {
+    expect(nivelQueFiltra("a", { nivelRestringeAcesso: false })).toBeNull();
+  });
+
+  it("`true`: o nível do aluno", () => {
+    expect(nivelQueFiltra("a", { nivelRestringeAcesso: true })).toBe("a");
+  });
+
+  it("campo ausente, empresa nula ou indefinida: o nível do aluno (a regra de hoje)", () => {
+    expect(nivelQueFiltra("a", {})).toBe("a");
+    expect(nivelQueFiltra("a", null)).toBe("a");
+    expect(nivelQueFiltra("a", undefined)).toBe("a");
+  });
+
+  it("aluno sem nível continua sem nível, com a chave em qualquer valor", () => {
+    expect(nivelQueFiltra(null, { nivelRestringeAcesso: true })).toBeNull();
+    expect(nivelQueFiltra(null, { nivelRestringeAcesso: false })).toBeNull();
   });
 });

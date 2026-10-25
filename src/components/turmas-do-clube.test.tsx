@@ -13,6 +13,7 @@ import { ApiError } from "@/lib/api-client";
 
 const listTurmasDisponiveis = vi.hoisted(() => vi.fn());
 const getMeuCadastro = vi.hoisted(() => vi.fn());
+const getMinhaEmpresa = vi.hoisted(() => vi.fn());
 const entrarNaTurma = vi.hoisted(() => vi.fn());
 const sairDaTurma = vi.hoisted(() => vi.fn());
 const listarMinhaFila = vi.hoisted(() => vi.fn());
@@ -28,6 +29,7 @@ vi.mock("@/lib/api-client", async () => {
     ...real,
     listTurmasDisponiveis,
     getMeuCadastro,
+    getMinhaEmpresa,
     entrarNaTurma,
     sairDaTurma,
     listarMinhaFila,
@@ -83,6 +85,8 @@ beforeEach(() => {
   // 2026-09-24 (12 alunos ativos, 9 COM nível — 75%). Ver a supersessão na
   // SPEC-072.
   getMeuCadastro.mockResolvedValue({ nivelId: null });
+  // SPEC-089 — o clube restringe por nível, como todo clube hoje.
+  getMinhaEmpresa.mockResolvedValue({ nivelRestringeAcesso: true });
   entrarNaTurma.mockResolvedValue(undefined);
   sairDaTurma.mockResolvedValue(undefined);
   // SPEC-064/TASK-005 — sem fila por padrão: as provas antigas continuam
@@ -438,6 +442,33 @@ describe("SPEC-072/TASK-002 — o recorte por nível, agora SEM escape", () => {
     expect(await screen.findByText("Do meu nível")).toBeInTheDocument();
     expect(screen.queryByText("De outro nível")).toBeNull();
   });
+
+  it.each([
+    ["false", { nivelRestringeAcesso: false }, true],
+    ["true", { nivelRestringeAcesso: true }, false],
+    ["ausente (back anterior à 089)", {}, false],
+  ])(
+    "SPEC-089/AC-011 e AC-012 — chave %s: a turma de outro nível aparece só com a chave false",
+    async (_rotulo, empresa, aparece) => {
+      getMinhaEmpresa.mockResolvedValue(empresa);
+      listTurmasDisponiveis.mockResolvedValue([
+        turma({ id: "t1", nome: "Do meu nível", nivelId: A, nivelNome: "A" }),
+        turma({ id: "t2", nome: "De outro nível", nivelId: B, nivelNome: "B" }),
+      ]);
+
+      render(<TurmasDoClube />);
+
+      expect(await screen.findByText("Do meu nível")).toBeInTheDocument();
+      await waitFor(() =>
+        expect(getMinhaEmpresa).toHaveBeenCalled(),
+      );
+      if (aparece) {
+        expect(await screen.findByText("De outro nível")).toBeInTheDocument();
+      } else {
+        expect(screen.queryByText("De outro nível")).toBeNull();
+      }
+    },
+  );
 
   it("e o nível da turma aparece no cartão", async () => {
     listTurmasDisponiveis.mockResolvedValue([

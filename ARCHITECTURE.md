@@ -1,6 +1,16 @@
 # ARCHITECTURE — `cliente` (PlayCK)
 
-**Fonte: análise direta do código.** Data: **2026-10-08** (era 2026-10-04).
+**Fonte: análise direta do código.** Data: **2026-10-25** (era 2026-10-08).
+**SPEC-089, na branch `spec089/nivel-opcional` (sobre o `main` `2125dc5`):**
+**81** arquivos de teste, **971** casos, todos verdes (`vitest run
+--pool=threads`, em série, nenhum worker perdido); navegador **130** casos
+verdes. Nenhum arquivo novo: `filtro-de-nivel.ts` ganhou `nivelQueFiltra`
+(pura) e `carregarNivelQueFiltra` (o carregamento que as três telas do
+recorte por nível — turmas do clube, remarcar, minhas reposições — passaram a
+chamar no lugar do `getMeuCadastro` direto). Com `nivelRestringeAcesso:
+false` em `GET /me/company`, o nível que filtra é `null` e a tela mostra tudo;
+**campo ausente conta como `true`**, para o Cliente não abrir o que um back
+anterior ainda recusa. +13 casos (9 nas telas, 4 da função pura).
 **SPEC-086, na branch `spec-086/escolha-de-empresa` (sobre o `main` `bfd4b54`):**
 **81** arquivos de teste, **956** casos, **todos verdes** (`vitest run
 --pool=threads`, em série: 74 arquivos / 776 casos na suíte, e os 7 cujo worker
@@ -359,7 +369,7 @@ deploy*.
 | `comprimir-imagem.ts` idêntico entre `admin` e `cliente` | **não existe gate** — poly-repo sem pacote compartilhado (ADR-001). Custo declarado, ver a seção da compressão |
 | **Alegação VISUAL se prova em navegador, nunca em jsdom** (SPEC-072/D2). Campo presente no texto não é campo visível na tela: `overflow:hidden` num ancestral, conteúdo atrás do botão, largura insuficiente e rolagem horizontal deixam a asserção de texto verde com a queixa de pé | `pnpm run test:navegador` (job `navegador`). O detector do corte é geométrico e exato — elemento cortado por `text-overflow` tem `scrollWidth` **maior** que `clientWidth`. **O job não é obrigatório no ruleset**, e `src/lib/prova-visual.test.ts` guarda a existência dele |
 | **Aula e crédito de reposição se casam por `ocupacaoId`, nunca por texto de exibição** (SPEC-072/INV-072c). `turmaNome + data + horaInicio` funciona no teste e casa o crédito errado em produção: o schema não torna o nome da turma único | `credito-utilizavel.test.ts` — o caso das duas faltas indistinguíveis por texto, e a asserção **nomeia** o `faltaId`. Sabotagem: casar pela primeira falta derruba 3 casos |
-| **Filtro de nível é EXIBIÇÃO, e o servidor não recusa** (SPEC-072/INV-072a). Nível nunca foi autoridade | **duas metades em duas camadas:** no Cliente, `turmas-do-clube.test.tsx`; no **Back**, `test/fit/spec-072-credito-e-nivel.fit-spec.ts`, com `POST` real. A metade do Cliente usa o serviço mockado e **não diria nada** sobre o servidor |
+| **Filtro de nível é EXIBIÇÃO, e o servidor não recusa** (SPEC-072/INV-072a). Nível nunca foi autoridade. *Superado em parte: desde a SPEC-075 o servidor recusa, e desde a SPEC-089 o clube escolhe (`nivelRestringeAcesso`); o recorte da tela segue a mesma chave, por `carregarNivelQueFiltra`* | **duas metades em duas camadas:** no Cliente, `turmas-do-clube.test.tsx`; no **Back**, `test/fit/spec-072-credito-e-nivel.fit-spec.ts`, com `POST` real. A metade do Cliente usa o serviço mockado e **não diria nada** sobre o servidor |
 | **Recusa do servidor nunca vira silêncio na tela** (SPEC-072/INV-072f), e o mecanismo é por **CLASSE**: uma lista de códigos conhecidos não alcança resposta sem `code`, sem corpo, com código novo, nem o que o back acrescentar depois | `my-classes-list.test.tsx`. Sabotagem que prova o desenho: trocar a classe por uma lista dos cinco códigos nomeados deixa **os cinco verdes** e derruba **só** o genérico |
 
 ## 9. Compressão de imagem no navegador (SPEC-018/TASK-002)
