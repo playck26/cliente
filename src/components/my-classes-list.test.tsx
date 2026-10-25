@@ -38,6 +38,7 @@ const marcarReposicao = vi.hoisted(() => vi.fn());
 // proposito**: sem isto os reais rodavam, falhavam no jsdom e caiam no
 // `catch`, e as provas passavam por acidente de rede.
 const getMeuCadastro = vi.hoisted(() => vi.fn());
+const getMinhaEmpresa = vi.hoisted(() => vi.fn());
 const listarMinhaFila = vi.hoisted(() => vi.fn());
 const entrarNaFilaDeAula = vi.hoisted(() => vi.fn());
 const sairDaFila = vi.hoisted(() => vi.fn());
@@ -63,6 +64,7 @@ vi.mock("@/lib/api-client", async () => {
     listarOportunidadesDeReposicao,
     marcarReposicao,
     getMeuCadastro,
+    getMinhaEmpresa,
     listarMinhaFila,
     entrarNaFilaDeAula,
     sairDaFila,
@@ -107,6 +109,8 @@ beforeEach(() => {
   // Sem nivel por padrao: nulo nunca esconde nada (D15/INV-141), entao as
   // provas antigas continuam medindo exatamente o que mediam.
   getMeuCadastro.mockReset().mockResolvedValue({ nivelId: null });
+  // SPEC-089 — o clube restringe por nível, como todo clube hoje.
+  getMinhaEmpresa.mockReset().mockResolvedValue({ nivelRestringeAcesso: true });
   listarMinhaFila.mockReset().mockResolvedValue([]);
   entrarNaFilaDeAula.mockReset().mockResolvedValue(undefined);
   sairDaFila.mockReset().mockResolvedValue(undefined);
@@ -910,6 +914,40 @@ describe("o painel de remarcar RECORTA por nível (o defeito de 3248b94)", () =>
     expect(await screen.findByText("Do Meu Nivel")).toBeInTheDocument();
     expect(screen.queryByText("De Outro Nivel")).toBeNull();
   });
+
+  it.each([
+    ["false", { nivelRestringeAcesso: false }, true],
+    ["true", { nivelRestringeAcesso: true }, false],
+    ["ausente (back anterior à 089)", {}, false],
+  ])(
+    "SPEC-089/AC-011 e AC-012 — chave %s: a oportunidade de outro nível aparece só com a chave false",
+    async (_rotulo, empresa, aparece) => {
+      getMinhaEmpresa.mockResolvedValue(empresa);
+      listarOportunidadesDeReposicao.mockResolvedValue([
+        oportunidade({
+          ocupacaoId: "do-meu",
+          turmaNome: "Do Meu Nivel",
+          nivelId: "nivel-a",
+        }),
+        oportunidade({
+          ocupacaoId: "de-outro",
+          turmaNome: "De Outro Nivel",
+          nivelId: "nivel-b",
+        }),
+      ]);
+
+      render(<MyClassesList />);
+      await waitFor(() => expect(getMinhaEmpresa).toHaveBeenCalled());
+      fireEvent.click(await screen.findByRole("button", { name: "Remarcar" }));
+
+      expect(await screen.findByText("Do Meu Nivel")).toBeInTheDocument();
+      if (aparece) {
+        expect(await screen.findByText("De Outro Nivel")).toBeInTheDocument();
+      } else {
+        expect(screen.queryByText("De Outro Nivel")).toBeNull();
+      }
+    },
+  );
 
   it("turma SEM nível continua aparecendo para quem tem nível (INV-141)", async () => {
     listarOportunidadesDeReposicao.mockResolvedValue([

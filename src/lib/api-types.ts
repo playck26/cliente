@@ -2868,6 +2868,7 @@ export interface components {
             permiteAutoCadastro: boolean;
             /** @example 2 */
             limiteTurmasPorAluno: number | null;
+            nivelRestringeAcesso: boolean;
             logoUrl: string | null;
         };
         UpdateMinhaEmpresaDto: {

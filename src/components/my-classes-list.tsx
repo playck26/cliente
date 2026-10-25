@@ -13,7 +13,6 @@ import {
   ApiError,
   avisarFalta,
   entrarNaFilaDeAula,
-  getMeuCadastro,
   getMeuCreditoDeReposicao,
   listarMinhaFila,
   listarOportunidadesDeReposicao,
@@ -28,7 +27,10 @@ import {
 } from "@/lib/api-client";
 import { acaoDaOportunidade } from "@/lib/acao-da-oportunidade";
 import { creditoUtilizavel, EXPLICACAO } from "@/lib/credito-utilizavel";
-import { apareceParaMim } from "@/lib/filtro-de-nivel";
+import {
+  apareceParaMim,
+  carregarNivelQueFiltra,
+} from "@/lib/filtro-de-nivel";
 
 const DIAS_SEMANA = [
   "Domingo",
@@ -245,8 +247,9 @@ export function MyClassesList() {
   }, [carregarCredito]);
 
   useEffect(() => {
-    void getMeuCadastro()
-      .then((cadastro) => setMeuNivelId(cadastro.nivelId))
+    // SPEC-089 — o nível do aluno, ou nenhum se o clube não restringe.
+    void carregarNivelQueFiltra()
+      .then(setMeuNivelId)
       .catch(() => undefined);
   }, []);
 

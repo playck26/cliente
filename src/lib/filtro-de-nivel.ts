@@ -24,6 +24,7 @@
  * Por isso o predicado tem três escapes antes de comparar, e a ordem deles é
  * a própria regra.
  */
+import { getMeuCadastro, getMinhaEmpresa } from "./api-client";
 
 /** O que o filtro precisa saber de uma turma — nada além disto. */
 export type ComNivel = { nivelId: string | null };
@@ -77,4 +78,39 @@ export function escondidosPeloFiltro(
 ): number {
   return itens.filter((item) => !apareceParaMim(item, meuNivelId, verTodas))
     .length;
+}
+
+/**
+ * SPEC-089 — **o nível que filtra**: o do aluno, a não ser que o clube tenha
+ * desligado a restrição por nível (`nivelRestringeAcesso: false`). Aí é
+ * `null`, que é o primeiro escape do `apareceParaMim`: a tela mostra tudo,
+ * como o servidor também deixa entrar em tudo.
+ *
+ * **Campo ausente conta como `true`** (a regra de hoje): um back anterior à
+ * 089 não manda o campo, e o Cliente não pode abrir o que ele ainda recusa.
+ */
+export function nivelQueFiltra(
+  nivelIdDoAluno: string | null,
+  empresa: { nivelRestringeAcesso?: boolean } | null | undefined,
+): string | null {
+  if (empresa?.nivelRestringeAcesso === false) return null;
+  return nivelIdDoAluno;
+}
+
+/**
+ * SPEC-089 — **o carregamento das três telas, num lugar só.** O cadastro dá o
+ * nível; a empresa (cacheada em módulo, `getMinhaEmpresa`) dá a chave.
+ *
+ * Falha da empresa conta como "restringe": é o comportamento de hoje, e não
+ * abre nada que o servidor recuse. Falha do cadastro continua rejeitando, e
+ * cada tela trata como já tratava (mostra tudo).
+ */
+export async function carregarNivelQueFiltra(): Promise<string | null> {
+  const [cadastro, empresa] = await Promise.all([
+    getMeuCadastro(),
+    Promise.resolve()
+      .then(() => getMinhaEmpresa())
+      .catch(() => null),
+  ]);
+  return nivelQueFiltra(cadastro.nivelId, empresa);
 }

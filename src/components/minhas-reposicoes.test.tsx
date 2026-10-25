@@ -16,6 +16,7 @@ import { MinhasReposicoes } from "./minhas-reposicoes";
  */
 const getMeuCreditoDeReposicao = vi.hoisted(() => vi.fn());
 const getMeuCadastro = vi.hoisted(() => vi.fn());
+const getMinhaEmpresa = vi.hoisted(() => vi.fn());
 const listarOportunidadesDeReposicao = vi.hoisted(() => vi.fn());
 const marcarReposicao = vi.hoisted(() => vi.fn());
 const desmarcarReposicao = vi.hoisted(() => vi.fn());
@@ -35,6 +36,7 @@ vi.mock("@/lib/api-client", async () => {
     ...real,
     getMeuCreditoDeReposicao,
     getMeuCadastro,
+    getMinhaEmpresa,
     listarOportunidadesDeReposicao,
     marcarReposicao,
     desmarcarReposicao,
@@ -87,6 +89,8 @@ beforeEach(() => {
   // SEM nível: nele o recorte não esconde nada, e as provas antigas
   // continuam medindo exatamente o que mediam.
   getMeuCadastro.mockResolvedValue({ nivelId: null });
+  // SPEC-089 — o clube restringe por nível, como todo clube hoje.
+  getMinhaEmpresa.mockResolvedValue({ nivelRestringeAcesso: true });
   getMeuCreditoDeReposicao.mockResolvedValue(credito());
   listarOportunidadesDeReposicao.mockResolvedValue([oportunidade]);
   listarMinhaFila.mockResolvedValue([]);
@@ -281,6 +285,34 @@ describe("SPEC-072/TASK-002 — nível nas oportunidades, SEM escape", () => {
    * reposição). A frase não inventa compensação; diz o que continua valendo,
    * que é o crédito.
    */
+  it.each([
+    ["false", { nivelRestringeAcesso: false }, true],
+    ["true", { nivelRestringeAcesso: true }, false],
+    ["ausente (back anterior à 089)", {}, false],
+  ])(
+    "SPEC-089/AC-011 e AC-012 — chave %s: a vaga de outro nível aparece só com a chave false",
+    async (_rotulo, empresa, aparece) => {
+      getMinhaEmpresa.mockResolvedValue(empresa);
+      listarOportunidadesDeReposicao.mockResolvedValue([
+        { ...oportunidade, nivelId: B, nivelNome: "Avançado" },
+      ]);
+
+      await abrirEscolha();
+      await waitFor(() => expect(getMinhaEmpresa).toHaveBeenCalled());
+
+      if (aparece) {
+        expect(
+          await screen.findByText(oportunidade.turmaNome),
+        ).toBeInTheDocument();
+        expect(screen.queryByText(/Nenhum horário do seu nível/)).toBeNull();
+      } else {
+        expect(
+          await screen.findByText(/Nenhum horário do seu nível/),
+        ).toBeInTheDocument();
+      }
+    },
+  );
+
   it("a única vaga é de OUTRO nível: a tela diz isso, e não `sem vaga`", async () => {
     listarOportunidadesDeReposicao.mockResolvedValue([
       { ...oportunidade, nivelId: B, nivelNome: "Avançado" },
