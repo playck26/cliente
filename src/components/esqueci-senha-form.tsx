@@ -17,13 +17,30 @@ export const TEXTO_DO_PEDIDO_ENVIADO =
   "Se houver conta com este e-mail, enviamos um link para redefinir a senha. Ele vale por 1 hora. Confira também o spam.";
 
 /**
+ * SPEC-090 (I9, 2026-10-26) — **o `429` com texto fixo, em português.**
+ *
+ * A mensagem do servidor não serve: vem do `@nestjs/throttler`, em inglês. O
+ * Israel decidiu um texto só para o limite estourado nas três chamadas da
+ * redefinição — o pedido (`POST /auth/esqueci-senha`), a abertura do link
+ * (`GET /public/redefinicao/:token`) e o envio da senha nova
+ * (`POST /public/redefinicao`). Os outros estados não mudam.
+ */
+export const TEXTO_DE_MUITAS_TENTATIVAS =
+  "Muitas tentativas seguidas. Espere alguns minutos e tente de novo.";
+
+/** I9 — o limite estourado, em qualquer das três chamadas. */
+export function ehMuitasTentativas(erro: unknown): boolean {
+  return erro instanceof ApiError && erro.status === 429;
+}
+
+/**
  * SPEC-090 — **a página de pedir o link para redefinir a senha.**
  *
  * Um campo de e-mail. Ao enviar:
  *
  * - `202` → a frase de `TEXTO_DO_PEDIDO_ENVIADO`, para qualquer e-mail. O
  *   formulário sai: mandar de novo o mesmo pedido só gastaria o limite;
- * - `429` → a mensagem do servidor, e o formulário fica;
+ * - `429` → `TEXTO_DE_MUITAS_TENTATIVAS` (I9), e o formulário fica;
  * - `400` (e-mail malformado) → pede para conferir o e-mail;
  * - falha de rede ou `5xx` → pede para tentar de novo. Não diz que enviou:
  *   o pedido pode nem ter chegado.
@@ -63,8 +80,8 @@ export function EsqueciSenhaForm() {
       await pedirRedefinicaoDeSenha({ email: digitado });
       setEnviado(true);
     } catch (e) {
-      if (e instanceof ApiError && e.status === 429) {
-        setErro(e.message);
+      if (ehMuitasTentativas(e)) {
+        setErro(TEXTO_DE_MUITAS_TENTATIVAS);
       } else if (e instanceof ApiError && e.status === 400) {
         setErro("Confira o e-mail digitado.");
       } else {

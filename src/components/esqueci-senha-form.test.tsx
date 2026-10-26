@@ -1,14 +1,18 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import EsqueciSenhaPage from "@/app/esqueci-senha/page";
-import { EsqueciSenhaForm, TEXTO_DO_PEDIDO_ENVIADO } from "./esqueci-senha-form";
+import {
+  EsqueciSenhaForm,
+  TEXTO_DE_MUITAS_TENTATIVAS,
+  TEXTO_DO_PEDIDO_ENVIADO,
+} from "./esqueci-senha-form";
 
 /**
  * SPEC-090 (AC-023, D1, D9) — **a página de pedir o link.**
  *
  * O servidor de mentira registra cada pedido. O que se prova: o `202` mostra a
  * MESMA frase para qualquer e-mail (o servidor não diz se há conta, e a tela
- * não inventa diferença); o `429` mostra a mensagem do servidor e deixa o
+ * não inventa diferença); o `429` mostra o texto fixo da I9 e deixa o
  * formulário; e "Voltar ao login" existe nos dois estados.
  */
 
@@ -67,13 +71,20 @@ describe("AC-023 — /esqueci-senha: a mesma frase para qualquer e-mail", () => 
     },
   );
 
-  it("429: a mensagem do servidor, e o formulário fica para tentar depois", async () => {
-    const MENSAGEM = "Muitas tentativas. Espere alguns minutos.";
-    servidor(() => Response.json({ statusCode: 429, message: MENSAGEM }, { status: 429 }));
+  it("SPEC-090/I9: o texto fixo do 429 é o que o Israel decidiu", () => {
+    expect(TEXTO_DE_MUITAS_TENTATIVAS).toBe("Muitas tentativas seguidas. Espere alguns minutos e tente de novo.");
+  });
+
+  it("SPEC-090/I9 — 429: o texto fixo, e NÃO a mensagem do servidor; o formulário fica", async () => {
+    // A mensagem que o `@nestjs/throttler` manda de verdade, em inglês.
+    const DO_SERVIDOR = "ThrottlerException: Too Many Requests";
+    servidor(() => Response.json({ statusCode: 429, message: DO_SERVIDOR }, { status: 429 }));
     render(<EsqueciSenhaForm />);
     pedir("aluno@clube.com");
 
-    expect(await screen.findByRole("alert")).toHaveTextContent(MENSAGEM);
+    const alerta = await screen.findByRole("alert");
+    expect(alerta.textContent).toBe(TEXTO_DE_MUITAS_TENTATIVAS);
+    expect(screen.queryByText(DO_SERVIDOR)).toBeNull();
     // A região existe desde a montagem (REV-090-F03), e continua vazia.
     expect(screen.getAllByRole("status")).toHaveLength(1);
     expect(screen.getByRole("status")).toBeEmptyDOMElement();

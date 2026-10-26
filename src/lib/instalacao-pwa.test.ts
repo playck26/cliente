@@ -317,8 +317,8 @@ describe("assinarInstalacao — o subscribe do store", () => {
 });
 
 describe("conviteCabeNaRota — SPEC-084 (I1): o login fica sem convite", () => {
-  it("a lista é só o login", () => {
-    expect(ROTAS_SEM_CONVITE).toEqual(["/login"]);
+  it("a lista exata: o login (SPEC-084/I1) e /esqueci-senha (SPEC-090/I10)", () => {
+    expect(ROTAS_SEM_CONVITE).toEqual(["/login", "/esqueci-senha"]);
   });
 
   it.each([
@@ -347,9 +347,8 @@ describe("conviteCabeNaRota — SPEC-083 (I17, AC-055): a tela do link fica sem 
     "%C3%A9",
   ];
 
-  it("a lista de prefixos é só a do link, e a lista exata da SPEC-084 não mudou", () => {
-    expect(PREFIXOS_SEM_CONVITE).toEqual(["/ativar/"]);
-    expect(ROTAS_SEM_CONVITE).toEqual(["/login"]);
+  it("a lista de prefixos: a do link de ativação e a da redefinição (SPEC-090/I10)", () => {
+    expect(PREFIXOS_SEM_CONVITE).toEqual(["/ativar/", "/redefinir-senha/"]);
   });
 
   it.each(tokens)("/ativar/%s → sem convite", (token) => {
@@ -367,6 +366,38 @@ describe("conviteCabeNaRota — SPEC-083 (I17, AC-055): a tela do link fica sem 
     ["/x/ativar/abc", true],
     [null, true],
   ])("%s → convite cabe? %s", (caminho, esperado) => {
+    expect(conviteCabeNaRota(caminho)).toBe(esperado);
+  });
+});
+
+describe("conviteCabeNaRota — SPEC-090/I10: as telas de redefinir a senha ficam sem convite", () => {
+  /** O de 43 em pedaços, pela mesma razão do bloco acima (INV-062b). */
+  const tokens = [
+    ["AbCdEfGhIjKlMnOpQrStUvWxYz", "0123456789", "-_AbCdE"].join(""),
+    "x",
+    "-_-_",
+    "%C3%A9",
+  ];
+
+  it("SPEC-090/I10 — /esqueci-senha (a página exata) → sem convite", () => {
+    expect(conviteCabeNaRota("/esqueci-senha")).toBe(false);
+  });
+
+  it.each(tokens)("SPEC-090/I10 — /redefinir-senha/%s → sem convite", (token) => {
+    expect(conviteCabeNaRota(`/redefinir-senha/${token}`)).toBe(false);
+  });
+
+  it.each([
+    // Vizinhas que só começam com as mesmas letras continuam com o convite.
+    ["/esqueci-senha-x", true],
+    ["/esqueci-senhas", true],
+    ["/redefinir-senha", true],
+    ["/redefinir-senhax/abc", true],
+    ["/x/redefinir-senha/abc", true],
+    // As decisões anteriores não mudaram.
+    ["/login", false],
+    ["/home", true],
+  ])("SPEC-090/I10 — %s → convite cabe? %s", (caminho, esperado) => {
     expect(conviteCabeNaRota(caminho)).toBe(esperado);
   });
 });

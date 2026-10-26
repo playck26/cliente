@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ContaDaRedefinicao } from "@/lib/api-client";
 import { metadata } from "@/app/redefinir-senha/[token]/page";
+import { TEXTO_DE_MUITAS_TENTATIVAS } from "./esqueci-senha-form";
 import { RedefinirSenhaForm, TEXTO_LINK_DE_REDEFINICAO_INVALIDO } from "./redefinir-senha-form";
 
 /**
@@ -330,5 +331,52 @@ describe("AC-023 — 410: link inválido, com “Pedir outro link”", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
     expect(await screen.findByLabelText("Senha nova")).toBeInTheDocument();
+  });
+});
+
+/**
+ * SPEC-090/I9 (2026-10-26) — **o `429` com o texto fixo, nas duas chamadas da
+ * página.** A mensagem do servidor é a do `@nestjs/throttler`, em inglês, e não
+ * pode aparecer.
+ */
+describe("SPEC-090/I9 — 429 na página do token: o texto fixo, nunca a mensagem do servidor", () => {
+  const DO_SERVIDOR = "ThrottlerException: Too Many Requests";
+  const muitas = () => Response.json({ statusCode: 429, message: DO_SERVIDOR }, { status: 429 });
+
+  it("SPEC-090/I9 — 429 no GET: o texto fixo, sem dizer que o link morreu, e 'Tentar de novo' busca outra vez", async () => {
+    let primeira = true;
+    servidor({
+      get: () => {
+        if (primeira) {
+          primeira = false;
+          return muitas();
+        }
+        return contas(CONTA_A)();
+      },
+    });
+    render(<RedefinirSenhaForm token={TOKEN} />);
+
+    const alerta = await screen.findByRole("alert");
+    expect(alerta.textContent).toBe(TEXTO_DE_MUITAS_TENTATIVAS);
+    expect(screen.queryByText(DO_SERVIDOR)).toBeNull();
+    expect(screen.queryByRole("link", { name: "Pedir outro link" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Tentar de novo" }));
+    expect(await screen.findByLabelText("Senha nova")).toBeInTheDocument();
+  });
+
+  it("SPEC-090/I9 — 429 no POST: o texto fixo, e o formulário fica", async () => {
+    servidor({ get: contas(CONTA_A), post: muitas });
+    render(<RedefinirSenhaForm token={TOKEN} />);
+    await screen.findByLabelText("Senha nova");
+
+    preencher("senha-nova-1", "senha-nova-1");
+    fireEvent.click(screen.getByRole("button", { name: "Redefinir minha senha" }));
+
+    const alerta = await screen.findByRole("alert");
+    expect(alerta.textContent).toBe(TEXTO_DE_MUITAS_TENTATIVAS);
+    expect(screen.queryByText(DO_SERVIDOR)).toBeNull();
+    expect(screen.getByRole("button", { name: "Redefinir minha senha" })).toBeEnabled();
+    expect(replace).not.toHaveBeenCalled();
   });
 });

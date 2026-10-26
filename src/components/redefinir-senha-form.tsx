@@ -7,6 +7,7 @@ import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CampoSenha } from "@/components/campo-senha";
 import { EscolhaDeConta, nomeDoPapel } from "@/components/escolha-de-conta";
+import { ehMuitasTentativas, TEXTO_DE_MUITAS_TENTATIVAS } from "@/components/esqueci-senha-form";
 import { LogoDaEmpresa } from "@/components/logo-da-empresa";
 import {
   ApiError,
@@ -38,7 +39,8 @@ type Tela =
       escolhida?: boolean;
     }
   | { fase: "link-invalido" }
-  | { fase: "falha-ao-abrir" };
+  /** `muitasTentativas`: o `GET` voltou `429` (I9), e a tela diz isso, não "falhou". */
+  | { fase: "falha-ao-abrir"; muitasTentativas: boolean };
 
 function ehLinkInvalido(erro: unknown): boolean {
   return erro instanceof ApiError && erro.status === 410;
@@ -111,7 +113,11 @@ export function RedefinirSenhaForm({ token }: { token: string }) {
         // Só o `410` é link morto. Falha de rede ou `5xx` não diz nada sobre
         // o link, e mandar a pessoa pedir outro por causa disso a faria
         // esperar outro e-mail à toa.
-        setTela({ fase: ehLinkInvalido(e) ? "link-invalido" : "falha-ao-abrir" });
+        setTela(
+          ehLinkInvalido(e)
+            ? { fase: "link-invalido" }
+            : { fase: "falha-ao-abrir", muitasTentativas: ehMuitasTentativas(e) },
+        );
       });
     return () => {
       valendo = false;
@@ -150,10 +156,13 @@ export function RedefinirSenhaForm({ token }: { token: string }) {
         // responderia `410` de novo.
         setTela({ fase: "link-invalido" });
       } else {
+        // I9: o `429` vem do throttler em inglês; a tela diz o texto fixo.
         setErro(
-          e instanceof ApiError
-            ? e.message
-            : "Não foi possível redefinir sua senha. Tente de novo.",
+          ehMuitasTentativas(e)
+            ? TEXTO_DE_MUITAS_TENTATIVAS
+            : e instanceof ApiError
+              ? e.message
+              : "Não foi possível redefinir sua senha. Tente de novo.",
         );
       }
       setEnviando(false);
@@ -189,7 +198,9 @@ export function RedefinirSenhaForm({ token }: { token: string }) {
     return (
       <div className="flex flex-col gap-4 text-center">
         <p role="alert" className="text-sm text-[var(--color-error)]">
-          Não foi possível abrir o link. Tente de novo.
+          {tela.muitasTentativas
+            ? TEXTO_DE_MUITAS_TENTATIVAS
+            : "Não foi possível abrir o link. Tente de novo."}
         </p>
         <Button
           type="button"
