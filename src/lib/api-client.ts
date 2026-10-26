@@ -1451,6 +1451,70 @@ export async function ativarConta(dto: AtivarConta): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// SPEC-090 — esqueci minha senha
+// ---------------------------------------------------------------------------
+
+/**
+ * `POST /auth/esqueci-senha` → `202` sem corpo, **com conta ou sem** (D1): o
+ * servidor responde antes de olhar o banco, e a tela mostra sempre a mesma
+ * frase. Erro só existe para e-mail malformado (`400`) e para o limite por IP
+ * (`429`, com a mensagem do servidor).
+ */
+export async function pedirRedefinicaoDeSenha(
+  dto: components["schemas"]["EsqueciSenhaDto"],
+): Promise<void> {
+  const res = await fetch(`${API_URL}/api/v1/auth/esqueci-senha`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dto),
+  });
+  if (!res.ok) {
+    throw await parseError(res, "Não foi possível pedir o link.");
+  }
+}
+
+/**
+ * O que a página do link pode mostrar: **clube, logo e papel de cada conta**
+ * que ainda aceita o link (D4) — nem e-mail, nem nome da pessoa. A conta que
+ * não aceita mais some da lista, sem card bloqueado (I8).
+ */
+export type RedefinicaoPublica = components["schemas"]["RedefinicaoPublicaResponseDto"];
+export type ContaDaRedefinicao = components["schemas"]["ContaDaRedefinicaoResponseDto"];
+export type RedefinirSenha = components["schemas"]["RedefinirSenhaDto"];
+
+/**
+ * `GET /public/redefinicao/:token`. **Não consome o link**, e todo link morto
+ * é o mesmo `410` (D4). O token mora no caminho, e a chamada sai sem
+ * `Referer`, como as da ativação (`SEM_REFERRER`).
+ */
+export async function getRedefinicao(token: string): Promise<RedefinicaoPublica> {
+  const res = await fetch(
+    `${API_URL}/api/v1/public/redefinicao/${encodeURIComponent(token)}`,
+    SEM_REFERRER,
+  );
+  if (!res.ok) {
+    throw await parseError(res, "Não foi possível abrir o link.");
+  }
+  return (await res.json()) as RedefinicaoPublica;
+}
+
+/**
+ * `POST /public/redefinicao` → `204`, **sem sessão** (D5): a pessoa entra pelo
+ * login com a senha nova. Também sem `Referer`.
+ */
+export async function redefinirSenha(dto: RedefinirSenha): Promise<void> {
+  const res = await fetch(`${API_URL}/api/v1/public/redefinicao`, {
+    ...SEM_REFERRER,
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(dto),
+  });
+  if (!res.ok) {
+    throw await parseError(res, "Não foi possível redefinir sua senha.");
+  }
+}
+
+// ---------------------------------------------------------------------------
 // SPEC-018/TASK-003 — foto de perfil
 // ---------------------------------------------------------------------------
 
