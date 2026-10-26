@@ -18,12 +18,32 @@
  *
  * O parâmetro é só apresentação: ele muda uma frase na tela e não autoriza,
  * não pula etapa e não grava nada.
+ *
+ * ## O segundo protocolo, no mesmo arquivo (SPEC-090, D9)
+ *
+ * A redefinição de senha pelo link do e-mail termina no login, como a
+ * ativação, e o login mostra "Senha redefinida. Entre com a senha nova." na
+ * MESMA região de aviso. A regra é a mesma: `LOGIN_APOS_REDEFINICAO` mora só
+ * aqui, a página `/redefinir-senha/[token]` a **importa**, e a varredura do
+ * teste reprova uma segunda cópia do literal `senha=redefinida`.
  */
 export const CHAVE_DE_ATIVACAO = "ativado";
 export const VALOR_DE_ATIVACAO = "1";
 export const LOGIN_APOS_ATIVACAO = `/login?${CHAVE_DE_ATIVACAO}=${VALOR_DE_ATIVACAO}`;
 
+/** SPEC-090 — a chave e o valor de quem acabou de redefinir a senha. */
+export const CHAVE_DE_REDEFINICAO = "senha";
+export const VALOR_DE_REDEFINICAO = "redefinida";
+export const LOGIN_APOS_REDEFINICAO = `/login?${CHAVE_DE_REDEFINICAO}=${VALOR_DE_REDEFINICAO}`;
+
 /** `true` só para o valor exato do protocolo: `?ativado=0` ou `=sim` não contam. */
 export function chegouDaAtivacao(busca: string): boolean {
   return new URLSearchParams(busca).get(CHAVE_DE_ATIVACAO) === VALOR_DE_ATIVACAO;
+}
+
+/**
+ * SPEC-090 — a mesma regra de valor exato: `?senha=1` ou `?senha=` não contam.
+ */
+export function chegouDaRedefinicao(busca: string): boolean {
+  return new URLSearchParams(busca).get(CHAVE_DE_REDEFINICAO) === VALOR_DE_REDEFINICAO;
 }

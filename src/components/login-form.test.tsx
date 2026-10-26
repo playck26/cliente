@@ -1,8 +1,10 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { act, render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { LoginForm } from "./login-form";
 import LoginPage from "@/app/login/page";
 import { FUNDO_DO_LOGIN } from "@/lib/login-appearance";
+import { LOGIN_APOS_ATIVACAO, LOGIN_APOS_REDEFINICAO } from "@/lib/ativacao-navigation";
+import { TEXTO_DO_AVISO_DE_ATIVACAO, TEXTO_DO_AVISO_DE_REDEFINICAO } from "./aviso-de-ativacao";
 
 const pushMock = vi.fn();
 
@@ -120,5 +122,53 @@ describe("LoginPage — SPEC-084", () => {
     const regiao = screen.getByRole("status");
     expect(regiao).toBeEmptyDOMElement();
     expect(container.querySelector("form")!.contains(regiao)).toBe(false);
+  });
+});
+
+/**
+ * SPEC-090 (D9) — **o login com a recuperação pelo e-mail.**
+ *
+ * AC-023: "Esqueceu a senha?" é link para `/esqueci-senha`, e o texto inerte
+ * de antes não está em lugar nenhum da página. AC-024/S25: chegar por
+ * `LOGIN_APOS_REDEFINICAO` põe a frase na MESMA região do aviso da ativação —
+ * a página continua com uma região `role="status"` só, antes e depois do
+ * efeito.
+ */
+describe("LoginPage — SPEC-090", () => {
+  beforeEach(() => {
+    pushMock.mockClear();
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  it("AC-023: “Esqueceu a senha?” leva a /esqueci-senha, e o texto antigo saiu da página", () => {
+    const { container } = render(<LoginPage />);
+    const link = screen.getByRole("link", { name: "Esqueceu a senha?" });
+    expect(link).toHaveAttribute("href", "/esqueci-senha");
+    expect(container.querySelector("form")!.contains(link)).toBe(true);
+    expect(screen.queryByRole("button", { name: "Esqueceu a senha?" })).toBeNull();
+    expect(container.textContent).not.toContain("Ainda não enviamos e-mail de recuperação");
+  });
+
+  it.each([
+    [LOGIN_APOS_ATIVACAO, TEXTO_DO_AVISO_DE_ATIVACAO],
+    [LOGIN_APOS_REDEFINICAO, TEXTO_DO_AVISO_DE_REDEFINICAO],
+  ])("AC-024/S25: %s — uma região de status na página, vazia antes e com o texto depois", async (endereco, texto) => {
+    vi.useFakeTimers();
+    try {
+      window.history.replaceState(null, "", endereco);
+      const { container } = render(<LoginPage />);
+      expect(screen.getAllByRole("status")).toHaveLength(1);
+      expect(screen.getByRole("status")).toBeEmptyDOMElement();
+
+      await act(async () => {
+        vi.advanceTimersByTime(1_000);
+      });
+      expect(screen.getAllByRole("status")).toHaveLength(1);
+      expect(screen.getByRole("status")).toHaveTextContent(texto);
+      expect(container.querySelectorAll("[role=status]")).toHaveLength(1);
+    } finally {
+      vi.useRealTimers();
+      window.history.replaceState(null, "", "/");
+    }
   });
 });

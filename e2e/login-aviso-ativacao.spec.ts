@@ -1,7 +1,7 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
-import { LOGIN_APOS_ATIVACAO } from "../src/lib/ativacao-navigation";
+import { LOGIN_APOS_ATIVACAO, LOGIN_APOS_REDEFINICAO } from "../src/lib/ativacao-navigation";
 
 /**
  * SPEC-084/TEST-005 — **o lado do login do protocolo de ativação (AC-008).**
@@ -17,6 +17,7 @@ import { LOGIN_APOS_ATIVACAO } from "../src/lib/ativacao-navigation";
  */
 
 const TEXTO = "Conta ativada. Entre com seu e-mail e senha.";
+const TEXTO_DA_REDEFINICAO = "Senha redefinida. Entre com a senha nova.";
 const EVIDENCIAS = join(__dirname, "..", "test-results", "spec-084");
 mkdirSync(join(EVIDENCIAS, "capturas"), { recursive: true });
 
@@ -43,6 +44,45 @@ test.describe("AC-008 — o HTML do servidor, antes da hidratação", () => {
     // não strings serializadas no payload do Next.
     await expect(page.getByText(TEXTO)).toHaveCount(0);
   });
+
+  // SPEC-090 (AC-024, DOR-090-R2-01): o segundo protocolo, pela constante
+  // importada, tem a mesma prova — região única e vazia no HTML do servidor.
+  test("SPEC-090: por LOGIN_APOS_REDEFINICAO, a região também existe VAZIA no HTML, sem o texto", async ({ page }) => {
+    const resposta = await page.goto(LOGIN_APOS_REDEFINICAO);
+    expect(resposta?.status()).toBe(200);
+
+    const regiao = page.locator("main").getByRole("status");
+    await expect(regiao).toHaveCount(1);
+    await expect(regiao).toBeEmpty();
+    await expect(page.getByText(TEXTO_DA_REDEFINICAO)).toHaveCount(0);
+    await expect(page.getByText(TEXTO)).toHaveCount(0);
+  });
+});
+
+test.describe("SPEC-090 — o aviso da redefinição, depois da hidratação", () => {
+  test("pela constante: o texto da redefinição na MESMA região, uma só, sem pedir nada", async ({ page }) => {
+    const pedidos: string[] = [];
+    page.on("request", (r) => pedidos.push(new URL(r.url()).pathname));
+    await page.goto(LOGIN_APOS_REDEFINICAO);
+
+    await expect(page.locator("main").getByRole("status")).toHaveText(TEXTO_DA_REDEFINICAO);
+    await expect(page.locator("main [role=status]")).toHaveCount(1);
+    await expect(page.locator("main [data-aviso-de-ativacao]")).toHaveText(TEXTO_DA_REDEFINICAO);
+    expect(await page.evaluate(() => document.activeElement === document.body)).toBe(true);
+    expect(pedidos.filter((p) => p.startsWith("/api/"))).toEqual([]);
+
+    await page.screenshot({ path: join(EVIDENCIAS, "capturas", "390x844-aviso-redefinicao.png"), fullPage: true });
+  });
+
+  for (const endereco of ["/login?senha=", "/login?senha=1", "/login?senha=Redefinida"]) {
+    test(`${endereco}: a região existe e continua vazia depois de hidratar`, async ({ page }) => {
+      await page.goto(endereco);
+      await esperarHidratacao(page);
+      await page.waitForTimeout(600);
+      await expect(page.locator("main").getByRole("status")).toHaveCount(1);
+      await expect(page.locator("main").getByRole("status")).toBeEmpty();
+    });
+  }
 });
 
 test.describe("AC-008 — depois da hidratação", () => {

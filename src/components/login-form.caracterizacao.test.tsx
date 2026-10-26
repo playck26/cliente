@@ -17,11 +17,17 @@ import { LoginForm } from "./login-form";
  * navegador e o gerenciador de senhas usam. Texto de tela e layout ficam no
  * `login-form.test.tsx`, que pode mudar.
  *
- * **Única mudança depois de congelado (I5, 2026-10-02):** saiu a asserção do
+ * **Primeira mudança depois de congelado (I5, 2026-10-02):** saiu a asserção do
  * link "Cadastre-se" → `/cadastro`. Não foi para acompanhar regressão: o
  * Israel decidiu tirar o cadastro do login, porque o aluno não se cadastra
  * sozinho. Hash do conteúdo em LF: `363bdb58…0590` (a234c3b) → o deste
  * arquivo, registrado no EVD-084-003. Todo o resto ficou igual.
+ *
+ * **Segunda mudança, a exceção declarada da SPEC-090 (DOR-090-R1-05):**
+ * "Esqueceu a senha?" deixou de ser o botão do texto de ajuda e virou link
+ * para `/esqueci-senha`. Mudaram **só** os dois testes que o tratavam como
+ * botão de ajuda ("botões com tipo e nome acessível…" e "“Esqueceu a
+ * senha?”…"); nenhum outro teste daqui mudou de expectativa.
  *
  * Os mocks são os mesmos da base: `next/navigation` só com `useRouter`. Um
  * hook novo dessa biblioteca dentro do `LoginForm` derruba este arquivo — e
@@ -143,16 +149,18 @@ describe("caracterização — atributos que o navegador e o gerenciador de senh
     expect(senha.minLength).toBe(8);
   });
 
-  it("botões com tipo e nome acessível, ajuda fechada", () => {
+  it("botões com tipo e nome acessível, e “Esqueceu a senha?” é link para /esqueci-senha", () => {
     servidor(sucesso());
     render(<LoginForm />);
 
     expect(screen.getByRole("button", { name: "Entrar" })).toHaveAttribute("type", "submit");
     expect(screen.getByRole("button", { name: "Mostrar senha" })).toHaveAttribute("type", "button");
 
-    const ajuda = screen.getByRole("button", { name: "Esqueceu a senha?" });
-    expect(ajuda).toHaveAttribute("type", "button");
-    expect(ajuda).toHaveAttribute("aria-expanded", "false");
+    // SPEC-090 (D9): deixou de ser botão de ajuda.
+    expect(screen.queryByRole("button", { name: "Esqueceu a senha?" })).toBeNull();
+    const esqueceu = screen.getByRole("link", { name: "Esqueceu a senha?" });
+    expect(esqueceu).toHaveAttribute("href", "/esqueci-senha");
+    expect(esqueceu).not.toHaveAttribute("aria-expanded");
 
     expect(screen.queryByRole("alert")).toBeNull();
   });
@@ -332,21 +340,16 @@ describe("caracterização — senha visível e ajuda, sem sair do formulário",
     expect(pushMock).not.toHaveBeenCalled();
   });
 
-  it("“Esqueceu a senha?” abre e fecha a explicação atual, sem enviar nada", () => {
+  it("“Esqueceu a senha?” leva a /esqueci-senha, e a explicação antiga não existe mais, sem enviar nada", () => {
     const fetchMock = servidor(sucesso());
-    render(<LoginForm />);
-    const ajuda = screen.getByRole("button", { name: "Esqueceu a senha?" });
-    const texto =
-      "Ainda não enviamos e-mail de recuperação. Peça ao seu clube para gerar uma senha nova; ela chega por WhatsApp e você troca no primeiro acesso.";
+    const { container } = render(<LoginForm />);
+    const esqueceu = screen.getByRole("link", { name: "Esqueceu a senha?" });
+    const textoAntigo = "Ainda não enviamos e-mail de recuperação";
 
-    expect(screen.queryByText(texto)).toBeNull();
-    fireEvent.click(ajuda);
-    expect(ajuda).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText(texto)).toBeInTheDocument();
-
-    fireEvent.click(ajuda);
-    expect(ajuda).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByText(texto)).toBeNull();
+    // SPEC-090 (D9, AC-023): o destino é a página de pedir o link.
+    expect(esqueceu).toHaveAttribute("href", "/esqueci-senha");
+    expect(container.textContent).not.toContain(textoAntigo);
+    expect(container.querySelector("[aria-expanded]")).toBeNull();
 
     expect(fetchMock).not.toHaveBeenCalled();
     expect(pushMock).not.toHaveBeenCalled();

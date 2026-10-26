@@ -107,8 +107,10 @@ async function simularLogin(page: Page, resposta: "erro" | "pendente") {
   });
 }
 
-type Estado = "normal" | "preenchido" | "ajuda" | "erro" | "carregando" | "aviso";
-const ESTADOS: Estado[] = ["normal", "preenchido", "ajuda", "erro", "carregando", "aviso"];
+type Estado = "normal" | "preenchido" | "erro" | "carregando" | "aviso";
+// SPEC-090: saiu o estado "ajuda" — "Esqueceu a senha?" virou link para
+// /esqueci-senha e não abre mais texto nenhum no login.
+const ESTADOS: Estado[] = ["normal", "preenchido", "erro", "carregando", "aviso"];
 
 async function prepararEstado(page: Page, estado: Estado) {
   if (estado === "erro") await simularLogin(page, "erro");
@@ -123,7 +125,6 @@ async function prepararEstado(page: Page, estado: Estado) {
     await email.fill("aluno.com.nome.comprido@clube-de-tenis.com.br");
     await senha.fill("senha-secreta");
   }
-  if (estado === "ajuda") await page.getByRole("button", { name: "Esqueceu a senha?" }).click();
   if (estado === "erro") {
     await page.getByRole("button", { name: "Entrar" }).click();
     await expect(page.locator("main").getByRole("alert")).toHaveText(MENSAGEM_LONGA);
@@ -150,10 +151,9 @@ function alvosDeTexto(page: Page, estado: Estado) {
     { rotulo: "rótulo senha", alvo: main.locator("label[for=senha]") },
     { rotulo: "campo e-mail", alvo: page.getByLabel("E-mail", { exact: true }) },
     { rotulo: "campo senha", alvo: page.getByLabel("Senha", { exact: true }) },
-    { rotulo: "esqueceu a senha", alvo: page.getByRole("button", { name: "Esqueceu a senha?" }) },
+    { rotulo: "esqueceu a senha", alvo: page.getByRole("link", { name: "Esqueceu a senha?" }) },
     { rotulo: "botão", alvo: main.locator("button[type=submit]") },
   ];
-  if (estado === "ajuda") alvos.push({ rotulo: "ajuda", alvo: page.getByText("Ainda não enviamos", { exact: false }) });
   if (estado === "erro") alvos.push({ rotulo: "erro", alvo: page.locator("main").getByRole("alert") });
   if (estado === "aviso") alvos.push({ rotulo: "aviso", alvo: page.locator("main").getByRole("status") });
   return alvos;
@@ -316,7 +316,7 @@ for (const [nome, viewport] of Object.entries(VIEWPORTS)) {
         page.getByLabel("E-mail", { exact: true }),
         page.getByLabel("Senha", { exact: true }),
         page.getByRole("button", { name: "Mostrar senha" }),
-        page.getByRole("button", { name: "Esqueceu a senha?" }),
+        page.getByRole("link", { name: "Esqueceu a senha?" }),
         page.getByRole("button", { name: "Entrar" }),
       ]) {
         const caixa = (await alvo.boundingBox())!;
@@ -744,7 +744,7 @@ for (const [nome, fundo] of MATRIZ) {
         { rotulo: "foco e-mail", alvo: page.getByLabel("E-mail", { exact: true }) },
         { rotulo: "foco senha", alvo: page.getByLabel("Senha", { exact: true }) },
         { rotulo: "foco olho", alvo: page.getByRole("button", { name: "Mostrar senha" }) },
-        { rotulo: "foco esqueceu", alvo: page.getByRole("button", { name: "Esqueceu a senha?" }) },
+        { rotulo: "foco esqueceu", alvo: page.getByRole("link", { name: "Esqueceu a senha?" }) },
         { rotulo: "foco botão", alvo: page.getByRole("button", { name: "Entrar" }) },
       ];
       await page.evaluate(() => window.scrollTo(0, 0));
@@ -874,7 +874,6 @@ test.describe("AC-006 — zoom de 200% (simulado) e fonte aumentada", () => {
       await simularLogin(page, "erro");
       await page.goto("/login");
       await esperarHidratacao(page);
-      await page.getByRole("button", { name: "Esqueceu a senha?" }).click();
       await page.getByLabel("E-mail", { exact: true }).fill("a@b.com");
       await page.getByLabel("Senha", { exact: true }).fill("senha-secreta");
       await page.getByRole("button", { name: "Entrar" }).click();
@@ -891,12 +890,11 @@ test.describe("AC-006 — zoom de 200% (simulado) e fonte aumentada", () => {
   test.describe("fonte aumentada: html a 200% em 390×844", () => {
     test.use({ viewport: VIEWPORTS["390x844"] });
 
-    test("ajuda, erro e botão continuam visíveis e inteiros", async ({ page }) => {
+    test("link de recuperação, erro e botão continuam visíveis e inteiros", async ({ page }) => {
       await simularLogin(page, "erro");
       await page.goto("/login");
       await page.addStyleTag({ content: "html { font-size: 200% !important; }" });
       await esperarHidratacao(page);
-      await page.getByRole("button", { name: "Esqueceu a senha?" }).click();
       await page.getByLabel("E-mail", { exact: true }).fill("a@b.com");
       await page.getByLabel("Senha", { exact: true }).fill("senha-secreta");
       await page.getByRole("button", { name: "Entrar" }).click();
@@ -914,7 +912,7 @@ test.describe("AC-006 — zoom de 200% (simulado) e fonte aumentada", () => {
       expect(m.cortados).toEqual([]);
       expect(m.rolagem).toBeLessThanOrEqual(m.largura + 1);
       for (const alvo of [
-        page.getByText("Ainda não enviamos", { exact: false }),
+        page.getByRole("link", { name: "Esqueceu a senha?" }),
         page.locator("main").getByRole("alert"),
         page.getByRole("button", { name: "Entrar" }),
       ]) {
