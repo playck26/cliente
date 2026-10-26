@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
@@ -22,10 +22,21 @@ export const TEXTO_LINK_DE_REDEFINICAO_INVALIDO = "Este link não vale mais.";
 /** O mínimo do `RedefinirSenhaDto` (`MinLength(8)`), o mesmo de todo campo de senha. */
 const TAMANHO_MINIMO_DA_SENHA = 8;
 
+/**
+ * `voltou` e `escolhida` dizem que a fase nasceu de um toque da pessoa (o
+ * "Voltar" e o cartão da lista), e não da resposta do `GET`: só então o foco
+ * é levado para a tela nova (REV-090-F03). Na abertura da página o foco fica
+ * onde o navegador o pôs.
+ */
 type Tela =
   | { fase: "carregando" }
-  | { fase: "escolha"; contas: ContaDaRedefinicao[] }
-  | { fase: "formulario"; contas: ContaDaRedefinicao[]; conta: ContaDaRedefinicao }
+  | { fase: "escolha"; contas: ContaDaRedefinicao[]; voltou?: boolean }
+  | {
+      fase: "formulario";
+      contas: ContaDaRedefinicao[];
+      conta: ContaDaRedefinicao;
+      escolhida?: boolean;
+    }
   | { fase: "link-invalido" }
   | { fase: "falha-ao-abrir" };
 
@@ -58,6 +69,14 @@ function ehLinkInvalido(erro: unknown): boolean {
  * `replace`, e não `push`, depois do `204`: o link já foi gasto, e o "voltar"
  * do navegador não deve devolver a pessoa a um formulário que só responde
  * `410`.
+ *
+ * ## O foco nas trocas (REV-090-F03)
+ *
+ * Tocar num cartão tira a lista inteira da página, com o botão que tinha o
+ * foco; o "Voltar" faz o mesmo com o formulário. Sem mover o foco, ele cai no
+ * `body` e o próximo Tab recomeça do topo. Por isso: depois de escolher, o
+ * foco vai para o campo "Senha nova" (o clube e o papel ficam logo acima, e o
+ * "Voltar" a um Shift+Tab); depois do "Voltar", para o título da lista.
  */
 export function RedefinirSenhaForm({ token }: { token: string }) {
   const router = useRouter();
@@ -68,6 +87,13 @@ export function RedefinirSenhaForm({ token }: { token: string }) {
   const [confirmacao, setConfirmacao] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const formularioRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    if (tela.fase === "formulario" && tela.escolhida) {
+      formularioRef.current?.querySelector<HTMLInputElement>("input#senha")?.focus();
+    }
+  }, [tela]);
 
   useEffect(() => {
     // Resposta de uma tentativa antiga que chega depois da nova não pinta a
@@ -98,7 +124,7 @@ export function RedefinirSenhaForm({ token }: { token: string }) {
     setSenha("");
     setConfirmacao("");
     setErro(null);
-    setTela({ fase: "formulario", contas, conta });
+    setTela({ fase: "formulario", contas, conta, escolhida: true });
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>, conta: ContaDaRedefinicao) {
@@ -181,20 +207,31 @@ export function RedefinirSenhaForm({ token }: { token: string }) {
 
   if (tela.fase === "escolha") {
     const { contas } = tela;
-    return <EscolhaDeConta contas={contas} onEscolher={(id) => escolher(contas, id)} />;
+    return (
+      <EscolhaDeConta
+        contas={contas}
+        onEscolher={(id) => escolher(contas, id)}
+        focarTitulo={tela.voltou === true}
+      />
+    );
   }
 
   const { conta, contas } = tela;
   const daLista = contas.length > 1;
 
   return (
-    <form onSubmit={(e) => void handleSubmit(e, conta)} className="flex flex-col gap-4" noValidate>
+    <form
+      ref={formularioRef}
+      onSubmit={(e) => void handleSubmit(e, conta)}
+      className="flex flex-col gap-4"
+      noValidate
+    >
       {daLista ? (
         <button
           type="button"
           onClick={() => {
             setErro(null);
-            setTela({ fase: "escolha", contas });
+            setTela({ fase: "escolha", contas, voltou: true });
           }}
           disabled={enviando}
           className="flex min-h-11 items-center gap-2 self-start rounded-lg px-1 text-sm font-bold text-[var(--color-primary-strong)] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]"

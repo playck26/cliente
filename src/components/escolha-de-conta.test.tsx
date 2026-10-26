@@ -77,6 +77,19 @@ describe("EscolhaDeConta", () => {
     expect(screen.queryByText(/Usar outro e-mail|Entrando|Em qual clube/)).toBeNull();
   });
 
+  it("focarTitulo: o foco vai ao título, que fica fora da ordem do Tab; sem ele, o foco não se move", () => {
+    const { unmount } = render(<EscolhaDeConta contas={DUAS} onEscolher={vi.fn()} />);
+    const titulo = screen.getByRole("heading", { name: "Qual conta vai ter a senha redefinida?" });
+    expect(titulo).toHaveAttribute("tabindex", "-1");
+    expect(document.activeElement).toBe(document.body);
+    unmount();
+
+    render(<EscolhaDeConta contas={DUAS} onEscolher={vi.fn()} focarTitulo />);
+    expect(document.activeElement).toBe(
+      screen.getByRole("heading", { name: "Qual conta vai ter a senha redefinida?" }),
+    );
+  });
+
   it("tocar num cartão escolhe aquela conta, e só ela", () => {
     const onEscolher = vi.fn();
     render(<EscolhaDeConta contas={TRES} onEscolher={onEscolher} />);

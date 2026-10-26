@@ -56,7 +56,7 @@ describe("AC-023 — /esqueci-senha: a mesma frase para qualquer e-mail", () => 
       const { container } = render(<EsqueciSenhaForm />);
       pedir(email);
 
-      expect(await screen.findByRole("status")).toHaveTextContent(TEXTO_DO_PEDIDO_ENVIADO);
+      await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(TEXTO_DO_PEDIDO_ENVIADO));
       expect(pedidos).toEqual([
         { caminho: "/api/v1/auth/esqueci-senha", metodo: "POST", corpo: { email } },
       ]);
@@ -74,7 +74,9 @@ describe("AC-023 — /esqueci-senha: a mesma frase para qualquer e-mail", () => 
     pedir("aluno@clube.com");
 
     expect(await screen.findByRole("alert")).toHaveTextContent(MENSAGEM);
-    expect(screen.queryByRole("status")).toBeNull();
+    // A região existe desde a montagem (REV-090-F03), e continua vazia.
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+    expect(screen.getByRole("status")).toBeEmptyDOMElement();
     expect(screen.getByLabelText("E-mail")).toHaveValue("aluno@clube.com");
     expect(screen.getByRole("button", { name: "Enviar link" })).toBeEnabled();
   });
@@ -128,6 +130,37 @@ describe("AC-023 — /esqueci-senha: a mesma frase para qualquer e-mail", () => 
     servidor(ACEITO);
     render(<EsqueciSenhaForm />);
     expect(screen.getByRole("link", { name: "Voltar ao login" })).toHaveAttribute("href", "/login");
+  });
+});
+
+/**
+ * REV-090-F03 — a região viva existe **vazia** antes do pedido (a que nasce
+ * com o texto costuma não ser anunciada) e é o mesmo nó que recebe a frase; e
+ * o foco não cai no `body` quando o formulário sai.
+ */
+describe("AC-026 — /esqueci-senha: o anúncio e o foco", () => {
+  it("a região de status existe vazia desde a montagem e é a mesma que recebe a frase", async () => {
+    servidor(ACEITO);
+    render(<EsqueciSenhaForm />);
+
+    const regiao = screen.getByRole("status");
+    expect(regiao).toBeEmptyDOMElement();
+
+    pedir("aluno@clube.com");
+    await waitFor(() => expect(regiao).toHaveTextContent(TEXTO_DO_PEDIDO_ENVIADO));
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+    expect(screen.getByRole("status")).toBe(regiao);
+  });
+
+  it("depois do 202, o foco vai para “Voltar ao login”, e não para o body", async () => {
+    servidor(ACEITO);
+    render(<EsqueciSenhaForm />);
+    pedir("aluno@clube.com");
+
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(TEXTO_DO_PEDIDO_ENVIADO));
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole("link", { name: "Voltar ao login" })),
+    );
   });
 });
 

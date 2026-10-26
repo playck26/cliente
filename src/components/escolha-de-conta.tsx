@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { ChevronRight } from "lucide-react";
 import { LogoDaEmpresa } from "@/components/logo-da-empresa";
 import type { ContaDaRedefinicao } from "@/lib/api-client";
@@ -27,6 +28,11 @@ import type { ContaDaRedefinicao } from "@/lib/api-client";
  *
  * As cores são as do `AuthShell` (cartão claro do tema), e não as do login
  * fotográfico: esta tela mora na moldura das telas públicas de conta.
+ *
+ * - **`focarTitulo`:** quem volta do formulário pelo "Voltar" chega aqui com
+ *   o foco no título (`tabIndex={-1}`: focável pelo código, fora da ordem do
+ *   Tab), e não no `body` (REV-090-F03). Na primeira abertura, não: o foco
+ *   fica onde o navegador o pôs.
  */
 
 const NOME_DO_PAPEL: Record<string, string> = {
@@ -46,15 +52,25 @@ const FOCO =
 export interface EscolhaDeContaProps {
   contas: readonly ContaDaRedefinicao[];
   onEscolher: (usuarioId: string) => void;
+  /** Leva o foco ao título ao montar — para quem volta do formulário. */
+  focarTitulo?: boolean;
 }
 
-export function EscolhaDeConta({ contas, onEscolher }: EscolhaDeContaProps) {
+export function EscolhaDeConta({ contas, onEscolher, focarTitulo = false }: EscolhaDeContaProps) {
+  const tituloRef = useRef<HTMLHeadingElement>(null);
+
+  useEffect(() => {
+    if (focarTitulo) tituloRef.current?.focus();
+  }, [focarTitulo]);
+
   return (
     <section aria-labelledby="titulo-da-escolha-de-conta" className="flex flex-col gap-4">
       <div className="flex flex-col gap-1">
         <h2
+          ref={tituloRef}
           id="titulo-da-escolha-de-conta"
-          className="text-lg leading-tight font-extrabold text-[var(--color-text-primary)]"
+          tabIndex={-1}
+          className={`rounded-sm text-lg leading-tight font-extrabold text-[var(--color-text-primary)] ${FOCO}`}
         >
           Qual conta vai ter a senha redefinida?
         </h2>

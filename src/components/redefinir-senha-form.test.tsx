@@ -217,6 +217,52 @@ describe("AC-023 — duas contas: lista → formulário → voltar", () => {
   });
 });
 
+/**
+ * AC-026, REV-090-F03 — **o foco nas trocas da tela.** Tocar num cartão tira a
+ * lista (e o botão focado) da página; o "Voltar" tira o formulário. O foco tem
+ * de ir para a tela nova, e não cair no `body`. O cartão e o "Voltar" são
+ * focados antes do toque, como faria o teclado.
+ */
+describe("AC-026 — duas contas: o foco acompanha a troca de tela", () => {
+  const TITULO = "Qual conta vai ter a senha redefinida?";
+
+  it("abrir a lista não rouba o foco; escolher leva a “Senha nova”; Voltar leva ao título da lista", async () => {
+    servidor({ get: contas(CONTA_A, CONTA_B) });
+    render(<RedefinirSenhaForm token={TOKEN} />);
+
+    const titulo = await screen.findByRole("heading", { name: TITULO });
+    expect(document.activeElement).toBe(document.body);
+    // O título é focável pelo código, mas não entra na ordem do Tab.
+    expect(titulo).toHaveAttribute("tabindex", "-1");
+
+    const cartao = screen.getByRole("button", { name: "Redefinir a senha de Clube B, como Professor" });
+    cartao.focus();
+    fireEvent.click(cartao);
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText("Senha nova")));
+
+    const voltar = screen.getByRole("button", { name: "Voltar" });
+    voltar.focus();
+    fireEvent.click(voltar);
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole("heading", { name: TITULO })),
+    );
+
+    // E de novo, para outra conta: o foco vai outra vez ao campo.
+    const outro = screen.getByRole("button", { name: "Redefinir a senha de Clube A, como Aluno" });
+    outro.focus();
+    fireEvent.click(outro);
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText("Senha nova")));
+    expect(screen.getByText("Clube A")).toBeInTheDocument();
+  });
+
+  it("uma conta: o formulário direto não rouba o foco na abertura", async () => {
+    servidor({ get: contas(CONTA_A) });
+    render(<RedefinirSenhaForm token={TOKEN} />);
+    await screen.findByLabelText("Senha nova");
+    expect(document.activeElement).toBe(document.body);
+  });
+});
+
 describe("AC-023 — 410: link inválido, com “Pedir outro link”", () => {
   async function conferirInvalido() {
     expect(await screen.findByRole("alert")).toHaveTextContent(TEXTO_LINK_DE_REDEFINICAO_INVALIDO);
