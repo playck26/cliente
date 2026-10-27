@@ -11,6 +11,7 @@ import {
   ApiError,
   escolhaDoErro,
   escolherEmpresa,
+  limparCacheDaEmpresa,
   login,
   type EscolhaDeEmpresa as Escolha,
   type LoginResult,
@@ -91,6 +92,11 @@ export function LoginForm() {
    */
   function entrar(result: LoginResult) {
     saveAccessToken(result.accessToken);
+    // A empresa guardada em memória é da sessão anterior, se houve uma nesta
+    // aba — e a conta que entra agora pode ser de outro clube (SPEC-086).
+    // Limpar aqui cobre também quem chega ao login sem ter passado pelo
+    // "Sair" (sessão expirada numa aba que já estava em /login).
+    limparCacheDaEmpresa();
     // O papel vai junto do token: é o que permite ao `BottomNav` acertar
     // a barra na PRIMEIRA pintura, sem esperar o `getMe()`.
     savePapel(result.usuario.role);
