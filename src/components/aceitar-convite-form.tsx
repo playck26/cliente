@@ -13,6 +13,7 @@ import {
   getConvite,
   type ConvitePublico,
 } from "@/lib/api-client";
+import { epocaAtual } from "@/lib/sessao-da-aba";
 
 /**
  * SPEC-009/REQ-002 — aceite de convite.
@@ -53,6 +54,7 @@ export function AceitarConviteForm({ token }: { token: string }) {
     event.preventDefault();
     setError(null);
     setLoading(true);
+    const epoca = epocaAtual();
     try {
       await aceitarConvite({
         token,
@@ -66,6 +68,9 @@ export function AceitarConviteForm({ token }: { token: string }) {
         // no primeiro acesso, onde aparece inteiro.
         contratoVersao: convite?.contrato?.versao,
       });
+      // Outra sessão começou nesta aba enquanto o servidor respondia (um login
+      // em outra rota): mandar para o login seria sair por ela (PRD-090-R5-01).
+      if (epoca !== epocaAtual()) return;
       router.push("/login");
     } catch (err) {
       setError(
