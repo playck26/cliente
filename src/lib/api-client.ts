@@ -572,6 +572,11 @@ export async function logout(): Promise<void> {
     // Rede fora. O servidor não soube, e o token dele expira sozinho.
   } finally {
     clearAccessToken();
+    // O "Sair" volta ao login por `router.push`, sem recarregar a aba: o
+    // módulo — e a empresa guardada nele — sobrevive. Sem isto, quem tem o
+    // mesmo e-mail em dois clubes (SPEC-086) sai de um, entra no outro e vê
+    // a logo e o nome do primeiro até recarregar a página.
+    limparCacheDaEmpresa();
   }
 }
 
