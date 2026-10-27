@@ -300,6 +300,12 @@ async function renovarSessao(): Promise<boolean> {
       if (!res.ok) return false;
       const { accessToken } = (await res.json()) as { accessToken: string };
       saveAccessToken(accessToken);
+      // Este token foi esta aba que obteve, e é dela a resposta que o
+      // retry vai trazer. Sem conferir aqui, a carga por cookie (sem
+      // token local) mostraria a empresa sem a aba ter dono, e a conta que
+      // outra aba gravasse depois seria adotada como a primeira, sem
+      // recarga (PRD-090-R3-01).
+      conferirDonoDaAba(identidadeDoToken(accessToken));
       return true;
     } catch {
       return false;
@@ -1580,8 +1586,9 @@ let empresaEmCache: Promise<MinhaEmpresa> | null = null;
  * último pedido de empresa. A diferença importa (PRD-090-R2-01): se a leitura
  * de B acontece antes de o evento `storage` chegar, uma identidade amarrada
  * ao cache já seria B quando o evento fosse tratado, e o cabeçalho montado
- * com A ficaria na tela sem recarga. Só o "Sair" e o login desta aba a zeram,
- * por `limparCacheDaEmpresa()`.
+ * com A ficaria na tela sem recarga. A renovação por cookie também a define
+ * (PRD-090-R3-01). Só o "Sair", o login desta aba e a sessão encerrada a
+ * zeram, por `limparCacheDaEmpresa()`.
  */
 let identidadeDaAba: string | null = null;
 let vigiandoOutraAba = false;
