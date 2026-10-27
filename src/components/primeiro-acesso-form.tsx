@@ -4,9 +4,15 @@ import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { CampoSenha } from "@/components/campo-senha";
-import { ApiError, getMe, trocarSenha } from "@/lib/api-client";
+import {
+  ApiError,
+  epocaAtual,
+  getMe,
+  gravarPapelDaSessao,
+  gravarTokenDaSessao,
+  trocarSenha,
+} from "@/lib/api-client";
 import { rotaInicial } from "@/lib/rota-inicial";
-import { saveAccessToken, savePapel } from "@/lib/auth-storage";
 
 /**
  * SPEC-009/REQ-004 — primeiro acesso.
@@ -35,20 +41,26 @@ export function PrimeiroAcessoForm() {
     }
 
     setLoading(true);
+    // A sessão em que a troca foi pedida. Se outra começar nesta aba antes
+    // de a resposta voltar (a pessoa saiu daqui e entrou em outra conta), o
+    // token desta resposta é de quem já não está na tela, e não é gravado
+    // (PRD-090-R4-01).
+    const epoca = epocaAtual();
     try {
       const { accessToken } = await trocarSenha({ senhaAtual, novaSenha });
       // O backend revoga as sessões antigas e devolve um par novo (AC-009):
       // sem guardar este token, a pessoa cairia no login logo depois de
       // fazer exatamente o que o sistema exigiu.
-      saveAccessToken(accessToken);
+      if (gravarTokenDaSessao(accessToken, epoca) !== "aplicado") return;
       // SPEC-013 — o destino depende do papel, e `trocarSenha` devolve só o
       // token. Uma ida a `/auth/me` custa menos que mandar o professor para
       // a Home do aluno, onde o servidor recusaria tudo e ele veria um erro
       // logo depois de fazer exatamente o que o sistema exigiu.
       const usuario = await getMe();
-      savePapel(usuario.role);
+      if (!gravarPapelDaSessao(usuario.role, epoca)) return;
       router.push(rotaInicial(usuario.role));
     } catch (err) {
+      if (err instanceof ApiError && err.code === "SESSAO_SUBSTITUIDA") return;
       setError(
         err instanceof ApiError
           ? err.message
