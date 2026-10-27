@@ -8,17 +8,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  abrirPedidoDeLogin,
   ApiError,
   escolhaDoErro,
   escolherEmpresa,
-  limparCacheDaEmpresa,
+  iniciarSessaoNestaAba,
   login,
   type EscolhaDeEmpresa as Escolha,
   type LoginResult,
 } from "@/lib/api-client";
 import { EscolhaDeEmpresa } from "@/components/escolha-de-empresa";
 import { rotaInicial } from "@/lib/rota-inicial";
-import { saveAccessToken, savePapel } from "@/lib/auth-storage";
 import { lerNomesDeTipo } from "@/lib/nomes-de-tipo";
 
 /**
@@ -90,16 +90,23 @@ export function LoginForm() {
    * O pós-login de sempre, para o login de uma conta e para a escolha
    * (AC-014): token e papel salvos, nomes de tipo aquecidos, e o destino.
    */
-  function entrar(result: LoginResult) {
-    saveAccessToken(result.accessToken);
-    // A empresa guardada em memória é da sessão anterior, se houve uma nesta
-    // aba — e a conta que entra agora pode ser de outro clube (SPEC-086).
-    // Limpar aqui cobre também quem chega ao login sem ter passado pelo
-    // "Sair" (sessão expirada numa aba que já estava em /login).
-    limparCacheDaEmpresa();
-    // O papel vai junto do token: é o que permite ao `BottomNav` acertar
-    // a barra na PRIMEIRA pintura, sem esperar o `getMe()`.
-    savePapel(result.usuario.role);
+  function entrar(pedido: number, result: LoginResult) {
+    const destino = result.usuario.senhaTemporaria
+      ? "/primeiro-acesso"
+      : rotaInicial(result.usuario.role);
+    // Token e papel salvos juntos — o papel é o que permite ao `BottomNav`
+    // acertar a barra na PRIMEIRA pintura, sem esperar o `getMe()` —, e a
+    // empresa da sessão anterior descartada (SPEC-086). Um login que não é o
+    // último enviado não grava nada (PRD-090-R4-01).
+    const desfecho = iniciarSessaoNestaAba(pedido, result);
+    if (desfecho === "descartado") return;
+    if (desfecho === "recarregando") {
+      // A aba já era de outra conta sem ter passado pelo "Sair": o que está
+      // em memória — um cabeçalho montado, uma resposta em voo — é dela.
+      // Navegação dura descarta tudo.
+      window.location.assign(destino);
+      return;
+    }
     // SPEC-059 — **aquece o nome dos tipos de reserva no login.**
     //
     // Sem isto, a primeira visita a "Fazer reserva" ainda mostraria
@@ -107,15 +114,16 @@ export function LoginForm() {
     // armazenamento só ajuda a partir da segunda. `void` porque nada nesta
     // tela depende do resultado, e `lerNomesDeTipo` nunca lança.
     void lerNomesDeTipo();
-    router.push(result.usuario.senhaTemporaria ? "/primeiro-acesso" : rotaInicial(result.usuario.role));
+    router.push(destino);
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
     setLoading(true);
+    const pedido = abrirPedidoDeLogin();
     try {
-      entrar(await login({ email, senha }));
+      entrar(pedido, await login({ email, senha }));
     } catch (err) {
       const deEscolha = escolhaDoErro(err);
       if (deEscolha) {
@@ -132,8 +140,9 @@ export function LoginForm() {
     if (!escolha) return;
     setError(null);
     setEntrando(usuarioId);
+    const pedido = abrirPedidoDeLogin();
     try {
-      entrar(await escolherEmpresa({ token: escolha.token, usuarioId }));
+      entrar(pedido, await escolherEmpresa({ token: escolha.token, usuarioId }));
     } catch (err) {
       // AC-015 — volta ao formulário, com a mensagem do servidor e o e-mail
       // que já estava digitado.

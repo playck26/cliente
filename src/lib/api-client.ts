@@ -3,7 +3,11 @@ import {
   clearAccessToken,
   getAccessToken,
   saveAccessToken,
+  savePapel,
 } from "./auth-storage";
+import { abrirEpoca, epocaAtual } from "./sessao-da-aba";
+
+export { epocaAtual };
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
 
@@ -282,36 +286,55 @@ async function parseError(res: Response, fallback: string): Promise<ApiError> {
  * `credentials: "include"` é obrigatório — é o que manda o cookie de
  * refresh (httpOnly, `SameSite=Strict`, path `/api/v1/auth`).
  */
-let renovacaoEmCurso: Promise<boolean> | null = null;
+/**
+ * `"substituida"`: a sessão em que o pedido nasceu já não é a desta aba
+ * (login, "Sair" ou troca de conta no meio do caminho), ou o token que voltou
+ * é de outra conta e a aba está recarregando. Nos dois casos **não há
+ * retry**: repetir a requisição, que pode ser uma alteração, com o token de
+ * outra pessoa a partir da tela antiga seria o pior desfecho (PRD-090-R4-01).
+ */
+type Renovacao = "renovada" | "falhou" | "substituida";
 
-async function renovarSessao(): Promise<boolean> {
+let renovacaoEmCurso: { epoca: number; promessa: Promise<Renovacao> } | null =
+  null;
+
+async function renovarSessao(epoca: number): Promise<Renovacao> {
+  if (epoca !== epocaAtual()) return "substituida";
   // Várias requisições podem receber 401 ao mesmo tempo (uma tela que
   // carrega três listas, por exemplo). Sem esta trava, cada uma dispararia
   // um refresh, e a rotação do backend trataria as concorrentes como reuso
-  // de token — revogando a sessão inteira, que é o oposto do desejado.
-  if (renovacaoEmCurso) return renovacaoEmCurso;
+  // de token — revogando a sessão inteira, que é o oposto do desejado. A
+  // trava é por época: a renovação de uma sessão anterior não serve à atual.
+  if (renovacaoEmCurso?.epoca === epoca) return renovacaoEmCurso.promessa;
 
-  renovacaoEmCurso = (async () => {
+  const promessa = (async (): Promise<Renovacao> => {
     try {
       const res = await fetch(`${API_URL}/api/v1/auth/refresh`, {
         method: "POST",
         credentials: "include",
       });
-      if (!res.ok) return false;
+      if (!res.ok) return epoca === epocaAtual() ? "falhou" : "substituida";
       const { accessToken } = (await res.json()) as { accessToken: string };
-      saveAccessToken(accessToken);
-      return true;
+      return gravarTokenDaSessao(accessToken, epoca) === "aplicado"
+        ? "renovada"
+        : "substituida";
     } catch {
-      return false;
-    } finally {
-      renovacaoEmCurso = null;
+      return epoca === epocaAtual() ? "falhou" : "substituida";
     }
   })();
-
-  return renovacaoEmCurso;
+  renovacaoEmCurso = { epoca, promessa };
+  // Fora da função assíncrona: se o `fetch` lançasse antes do primeiro
+  // `await`, um `finally` lá dentro rodaria antes desta atribuição.
+  void promessa.finally(() => {
+    if (renovacaoEmCurso?.promessa === promessa) renovacaoEmCurso = null;
+  });
+  return promessa;
 }
 
-function encerrarSessao(): void {
+function encerrarSessao(epoca: number): void {
+  // O 401 de uma sessão que já acabou nesta aba não derruba a seguinte.
+  if (epoca !== epocaAtual()) return;
+  abrirEpoca();
   clearAccessToken();
   // A navegação dura abaixo já descartaria o cache, mas ela é condicional
   // (não roda se a pessoa já está em /login). Limpar aqui garante que a
@@ -372,6 +395,7 @@ async function authFetch(
   path: string,
   init: RequestInit = {},
 ): Promise<Response> {
+  const epoca = epocaAtual();
   let res = await requisicaoAutenticada(path, init);
 
   // 401 aqui quase sempre é access token vencido, não credencial errada:
@@ -388,7 +412,7 @@ async function authFetch(
   // numa tela viva cheia de erros, sem entender que perdeu o acesso.
   // Encerra a sessão como se fosse expiração, porque para ela é isso mesmo.
   if (res.status === 403 && (await temCodigo(res.clone(), "CONTA_INATIVA"))) {
-    encerrarSessao();
+    encerrarSessao(epoca);
     throw await parseError(
       res,
       "Esta conta está inativa. Procure o administrador.",
@@ -404,7 +428,7 @@ async function authFetch(
   // Mensagem separada de propósito: a conta dela está em ordem, e "procure o
   // administrador" mandaria o gestor procurar a si mesmo.
   if (res.status === 403 && (await temCodigo(res.clone(), "EMPRESA_INATIVA"))) {
-    encerrarSessao();
+    encerrarSessao(epoca);
     throw await parseError(
       res,
       "O acesso deste clube está suspenso. Fale com o suporte da plataforma.",
@@ -415,6 +439,7 @@ async function authFetch(
     res.status === 403 &&
     (await temCodigo(res.clone(), "SENHA_TEMPORARIA"))
   ) {
+    if (epoca !== epocaAtual()) throw sessaoSubstituida();
     if (
       typeof window !== "undefined" &&
       window.location.pathname !== "/primeiro-acesso"
@@ -437,6 +462,7 @@ async function authFetch(
   // resolve o problema dela. E a LIM-024d da spec, e este bloco e a resposta
   // a ela.
   if (res.status === 403 && (await temCodigo(res.clone(), "ACEITE_PENDENTE"))) {
+    if (epoca !== epocaAtual()) throw sessaoSubstituida();
     if (
       typeof window !== "undefined" &&
       window.location.pathname !== "/aceite"
@@ -464,21 +490,23 @@ async function authFetch(
   // A renovação relê o usuário do banco e reemite o token com as claims
   // atuais. Se depois disso ainda for 403, aí é permissão de verdade.
   if (res.status === 403) {
-    const renovou = await renovarSessao();
-    if (renovou) {
+    const renovacao = await renovarSessao(epoca);
+    if (renovacao === "substituida") throw sessaoSubstituida();
+    if (renovacao === "renovada") {
       res = await requisicaoAutenticada(path, init);
     }
   }
 
   if (res.status === 401) {
-    const renovou = await renovarSessao();
-    if (!renovou) {
-      encerrarSessao();
+    const renovacao = await renovarSessao(epoca);
+    if (renovacao === "substituida") throw sessaoSubstituida();
+    if (renovacao === "falhou") {
+      encerrarSessao(epoca);
       throw await parseError(res, "Sua sessão expirou. Entre novamente.");
     }
     res = await requisicaoAutenticada(path, init);
     if (res.status === 401) {
-      encerrarSessao();
+      encerrarSessao(epoca);
       throw await parseError(res, "Sua sessão expirou. Entre novamente.");
     }
   }
@@ -556,8 +584,18 @@ export async function login(dto: LoginDto): Promise<LoginResult> {
  *
  * `credentials: "include"` é obrigatório: a identificação do refresh vem
  * pelo cookie.
+ *
+ * **A sessão que sai é a do gesto, não a da hora em que este código roda**
+ * (PRD-090-R5-01). O "Sair" espera a desinscrição do aparelho antes de
+ * chegar aqui, e nesse meio-tempo pode ter havido outro login nesta aba:
+ * quem chama passa o número capturado no clique. Se a sessão já é outra,
+ * não avisa o servidor, não apaga nada e devolve `false` — e quem chamou não
+ * navega para o login.
  */
-export async function logout(): Promise<void> {
+export async function logout(
+  epoca: number = epocaAtual(),
+): Promise<boolean> {
+  if (epoca !== epocaAtual()) return false;
   try {
     await fetch(`${API_URL}/api/v1/auth/logout`, {
       method: "POST",
@@ -570,14 +608,18 @@ export async function logout(): Promise<void> {
     });
   } catch {
     // Rede fora. O servidor não soube, e o token dele expira sozinho.
-  } finally {
-    clearAccessToken();
-    // O "Sair" volta ao login por `router.push`, sem recarregar a aba: o
-    // módulo — e a empresa guardada nele — sobrevive. Sem isto, quem tem o
-    // mesmo e-mail em dois clubes (SPEC-086) sai de um, entra no outro e vê
-    // a logo e o nome do primeiro até recarregar a página.
-    limparCacheDaEmpresa();
   }
+  // Se outra sessão começou enquanto o servidor respondia, o token que está
+  // aqui é dela, e o "Sair" da anterior não o apaga.
+  if (epoca !== epocaAtual()) return false;
+  abrirEpoca();
+  clearAccessToken();
+  // O "Sair" volta ao login por `router.push`, sem recarregar a aba: o
+  // módulo — e a empresa guardada nele — sobrevive. Sem isto, quem tem o
+  // mesmo e-mail em dois clubes (SPEC-086) sai de um, entra no outro e vê a
+  // logo e o nome do primeiro até recarregar a página.
+  limparCacheDaEmpresa();
+  return true;
 }
 
 /**
@@ -1575,9 +1617,76 @@ export async function removerMinhaFoto(): Promise<void> {
 export type MinhaEmpresa = components["schemas"]["MinhaEmpresaResponseDto"];
 
 let empresaEmCache: Promise<MinhaEmpresa> | null = null;
-/** De quem é a empresa em cache: a identidade do token que a pediu. */
-let identidadeDoCache: string | null = null;
+/**
+ * De quem é ESTA aba: a primeira identidade que ela viu no token, e não a do
+ * último pedido de empresa. A diferença importa (PRD-090-R2-01): se a leitura
+ * de B acontece antes de o evento `storage` chegar, uma identidade amarrada
+ * ao cache já seria B quando o evento fosse tratado, e o cabeçalho montado
+ * com A ficaria na tela sem recarga. A renovação por cookie também a define
+ * (PRD-090-R3-01). O login desta aba a passa ao dono novo
+ * (`iniciarSessaoNestaAba`); o "Sair" e a sessão encerrada a zeram, por
+ * `limparCacheDaEmpresa()`.
+ */
+let identidadeDaAba: string | null = null;
 let vigiandoOutraAba = false;
+
+/** O login mais recente desta aba: só ele pode virar sessão (`sessao-da-aba.ts`). */
+let ultimoPedidoDeLogin = 0;
+
+/** O que aconteceu com um token recebido. */
+export type Desfecho = "aplicado" | "descartado" | "recarregando";
+
+/** O pedido era de uma sessão que esta aba já não tem. */
+function sessaoSubstituida(): ApiError {
+  return new ApiError(0, "Sua sessão mudou.", "SESSAO_SUBSTITUIDA");
+}
+
+/**
+ * **O único caminho de um token de sessão existente até o armazenamento.**
+ * Descarta o de uma sessão anterior sem tocar no `localStorage`, e confere o
+ * dono com o token **recebido**, nunca com o que estiver guardado: com outra
+ * gravação no meio, o guardado seria de outra pessoa (PRD-090-R3-01).
+ */
+export function gravarTokenDaSessao(token: string, epoca: number): Desfecho {
+  if (epoca !== epocaAtual()) return "descartado";
+  saveAccessToken(token);
+  return conferirDonoDaAba(identidadeDoToken(token))
+    ? "recarregando"
+    : "aplicado";
+}
+
+export function gravarPapelDaSessao(papel: Papel, epoca: number): boolean {
+  if (epoca !== epocaAtual()) return false;
+  savePapel(papel);
+  return true;
+}
+
+/** Chamado ANTES de pedir o login: vence o último enviado, não o que voltar por último. */
+export function abrirPedidoDeLogin(): number {
+  return ++ultimoPedidoDeLogin;
+}
+
+/**
+ * O login desta aba vira a sessão dela. Abre uma época nova, de modo que
+ * nenhuma resposta pedida antes grava depois, e passa a aba ao dono novo.
+ * Se ela já tinha dono de **outra** conta — um cabeçalho dele pode estar
+ * montado —, devolve `"recarregando"` e quem chamou navega com recarga. Depois
+ * do "Sair" a aba não tem dono, e o login segue sem recarga.
+ */
+export function iniciarSessaoNestaAba(
+  pedido: number,
+  resultado: LoginResult,
+): Desfecho {
+  if (pedido !== ultimoPedidoDeLogin) return "descartado";
+  const quem = identidadeDoToken(resultado.accessToken);
+  const outroDono = identidadeDaAba !== null && quem !== identidadeDaAba;
+  abrirEpoca();
+  empresaEmCache = null;
+  saveAccessToken(resultado.accessToken);
+  savePapel(resultado.usuario.role);
+  identidadeDaAba = quem;
+  return outroDono ? "recarregando" : "aplicado";
+}
 
 /**
  * Quem é o dono do token, lido do payload **sem conferir a assinatura**:
@@ -1614,12 +1723,32 @@ function vigiarTrocaDeContaEmOutraAba(): void {
   if (vigiandoOutraAba || typeof window === "undefined") return;
   vigiandoOutraAba = true;
   window.addEventListener("storage", () => {
-    const atual = identidadeDoToken(getAccessToken());
-    if (empresaEmCache === null || atual === null) return;
-    if (atual === identidadeDoCache) return;
-    limparCacheDaEmpresa();
-    location.reload();
+    conferirDonoDaAba(identidadeDoToken(getAccessToken()));
   });
+}
+
+/**
+ * Chamada pelo evento E pela leitura da empresa, porque a ordem entre os dois
+ * não é garantida. Token ausente não decide nada: pode ser um refresh por
+ * cookie em curso ou o "Sair" de outra aba, que o 401 seguinte já trata. A
+ * primeira identidade vista vira a da aba; uma diferente depois disso é outra
+ * conta, e a aba recarrega uma vez só, porque já passa a ser da nova.
+ */
+function conferirDonoDaAba(atual: string | null): boolean {
+  if (atual === null) return false;
+  if (identidadeDaAba === null) {
+    identidadeDaAba = atual;
+    return false;
+  }
+  if (atual === identidadeDaAba) return false;
+  identidadeDaAba = atual;
+  empresaEmCache = null;
+  // Nada pedido por esta aba antes da troca grava depois dela: sem isto, a
+  // renovação em voo da conta anterior gravaria o token dela por cima da
+  // nova, e a outra aba voltaria para a conta antiga.
+  abrirEpoca();
+  location.reload();
+  return true;
 }
 
 /**
@@ -1651,10 +1780,7 @@ export async function getPrazosDoClube(): Promise<unknown> {
 
 export async function getMinhaEmpresa(): Promise<MinhaEmpresa> {
   vigiarTrocaDeContaEmOutraAba();
-  const identidade = identidadeDoToken(getAccessToken());
-  if (empresaEmCache && identidade !== identidadeDoCache) {
-    limparCacheDaEmpresa();
-  }
+  conferirDonoDaAba(identidadeDoToken(getAccessToken()));
   if (empresaEmCache) return empresaEmCache;
 
   const promessa: Promise<MinhaEmpresa> = authFetch("/me/company")
@@ -1669,17 +1795,17 @@ export async function getMinhaEmpresa(): Promise<MinhaEmpresa> {
       // primeiro carregamento deixaria a logo ausente até recarregar a aba.
       // Só apaga se ainda for ESTA promessa: a de uma conta anterior, que
       // falha depois do login da seguinte, não pode derrubar o cache novo.
-      if (empresaEmCache === promessa) limparCacheDaEmpresa();
+      // Só o cache: falhar uma busca não muda de quem é a aba.
+      if (empresaEmCache === promessa) empresaEmCache = null;
       throw erro;
     });
   empresaEmCache = promessa;
-  identidadeDoCache = identidade;
   return promessa;
 }
 
 export function limparCacheDaEmpresa(): void {
   empresaEmCache = null;
-  identidadeDoCache = null;
+  identidadeDaAba = null;
 }
 
 // =====================================================================

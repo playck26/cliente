@@ -16,6 +16,7 @@ import {
   type ContaDaRedefinicao,
 } from "@/lib/api-client";
 import { LOGIN_APOS_REDEFINICAO } from "@/lib/ativacao-navigation";
+import { epocaAtual } from "@/lib/sessao-da-aba";
 
 /** D9 — o estado do `410`, no `GET` ou no `POST`. */
 export const TEXTO_LINK_DE_REDEFINICAO_INVALIDO = "Este link não vale mais.";
@@ -147,6 +148,7 @@ export function RedefinirSenhaForm({ token }: { token: string }) {
     }
 
     setEnviando(true);
+    const epoca = epocaAtual();
     try {
       await redefinirSenha({ token, usuarioId: conta.usuarioId, senha });
     } catch (e) {
@@ -170,6 +172,9 @@ export function RedefinirSenhaForm({ token }: { token: string }) {
     }
     // O botão continua desabilitado até a navegação: um segundo toque
     // mandaria o link já gasto e mostraria o `410` a quem acabou de dar certo.
+    // Outra sessão começou nesta aba enquanto o servidor respondia (um login
+    // em outra rota): mandar para o login seria sair por ela (PRD-090-R5-01).
+    if (epoca !== epocaAtual()) return;
     router.replace(LOGIN_APOS_REDEFINICAO);
   }
 

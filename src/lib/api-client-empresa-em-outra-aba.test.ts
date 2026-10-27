@@ -147,4 +147,28 @@ describe("a resposta atrasada de uma conta anterior", () => {
     expect((await getMinhaEmpresa()).nome).toBe("Clube B");
     expect(chamadasDaEmpresa()).toBe(2);
   });
+
+  it("refresh por cookie, sem access token local: a empresa da mesma conta não é pedida de novo", async () => {
+    window.localStorage.removeItem(CHAVE);
+    let n = 0;
+    fetchMock = vi.fn((url: string) => {
+      if (String(url).endsWith("/auth/refresh")) {
+        return Promise.resolve(resposta({ accessToken: token("u-a", "a") }));
+      }
+      if (!String(url).endsWith("/me/company")) return Promise.resolve(resposta({}));
+      n += 1;
+      return Promise.resolve(
+        n === 1
+          ? ({ ok: false, status: 401, json: () => Promise.resolve({}), clone() { return this; } } as unknown as Response)
+          : resposta(CLUBE_A),
+      );
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getMinhaEmpresa();
+    await getMinhaEmpresa();
+
+    expect(chamadasDaEmpresa()).toBe(2); // o 401 e o retry; nenhum terceiro
+    expect(recarregar).not.toHaveBeenCalled();
+  });
 });

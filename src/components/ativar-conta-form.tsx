@@ -11,6 +11,7 @@ import {
   type AtivacaoPublica,
 } from "@/lib/api-client";
 import { LOGIN_APOS_ATIVACAO } from "@/lib/ativacao-navigation";
+import { epocaAtual } from "@/lib/sessao-da-aba";
 
 /** D11 — o texto do `410`, igual ao que o servidor manda no `LINK_INVALIDO`. */
 export const TEXTO_LINK_INVALIDO =
@@ -100,6 +101,7 @@ export function AtivarContaForm({ token }: { token: string }) {
     }
 
     setEnviando(true);
+    const epoca = epocaAtual();
     try {
       await ativarConta({ token, senha });
     } catch (e) {
@@ -121,6 +123,9 @@ export function AtivarContaForm({ token }: { token: string }) {
     // O botão continua desabilitado até a navegação: um segundo toque
     // mandaria o mesmo token já gasto e mostraria o `410` a quem acabou de
     // dar certo.
+    // Outra sessão começou nesta aba enquanto o servidor respondia (um login
+    // em outra rota): mandar para o login seria sair por ela (PRD-090-R5-01).
+    if (epoca !== epocaAtual()) return;
     router.replace(LOGIN_APOS_ATIVACAO);
   }
 
