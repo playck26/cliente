@@ -1,6 +1,16 @@
 # ARCHITECTURE — `cliente` (PlayCK)
 
-**Fonte: análise direta do código.** Data: **2026-10-25** (era 2026-10-08).
+**Fonte: análise direta do código.** Data: **2026-10-26** (era 2026-10-25).
+**SPEC-090, na branch `spec090/esqueci-senha` (sobre o `main` `2b943e2`, que já
+tem a SPEC-089):** **84** arquivos de teste, **1046** casos, todos verdes
+(`vitest run --pool=threads`, uma rodada, em série, `Test Files 84 passed`,
+exit 0), **59** componentes (`.tsx` de `src/components` sem subpastas e sem os
+testes; o `main` tem 56) e **23** módulos em `lib/` (sem mudança). +3 arquivos
+de teste (`escolha-de-conta`, `esqueci-senha-form`, `redefinir-senha-form`) e
++75 casos sobre os 971 do registro da SPEC-089 logo abaixo; +3 componentes, os
+mesmos três; +2 páginas (`/esqueci-senha`, `/redefinir-senha/[token]`). A
+suíte de navegador **não foi rodada nesta conferência** (o job `navegador` do
+CI é a prova dela). Ver "O esqueci minha senha (SPEC-090)" na seção 9.
 **SPEC-089, na branch `spec089/nivel-opcional` (sobre o `main` `2125dc5`):**
 **81** arquivos de teste, **971** casos, todos verdes (`vitest run
 --pool=threads`, em série, nenhum worker perdido); navegador **130** casos
@@ -158,12 +168,14 @@ page.tsx (server component, fino)
 
 | Rota | Componente | Papel |
 |---|---|---|
-| `/login` | página (foto, marca, texto) → `aviso-de-ativacao` + `login-form` | entrada; leva a `/primeiro-acesso` se a senha for temporária. **DEF-003**: "Cadastre-se" virou link real para `/cadastro` (era `<span>` morto desde a SPEC-007) e "Esqueceu a senha?" passou a dizer o caminho que existe hoje. **SPEC-084 — o login fotográfico** (seção 9, "O login fotográfico"): a página saiu do `app-screen` e virou uma coluna de até 480 px com a foto de quadra atrás; o `login-form` ficou só com o formulário, e o comportamento dele é o da base, congelado em `login-form.caracterizacao.test.tsx`. **O convite de instalação não aparece aqui** (I1), **nem a chamada para cadastro** (I5: o aluno não se cadastra sozinho; a rota `/cadastro` continua existindo, só o login deixou de apontar para ela). **SPEC-086 — a escolha do clube:** quando a senha abre mais de uma conta, o login responde `409 ESCOLHA_DE_EMPRESA` e o `login-form` troca o formulário pelo `escolha-de-empresa` (um botão por clube, com `LogoDaEmpresa` num quadro claro, nome inteiro e papel; a conta com senha temporária vencida aparece bloqueada, sem botão). Tocar chama `POST /auth/login/escolher` (`escolherEmpresa`, `escolhaDoErro` em `lib/api-client.ts`) e segue o mesmo pós-login. A caracterização do `login-form` continua intacta: a escolha é um ramo novo no `catch` |
+| `/login` | página (foto, marca, texto) → `aviso-de-ativacao` + `login-form` | entrada; leva a `/primeiro-acesso` se a senha for temporária. **DEF-003**: "Cadastre-se" virou link real para `/cadastro` (era `<span>` morto desde a SPEC-007) e "Esqueceu a senha?" passou a dizer o caminho que existia então. **SPEC-090:** "Esqueceu a senha?" virou **link para `/esqueci-senha`**; o texto de ajuda (*"Ainda não enviamos e-mail de recuperação…"*) saiu. O aviso **"Senha redefinida. Entre com a senha nova."** (`?senha=redefinida`) sai na mesma região do aviso de ativação. **SPEC-084 — o login fotográfico** (seção 9, "O login fotográfico"): a página saiu do `app-screen` e virou uma coluna de até 480 px com a foto de quadra atrás; o `login-form` ficou só com o formulário, e o comportamento dele é o da base, congelado em `login-form.caracterizacao.test.tsx`. **O convite de instalação não aparece aqui** (I1), **nem a chamada para cadastro** (I5: o aluno não se cadastra sozinho; a rota `/cadastro` continua existindo, só o login deixou de apontar para ela). **SPEC-086 — a escolha do clube:** quando a senha abre mais de uma conta, o login responde `409 ESCOLHA_DE_EMPRESA` e o `login-form` troca o formulário pelo `escolha-de-empresa` (um botão por clube, com `LogoDaEmpresa` num quadro claro, nome inteiro e papel; a conta com senha temporária vencida aparece bloqueada, sem botão). Tocar chama `POST /auth/login/escolher` (`escolherEmpresa`, `escolhaDoErro` em `lib/api-client.ts`) e segue o mesmo pós-login. A caracterização do `login-form` continua intacta: a escolha é um ramo novo no `catch` |
 | `/primeiro-acesso` | `primeiro-acesso-form` | troca obrigatória da senha temporária (INV-008) |
 | `/cadastro` | `escolher-clube-form` | **DEF-003**: pede o código do clube e redireciona para `/cadastro/<slug>`. Existe porque o login não sabe de qual clube a pessoa é; não valida o código aqui (o limite de 10/15min do endpoint público trancaria quem errasse duas vezes) |
 | `/cadastro/[slug]` | `cadastro-publico-form` | auto-cadastro pelo link público da empresa |
 | `/convite/[token]` | `aceitar-convite-form` | aceite de convite |
 | `/ativar/[token]` | `ativar-conta-form` | **SPEC-083 — o link do e-mail.** A conta já existe (o gestor a criou na importação ou na ficha) e a pessoa só cria a senha. Lê `GET /public/ativacao/:token` (primeiro nome e clube, e nada mais) e mostra *"Olá, <primeiroNome>. Crie sua senha para entrar no <clube>."*, com senha e confirmação. `410` mostra *"Este link não vale mais. Peça um novo convite ao seu clube."*; falha de rede ao abrir **não** diz que o link morreu. Depois do `204` faz `router.replace(LOGIN_APOS_ATIVACAO)`, com a constante **importada** da SPEC-084 — o login real mostra o aviso. `410`, `400` e rede ficam na tela. A página declara `no-referrer` (`metadata.referrer`, no `<head>`), e as duas chamadas repetem a política no `fetch`. Sem sessão: o termo é aceito no portão do primeiro acesso (I12). Sem convite de instalação (I17). Ver seção 9, "O link de ativação e o banner dos e-mails" |
+| `/esqueci-senha` | `AuthShell` → `esqueci-senha-form` | **SPEC-090 — pedir o link.** Campo de e-mail; `POST /auth/esqueci-senha` (`pedirRedefinicaoDeSenha`). `202` → **sempre** *"Se houver conta com este e-mail, enviamos um link para redefinir a senha. Ele vale por 1 hora. Confira também o spam."*, com conta ou sem; `429` → texto fixo *"Muitas tentativas seguidas. Espere alguns minutos e tente de novo."* (I9: o throttler responde em inglês); `400` → *"Confira o e-mail digitado."*; rede ou `5xx` → *"Não foi possível pedir o link agora. Tente de novo."* — nenhum dos dois diz que enviou. "Voltar ao login" nos dois estados, e o foco vai a ele depois do `202`. Sem convite de instalação (I10) |
+| `/redefinir-senha/[token]` | `AuthShell` → `redefinir-senha-form` (+ `escolha-de-conta`) | **SPEC-090 — o link do e-mail.** `GET /public/redefinicao/:token` (`getRedefinicao`): **uma** conta → o formulário direto, com o clube e o papel em cima; **duas ou mais** → a lista (`EscolhaDeConta`), e tocar num card leva ao formulário daquela conta, com "Voltar" para a lista. Senha e confirmação (mínimo 8, iguais), mostrar/ocultar; `POST /public/redefinicao` (`redefinirSenha`) → `204` → `router.replace(LOGIN_APOS_REDEFINICAO)`, **importado** de `lib/ativacao-navigation.ts`. `410` (no `GET` ou no `POST`) → *"Este link não vale mais."* e "Pedir outro link" para `/esqueci-senha`; `429` → o texto fixo da I9. `metadata.referrer = "no-referrer"` e as duas chamadas com `referrerPolicy: "no-referrer"`, como `/ativar/[token]`. Sem sessão. Sem convite de instalação (I10) |
 | `/home` | `home-view` → `cartao-da-proxima-aula` + `calendario-do-aluno` | **SPEC-058 — o calendário do mês e o cartão de volta.** O Israel usou a home em produção e pediu as duas coisas: um calendário *"parecido com o do professor, só que mais atrativo"* e o cartão de volta, *"trazendo os insights mais importantes"*. O **cartão** não repete a grade: ele diz **quanto falta** ("em 3 horas", "amanhã às 19:00"), que é o que ela não diz — e o insight foi **escolha dele entre quatro** (D3). **Sem aula futura ele não some**, vira convite (AC-007): cartão que some faz a home pular de altura. O **calendário** nasceu do molde de `agenda-do-professor`, **não de abstração comum** — lá o ponto é "faltou registrar presença", aqui é "você avisou que vai faltar", e amarrar as duas agora seria amarrar telas que ainda vão divergir (D1). **Uma requisição só no primeiro desenho**, com janela do 1º do mês até +60 dias: ela alimenta a grade *e* o cartão; trocar de mês troca só a grade, para o cartão não passar a apontar para o mês que o aluno foi espiar. **A semana (`semana-do-aluno`) saiu daqui e continua em `/minhas-aulas`**, onde é uma das duas abas e o aluno escolhe — na home era imposição. Invariantes herdadas que **não** caíram: nenhum link para `/quadras` (SPEC-053/AC-009), a palavra "quadra" ausente da home (AC-001 — a primeira versão do cartão a escrevia, e quem pegou foi o teste plantado pela SPEC-057), aula **não realizada** marcada na lista do dia (SPEC-030, achado ALTA), e o aviso de falha da agenda com lugar próprio (DEF-033) **SPEC-059 — a agenda passou a ter TUDO.** O calendário nascia só com aula de turma, e quem reservava quadra na sexta via sexta vazia: agora ele junta as três origens (`/me/classes` + `/bookings` na mesma janela) e **cada linha diz o que é**, com o termo que o CLUBE deu ao tipo (`nomes-de-tipo`, SPEC-054/D1) — clube que chama de "Espaço" lê "Reserva · Espaço". Cada item traz os **materiais alugados** ("2× Raquete · 1× Toalha"), o valor, a situação de pagamento e as marcas de aula (falta avisada, não realizada). Reserva cancelada aparece **riscada**, não some (SPEC-041/SPEC-056). **Falha de uma origem não derruba a outra:** sem as reservas, a grade mostra as aulas e o aviso ocupa o lugar do que faltou. **O rótulo do tipo revogou em parte a SPEC-053/AC-001** (a home não escrevia "quadra"): o Israel pediu o oposto olhando a tela, e a D3b registra a troca — o gate de redação `redacao-de-reservas.test.ts` continua verde porque o texto agora vem do nome configurado, não de frase fixa **SPEC-073 — a home parou de esperar em fila.** Eram três idas em série (`me` → aulas → reservas), e o professor faz uma. Com o papel guardado no login (`getPapel`, **navegação, nunca autorização**) aulas e reservas saem **junto com** o `getMe()`, num `Promise.allSettled` — a falha de uma continua não derrubando a outra, e a busca adiantada nunca rejeita. **Quem decide o que pinta continua sendo o `getMe()`:** papel guardado de aluno com `getMe` dizendo gestor pede e descarta (LIM-073a). A grade desenha **antes** do dado, como a do professor, com `carregando` no lugar da lista — e durante a carga ela **não diz** "Nenhum compromisso neste mês". Um contador (`pedidoDaAgenda`, o molde do DEF-021) impede resposta velha de pintar o mês da tela; a carga inicial alimenta o cartão sempre |
 | `/minhas-aulas` | `tela-de-aulas` → `my-classes-list` | **SPEC-057/TASK-002/D11 (card 5352) — a agenda é a tela, e o submenu saiu.** As abas "Próximas / Anteriores / Turmas" não existem mais. **A ordem da mudança é a decisão:** aquelas três abas **não eram três vistas do mesmo dado** — "Turmas" era o único lugar do produto onde o aluno entra e sai de turma, e "Anteriores" o único de onde ele avalia aula passada (achado B02 do veredito independente). Os dois ganharam **endereço próprio primeiro**, e só depois a barra saiu. A vista de semana agora **alcança o passado**: ela avisa a janela (`onJanela`) e o pai pede `GET /me/classes?de=&ate=`, somando ao que já tem em vez de substituir — trocar apagaria as próximas aulas da lista ao lado. **`abas-na-url` continua**, porque Reservas usa |
 | `/minhas-aulas/turmas` | `turmas-do-clube` | o catálogo, com o filtro de nível da TASK-004. **Sem a nota** desde a TASK-002/D12: o card manda ocultá-la do aluno, a SPEC-052 já a tinha tirado do professor, e a busca da média saiu junto com o desenho — chamada alimentando estado que ninguém lê é ida à rede por nada |
@@ -251,6 +263,13 @@ cada token, e a lista exata da 084 não o alcança. Entrou uma segunda lista, de
 `/ativar` sozinho e `/ativarx/...` continuam com convite. Provado em
 `instalacao-pwa.test.ts` e no `e2e/ativacao-login.spec.ts`, com o evento de
 instalação guardado e o controle em `/primeiro-acesso`, onde o convite aparece.
+
+**SPEC-090 (I10) — também fora das telas de redefinir a senha.**
+`/esqueci-senha` entrou na lista **exata** (`ROTAS_SEM_CONVITE = ["/login",
+"/esqueci-senha"]`: a página não tem subcaminho) e `/redefinir-senha/` na de
+**prefixos** (`PREFIXOS_SEM_CONVITE = ["/ativar/", "/redefinir-senha/"]`, com
+a barra final, pela mesma razão do `/ativar/`). Provado em
+`instalacao-pwa.test.ts`.
 
 Até a SPEC-050 existiam só os dois primeiros, e **o app era instalável sem
 nunca convidar ninguém** — não havia `beforeinstallprompt` em nenhum
@@ -833,6 +852,18 @@ congelada monta o `LoginForm` com o mock de `next/navigation` só com
 recebe o texto 150 ms depois da montagem, pelo `setTimeout`: região viva que já
 nasce com conteúdo costuma não ser anunciada.
 
+**SPEC-090 — dois protocolos, uma região.** O mesmo arquivo de protocolo
+ganhou `LOGIN_APOS_REDEFINICAO = "/login?senha=redefinida"` e a leitura
+`chegouDaRedefinicao` (valor exato: `?senha=1` ou `?senha=` não contam), e a
+varredura do `ativacao-navigation.test.ts` reprova também uma segunda cópia do
+literal `senha=redefinida`. O `aviso-de-ativacao.tsx` continua **uma** região
+`role="status"` e escolhe o texto (`textoDaChegada`): *"Conta ativada…"* ou
+*"Senha redefinida. Entre com a senha nova."* — vazia no servidor e no primeiro
+render, preenchida depois do mesmo atraso, nos dois protocolos. A leitura
+continua por `window.location.search` num efeito, sem `useSearchParams`.
+`e2e/login-aviso-ativacao.spec.ts` confere a região vazia no HTML do servidor
+também em `LOGIN_APOS_REDEFINICAO`.
+
 **O comportamento do login está congelado.**
 `login-form.caracterizacao.test.tsx` foi escrito contra o componente ANTIGO
 (16 casos: atributos, pedidos, armazenamento, destino por papel, erros,
@@ -841,6 +872,11 @@ vermelhas e passou sem nenhuma mudança contra o novo. **Mudou uma vez só**,
 por decisão de produto e não para acompanhar regressão: a I5 tirou a asserção
 do link de cadastro (hash do conteúdo em LF `363bdb58…` → `b35887f4…`). Mexer
 no `login-form.tsx` é passar por aquele arquivo sem editá-lo.
+**Mudou a segunda vez na SPEC-090**, por exceção declarada na spec
+(DOR-090-R1-05): os dois testes que tratavam "Esqueceu a senha?" como botão de
+ajuda passaram a esperar o link para `/esqueci-senha`, e o cabeçalho do arquivo
+diz "Primeira mudança" onde dizia "Única mudança"; nenhum outro teste mudou de
+expectativa.
 
 **As provas de navegador.**
 - `e2e/login-visual.spec.ts`: composição nos quatro viewports, copy aprovada,
@@ -897,6 +933,58 @@ publicado** para os e-mails já enviados, e o mesmo teste o protege. Os arquivos
 são estáticos: a `netlify-ignore` os trata como mudança de site (estão em
 `public/`), e um revert do Cliente depois do envio quebra o banner e o link dos
 e-mails já enviados (LIM-083j).
+
+### O esqueci minha senha (SPEC-090)
+
+*Escrito em 2026-10-26 sobre a branch `spec090/esqueci-senha` (commits
+`6b0aca7`..`ce30a04`, sobre o `main` `2b943e2`). **Não está no ar.** Spec:
+`specs/changes/090-esqueci-minha-senha/spec.md`.*
+
+**O caminho.** Login → "Esqueceu a senha?" (link) → `/esqueci-senha` → e-mail
+com o link de 1 hora → `/redefinir-senha/<token>` → `/login?senha=redefinida`.
+Sem sessão no fim: a pessoa entra pelo login. As rotas e os textos estão na
+tabela da seção 3; aqui fica o que não cabe lá.
+
+**As chamadas** (`lib/api-client.ts`): `pedirRedefinicaoDeSenha`,
+`getRedefinicao` e `redefinirSenha`, com os tipos `RedefinicaoPublica`,
+`ContaDaRedefinicao` e `RedefinirSenha` do contrato. As duas do link usam
+`SEM_REFERRER`, a mesma política das chamadas da ativação. O
+`contrato.lock.json` aponta para o Back `38b95da`, o último commit que mexe no
+`openapi.json` da SPEC-090.
+
+**`EscolhaDeConta`** (`components/escolha-de-conta.tsx`) é **componente
+próprio**, e não o `escolha-de-empresa.tsx` da SPEC-086 parametrizado: aquele
+tem quatro textos de login fixos e é congelado pelos testes da 086 (o diff dele
+na PR é vazio). Mesmo visual, reusando o `LogoDaEmpresa`; título *"Qual conta
+vai ter a senha redefinida?"*, apoio *"Seu e-mail tem conta em mais de um
+clube."*, `aria-label` de cada card *"Redefinir a senha de <clube>, como
+<papel>"*, **sem botão de voltar** na lista e sem card bloqueado (a conta que
+não aceita mais o link nem vem no `GET`, I8).
+
+**O foco do teclado nas trocas de tela** (REV-090-F03): ao escolher a conta,
+vai ao campo "Senha nova"; ao voltar, ao título da lista; depois do `202` em
+`/esqueci-senha`, a "Voltar ao login" — a confirmação já é lida pela região
+viva. Sem isso o foco caía no `body`.
+
+**I9 — o `429` em português.** `ehMuitasTentativas` e
+`TEXTO_DE_MUITAS_TENTATIVAS` moram em `esqueci-senha-form.tsx` e a página do
+token os importa: um texto só para as duas telas.
+
+**I10 — sem convite de instalação** em `/esqueci-senha` e
+`/redefinir-senha/<token>` (seção 4, "PWA").
+
+**O aviso no login** é o da SPEC-084, com o segundo protocolo no mesmo arquivo
+(ver "O aviso pós-ativação", acima, e a seção 3).
+
+| Prova | O quê |
+|---|---|
+| `esqueci-senha-form.test.tsx` | a mesma frase para qualquer `202`, `429`, `400`, rede, o foco |
+| `redefinir-senha-form.test.tsx` | uma conta, duas contas (lista → formulário → voltar), `204` com `LOGIN_APOS_REDEFINICAO` importado, `410` no `GET` e no `POST`, `429` |
+| `escolha-de-conta.test.tsx` | duas e três contas, o `aria-label`, nenhum botão de voltar |
+| `aviso-de-ativacao.test.tsx`, `login-form.test.tsx` | os dois textos numa região só, vazia logo depois do `render` |
+| `ativacao-navigation.test.ts` | a varredura das duas chaves |
+| `instalacao-pwa.test.ts` | as duas rotas sem convite |
+| `e2e/login-aviso-ativacao.spec.ts`, `e2e/login-visual.spec.ts`, `e2e/login-install.spec.ts` | a região vazia sem JavaScript também em `LOGIN_APOS_REDEFINICAO`; "Esqueceu a senha?" como **link**, ainda medido em contraste e no alvo de 44 px |
 
 ## 10. Avisos do clube — push (SPEC-062/TASK-004)
 

@@ -516,6 +516,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/esqueci-senha": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["EsqueciSenhaController_esqueciSenha"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/redefinicao/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["RedefinicaoPublicaController_consultar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/public/redefinicao": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["RedefinicaoPublicaController_redefinir"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/planos": {
         parameters: {
             query?: never;
@@ -2563,6 +2611,32 @@ export interface components {
         };
         AtivarContaDto: {
             token: string;
+            senha: string;
+        };
+        EsqueciSenhaDto: {
+            /** Format: email */
+            email: string;
+        };
+        /** @enum {string} */
+        PapelDaRedefinicao: "aluno" | "professor" | "company_admin";
+        EmpresaDaRedefinicaoResponseDto: {
+            /** @example Clube X */
+            nome: string;
+            logoUrl: string | null;
+        };
+        ContaDaRedefinicaoResponseDto: {
+            /** Format: uuid */
+            usuarioId: string;
+            papel: components["schemas"]["PapelDaRedefinicao"];
+            empresa: components["schemas"]["EmpresaDaRedefinicaoResponseDto"];
+        };
+        RedefinicaoPublicaResponseDto: {
+            contas: components["schemas"]["ContaDaRedefinicaoResponseDto"][];
+        };
+        RedefinirSenhaDto: {
+            token: string;
+            /** Format: uuid */
+            usuarioId: string;
             senha: string;
         };
         PlanoResponseDto: {
@@ -5528,6 +5602,69 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["AtivarContaDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    EsqueciSenhaController_esqueciSenha: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["EsqueciSenhaDto"];
+            };
+        };
+        responses: {
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    RedefinicaoPublicaController_consultar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RedefinicaoPublicaResponseDto"];
+                };
+            };
+        };
+    };
+    RedefinicaoPublicaController_redefinir: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RedefinirSenhaDto"];
             };
         };
         responses: {

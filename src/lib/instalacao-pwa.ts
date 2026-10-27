@@ -275,8 +275,13 @@ export function limparDispensa(): void {
  *
  * `null` é o caminho fora do roteador do Next (testes de componente): ali o
  * convite se comporta como antes.
+ *
+ * **SPEC-090 (I10, 2026-10-26):** `/esqueci-senha` entrou aqui, na lista
+ * **exata**, e não na de prefixos: a página não tem subcaminho, e um prefixo
+ * `/esqueci-senha` pegaria por acidente qualquer `/esqueci-senha-x`, enquanto
+ * `/esqueci-senha/` deixaria de fora a própria página.
  */
-export const ROTAS_SEM_CONVITE: readonly string[] = ["/login"];
+export const ROTAS_SEM_CONVITE: readonly string[] = ["/login", "/esqueci-senha"];
 
 /**
  * SPEC-083 (I17, D11) — **as telas sem convite que mudam com o endereço.**
@@ -288,8 +293,12 @@ export const ROTAS_SEM_CONVITE: readonly string[] = ["/login"];
  * Por isso é uma lista à parte, de **prefixos**, e a da SPEC-084 fica como
  * está. O prefixo termina em `/` de propósito: `/ativar/` pega todo token e
  * não pega uma rota vizinha que só comece com as mesmas letras.
+ *
+ * **SPEC-090 (I10, 2026-10-26):** `/redefinir-senha/<token>` é a mesma tela de
+ * criar senha a partir de um link do e-mail, e o Israel decidiu escondê-lo ali
+ * também. Mesma forma: prefixo com a barra final.
  */
-export const PREFIXOS_SEM_CONVITE: readonly string[] = ["/ativar/"];
+export const PREFIXOS_SEM_CONVITE: readonly string[] = ["/ativar/", "/redefinir-senha/"];
 
 export function conviteCabeNaRota(caminho: string | null): boolean {
   if (caminho === null) return true;

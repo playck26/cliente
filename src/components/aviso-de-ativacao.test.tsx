@@ -1,7 +1,11 @@
 import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { LOGIN_APOS_ATIVACAO } from "@/lib/ativacao-navigation";
-import { AvisoDeAtivacao, TEXTO_DO_AVISO_DE_ATIVACAO } from "./aviso-de-ativacao";
+import { LOGIN_APOS_ATIVACAO, LOGIN_APOS_REDEFINICAO } from "@/lib/ativacao-navigation";
+import {
+  AvisoDeAtivacao,
+  TEXTO_DO_AVISO_DE_ATIVACAO,
+  TEXTO_DO_AVISO_DE_REDEFINICAO,
+} from "./aviso-de-ativacao";
 
 /**
  * SPEC-084 (AC-008, TEST-005) — **o aviso de quem acabou de ativar a conta.**
@@ -74,6 +78,60 @@ describe("AvisoDeAtivacao", () => {
     expect(screen.getByRole("status")).toHaveTextContent(TEXTO_DO_AVISO_DE_ATIVACAO);
     expect(pedidos).toEqual([]);
     expect({ ...window.localStorage }).toEqual(antes);
+    expect(window.localStorage.length).toBe(0);
+    expect(document.activeElement).toBe(document.body);
+  });
+});
+
+/**
+ * SPEC-090 (AC-024, D9) — **o segundo protocolo, na mesma região.**
+ *
+ * As duas chegadas são medidas pelo mesmo roteiro: a região nasce vazia no
+ * render (antes do efeito), o texto certo entra depois, e continua havendo uma
+ * região só. Um ramo que preenchesse de imediato (S26) fica vermelho no
+ * `toBeEmptyDOMElement` logo depois do `render`; uma segunda região (S25), no
+ * `getAllByRole("status")`.
+ */
+describe("AvisoDeAtivacao — SPEC-090, a redefinição de senha", () => {
+  it.each([
+    [LOGIN_APOS_ATIVACAO, TEXTO_DO_AVISO_DE_ATIVACAO],
+    [LOGIN_APOS_REDEFINICAO, TEXTO_DO_AVISO_DE_REDEFINICAO],
+  ])("%s: uma região só, vazia antes do efeito, e o texto certo depois", async (endereco, texto) => {
+    irPara(endereco);
+    render(<AvisoDeAtivacao />);
+
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+    const regiao = screen.getByRole("status");
+    expect(regiao).toBeEmptyDOMElement();
+
+    await passarOTempo();
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+    expect(regiao).toHaveTextContent(texto);
+    expect(regiao.textContent).toBe(texto);
+  });
+
+  it("o texto da redefinição é o da D9", () => {
+    expect(TEXTO_DO_AVISO_DE_REDEFINICAO).toBe("Senha redefinida. Entre com a senha nova.");
+  });
+
+  it.each(["/login?senha=", "/login?senha=1", "/login?senha=Redefinida", "/login?senha=redefinida2", "/login?redefinida=1"])(
+    "%s: valor fora do protocolo, a região continua vazia",
+    async (endereco) => {
+      irPara(endereco);
+      render(<AvisoDeAtivacao />);
+      await passarOTempo();
+      expect(screen.getAllByRole("status")).toHaveLength(1);
+      expect(screen.getByRole("status")).toBeEmptyDOMElement();
+    },
+  );
+
+  it("redefinição: não pede nada à rede, não grava nada e não tira o foco", async () => {
+    irPara(LOGIN_APOS_REDEFINICAO);
+    render(<AvisoDeAtivacao />);
+    await passarOTempo();
+
+    expect(screen.getByRole("status")).toHaveTextContent(TEXTO_DO_AVISO_DE_REDEFINICAO);
+    expect(pedidos).toEqual([]);
     expect(window.localStorage.length).toBe(0);
     expect(document.activeElement).toBe(document.body);
   });

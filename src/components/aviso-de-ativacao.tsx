@@ -2,10 +2,25 @@
 
 import { useEffect, useState } from "react";
 import { CircleCheck } from "lucide-react";
-import { chegouDaAtivacao } from "@/lib/ativacao-navigation";
+import { chegouDaAtivacao, chegouDaRedefinicao } from "@/lib/ativacao-navigation";
 
 export const TEXTO_DO_AVISO_DE_ATIVACAO =
   "Conta ativada. Entre com seu e-mail e senha.";
+
+/** SPEC-090 (D9) — quem acabou de redefinir a senha pelo link do e-mail. */
+export const TEXTO_DO_AVISO_DE_REDEFINICAO =
+  "Senha redefinida. Entre com a senha nova.";
+
+/**
+ * O texto que a região recebe depois da montagem, ou `null` para continuar
+ * vazia. Os dois protocolos moram em `ativacao-navigation.ts`; aqui só se
+ * escolhe a frase.
+ */
+function textoDaChegada(busca: string): string | null {
+  if (chegouDaAtivacao(busca)) return TEXTO_DO_AVISO_DE_ATIVACAO;
+  if (chegouDaRedefinicao(busca)) return TEXTO_DO_AVISO_DE_REDEFINICAO;
+  return null;
+}
 
 /**
  * Quanto esperar depois da montagem para pôr o texto na região viva. Não é
@@ -44,13 +59,21 @@ const ATRASO_DO_ANUNCIO_MS = 150;
  * Cores locais do login (DESIGN.md, “Login fotográfico”): superfície opaca
  * escura, texto branco e ícone verde-lima. O verde `#00763A` do tema dava
  * 3,4:1 sobre o fundo escuro e ficou de fora (DOR-084-R1-01).
+ *
+ * ## Dois protocolos, uma região (SPEC-090, D9)
+ *
+ * A redefinição de senha manda para `LOGIN_APOS_REDEFINICAO`, e a frase dela
+ * entra **nesta mesma região**, pelo mesmo caminho: vazia no servidor e no
+ * primeiro render, texto depois do atraso. Uma segunda região `role="status"`
+ * quebraria a regra de uma região só na página (AC-008 da SPEC-084), e um
+ * ramo que preenchesse de imediato perderia o anúncio (AC-024 da SPEC-090).
  */
 export function AvisoDeAtivacao() {
-  const [mostrar, setMostrar] = useState(false);
+  const [texto, setTexto] = useState<string | null>(null);
 
   useEffect(() => {
     const id = window.setTimeout(() => {
-      setMostrar(chegouDaAtivacao(window.location.search));
+      setTexto(textoDaChegada(window.location.search));
     }, ATRASO_DO_ANUNCIO_MS);
     return () => window.clearTimeout(id);
   }, []);
@@ -60,15 +83,15 @@ export function AvisoDeAtivacao() {
       role="status"
       data-aviso-de-ativacao=""
       className={
-        mostrar
+        texto
           ? "mb-4 flex items-start gap-3 rounded-2xl bg-[#161A1D] p-4 text-sm leading-snug font-semibold break-words text-white ring-1 ring-white/20"
           : undefined
       }
     >
-      {mostrar ? (
+      {texto ? (
         <>
           <CircleCheck className="mt-px size-5 shrink-0 text-[#B9E52B]" aria-hidden="true" />
-          <span className="min-w-0">{TEXTO_DO_AVISO_DE_ATIVACAO}</span>
+          <span className="min-w-0">{texto}</span>
         </>
       ) : null}
     </div>

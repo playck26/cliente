@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowRight, CircleAlert, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,12 @@ import { lerNomesDeTipo } from "@/lib/nomes-de-tipo";
  * `login-form.caracterizacao.test.tsx`: pedidos, armazenamento, destino por
  * papel, erros, carregamento, senha visível e ajuda. Mexer aqui é passar por
  * aquele arquivo sem mudá-lo.
+ *
+ * **A exceção declarada (SPEC-090, DOR-090-R1-05):** "Esqueceu a senha?"
+ * deixou de abrir o texto de ajuda ("Ainda não enviamos e-mail de
+ * recuperação…") e virou link para `/esqueci-senha`, a recuperação pelo
+ * e-mail. Só os dois testes da caracterização que tratavam o botão de ajuda
+ * mudaram de expectativa; o resto do arquivo ficou igual.
  *
  * **Sem "Ainda não tem conta? Cadastre-se" (I5, 2026-10-02):** o aluno não se
  * cadastra sozinho, e o Israel pediu para tirar o convite ao cadastro do login.
@@ -74,7 +81,6 @@ export function LoginForm() {
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [ajudaSenha, setAjudaSenha] = useState(false);
   // SPEC-086 — a senha abriu mais de uma conta: a escolha do clube.
   const [escolha, setEscolha] = useState<Escolha | null>(null);
   const [entrando, setEntrando] = useState<string | null>(null);
@@ -160,14 +166,11 @@ export function LoginForm() {
             {mostrarSenha ? <EyeOff className="size-5" /> : <Eye className="size-5" />}
           </button>
         </div>
-        <button type="button" onClick={() => setAjudaSenha((v) => !v)} aria-expanded={ajudaSenha} className={`min-h-11 self-end rounded-lg px-1 text-sm font-extrabold text-[#B9E52B] ${FOCO}`}>
+        {/* SPEC-090 (D9): link, e não mais o botão do texto de ajuda. Mesma
+            cor, mesmo alvo de 44 px e o mesmo anel de foco de antes. */}
+        <Link href="/esqueci-senha" className={`flex min-h-11 items-center self-end rounded-lg px-1 text-sm font-extrabold text-[#B9E52B] ${FOCO}`}>
           Esqueceu a senha?
-        </button>
-        {ajudaSenha ? (
-          <p className="rounded-2xl bg-[#161A1D] p-3 text-sm leading-snug font-medium break-words text-[#E6EAE3] ring-1 ring-white/20">
-            Ainda não enviamos e-mail de recuperação. Peça ao seu clube para gerar uma senha nova; ela chega por WhatsApp e você troca no primeiro acesso.
-          </p>
-        ) : null}
+        </Link>
       </div>
 
       {error ? (
