@@ -94,10 +94,14 @@ export function TopAppBar({ saudacao, iniciais }: { saudacao?: string; iniciais?
           setSaindo(true);
           // `.catch` antes de navegar, e o mesmo padrão do `perfil-view`:
           // botão "Sair" que não sai porque a rede caiu é pior que não ter
-          // botão. A sessão local é encerrada de qualquer forma.
+          // botão. A sessão local é encerrada de qualquer forma. Só não
+          // navega quando a sessão já é outra (PRD-090-R5-01): mandar para o
+          // login quem entrou depois do clique seria sair por ela.
           void sairDaConta()
-            .catch(() => undefined)
-            .finally(() => router.replace("/login"));
+            .catch(() => true)
+            .then((saiu) => {
+              if (saiu) router.replace("/login");
+            });
         }}
         className={`flex h-11 items-center gap-2 rounded-2xl px-3 text-[13px] font-extrabold shadow-[var(--shadow-low)] ring-1 transition-colors ${
           confirmando

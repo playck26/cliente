@@ -1,5 +1,6 @@
 import { logout } from "./api-client";
 import { desinscreverNoLogout } from "./push-do-navegador";
+import { epocaAtual } from "./sessao-da-aba";
 
 /**
  * SPEC-062/D2a — **sair da conta, incluindo o aparelho.**
@@ -28,8 +29,16 @@ import { desinscreverNoLogout } from "./push-do-navegador";
  * Isto é a cortesia de liberar o aparelho na saída, e falha em silêncio de
  * propósito: um "Sair" que trava por causa de push seria pior que o problema
  * que resolve.
+ *
+ * ## A sessão que sai é a do clique (PRD-090-R5-01)
+ *
+ * O número da sessão é capturado **antes** da desinscrição, que espera o
+ * navegador e a rede. Se outro login acontecer nesta aba nesse meio-tempo, o
+ * `logout` recebe o número antigo e não apaga a sessão nova. Devolve `false`
+ * só nesse caso, e quem chamou não navega para o login.
  */
-export async function sairDaConta(): Promise<void> {
+export async function sairDaConta(): Promise<boolean> {
+  const epoca = epocaAtual();
   await desinscreverNoLogout();
-  await logout();
+  return (await logout(epoca)) !== false;
 }

@@ -21,10 +21,17 @@ import {
  */
 
 const push = vi.fn();
+const replace = vi.fn();
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push, replace: vi.fn() }),
+  useRouter: () => ({ push, replace }),
 }));
 vi.mock("./sino-de-avisos", () => ({ SinoDeAvisos: () => null }));
+/** Só para controlar quanto a desinscrição do aparelho demora no "Sair". */
+const desinscrever = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/push-do-navegador", async (original) => ({
+  ...(await original<typeof import("@/lib/push-do-navegador")>()),
+  desinscreverNoLogout: desinscrever,
+}));
 
 const CHAVE = "playck_cliente_access_token";
 
@@ -86,6 +93,8 @@ beforeEach(() => {
   limparCacheDaEmpresa();
   window.localStorage.clear();
   push.mockClear();
+  replace.mockClear();
+  desinscrever.mockReset().mockResolvedValue(undefined);
   recarregar.mockClear();
   navegarDuro.mockClear();
   hrefAtribuido = null;
@@ -451,5 +460,79 @@ describe("a renovação que devolve outra conta", () => {
     expect(await antigo).toBe("SESSAO_SUBSTITUIDA");
     expect(window.localStorage.getItem(CHAVE)).toBe(TOKEN_B);
     expect(recarregar).toHaveBeenCalledTimes(1);
+  });
+});
+
+/**
+ * O gesto inteiro de "Sair" pelo botão do cabeçalho (PRD-090-R5-01): ele
+ * espera a desinscrição do aparelho e o servidor, e só então navega. Um login
+ * nesta aba no meio do caminho — mesmo da MESMA conta — abre outra sessão, e
+ * o "Sair" antigo não pode apagá-la nem mandá-la para o login.
+ */
+describe("o \"Sair\" do cabeçalho com outro login no meio", () => {
+  async function clicarEmSair() {
+    const tela = render(<TopAppBar />);
+    await screen.findByText("Clube A");
+    fireEvent.click(screen.getByRole("button", { name: "Sair da conta" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirmar saída" }));
+    return tela;
+  }
+  const TOKEN_A_NOVO = token("u-a", "a", 1);
+  const loginANovo = () =>
+    Promise.resolve(
+      resposta({
+        accessToken: TOKEN_A_NOVO,
+        usuario: { id: "u-a", role: "aluno", senhaTemporaria: false },
+      }),
+    );
+
+  it("o servidor responde ao \"Sair\" depois do novo login: sem apagar e sem ir para o login", async () => {
+    window.localStorage.setItem(CHAVE, TOKEN_A);
+    const saida = emEspera();
+    rotas = (u) =>
+      u.endsWith("/auth/logout") ? saida.responder()
+      : u.endsWith("/auth/login") ? loginANovo()
+      : undefined;
+
+    const antiga = await clicarEmSair();
+    await saida.pedida;
+    antiga.unmount();
+    await entrarPeloFormulario("a@x.com");
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/home"));
+    saida.entregar(resposta({}));
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(window.localStorage.getItem(CHAVE)).toBe(TOKEN_A_NOVO);
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("a desinscrição termina depois do novo login: o \"Sair\" nem chega ao servidor", async () => {
+    window.localStorage.setItem(CHAVE, TOKEN_A);
+    let liberar!: () => void;
+    desinscrever.mockReturnValue(new Promise<void>((r) => (liberar = r)));
+    rotas = (u) => (u.endsWith("/auth/login") ? loginANovo() : undefined);
+
+    const antiga = await clicarEmSair();
+    await waitFor(() => expect(desinscrever).toHaveBeenCalled());
+    antiga.unmount();
+    await entrarPeloFormulario("a@x.com");
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/home"));
+    liberar();
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(window.localStorage.getItem(CHAVE)).toBe(TOKEN_A_NOVO);
+    expect(pedidosPara("/auth/logout")).toHaveLength(0);
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("sem login no meio: sai, apaga o token e vai para o login uma vez", async () => {
+    window.localStorage.setItem(CHAVE, TOKEN_A);
+
+    await clicarEmSair();
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/login"));
+
+    expect(replace).toHaveBeenCalledTimes(1);
+    expect(pedidosPara("/auth/logout")).toHaveLength(1);
+    expect(window.localStorage.getItem(CHAVE)).toBeNull();
   });
 });

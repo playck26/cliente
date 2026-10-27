@@ -163,13 +163,16 @@ export function PerfilView() {
             disabled={saindo}
             onClick={() => {
               setSaindo(true);
-              // `.catch` antes do `.finally`: o `logout()` de produção já
+              // `.catch` antes de navegar: o `logout()` de produção já
               // engole o erro, mas depender disso deixaria uma rejeição não
               // tratada no dia em que ele parar de engolir. O redirecionamento
-              // acontece nos dois caminhos.
+              // acontece nos dois caminhos — menos quando a sessão já é outra
+              // (PRD-090-R5-01), igual ao `top-app-bar`.
               void sairDaConta()
-                .catch(() => undefined)
-                .finally(() => router.replace("/login"));
+                .catch(() => true)
+                .then((saiu) => {
+                  if (saiu) router.replace("/login");
+                });
             }}
             className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-white px-4 text-sm font-bold text-[var(--color-error)] ring-1 ring-border transition-colors hover:bg-[var(--color-error)]/5 disabled:opacity-60"
           >
