@@ -1575,6 +1575,52 @@ export async function removerMinhaFoto(): Promise<void> {
 export type MinhaEmpresa = components["schemas"]["MinhaEmpresaResponseDto"];
 
 let empresaEmCache: Promise<MinhaEmpresa> | null = null;
+/** De quem é a empresa em cache: a identidade do token que a pediu. */
+let identidadeDoCache: string | null = null;
+let vigiandoOutraAba = false;
+
+/**
+ * Quem é o dono do token, lido do payload **sem conferir a assinatura**:
+ * serve para notar que a conta mudou, nunca para autorizar (INV-012). É
+ * `sub` + empresa, e não o token inteiro, porque o refresh da mesma conta
+ * troca o token e não pode custar uma nova chamada a `/me/company`.
+ */
+export function identidadeDoToken(token: string | null): string | null {
+  const meio = token?.split(".")[1];
+  if (!meio) return null;
+  try {
+    const base64 = meio.replace(/-/g, "+").replace(/_/g, "/");
+    const preenchido = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+    const corpo = JSON.parse(atob(preenchido)) as {
+      sub?: unknown;
+      companyId?: unknown;
+    };
+    return `${String(corpo.sub)}|${String(corpo.companyId)}`;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * O "Sair" e o login desta aba limpam o cache, mas o `localStorage` é da
+ * origem: entrar em outra conta **em outra aba** troca o token aqui também,
+ * sem passar por nenhum dos dois. O `TopAppBar` já montado guardou a empresa
+ * no estado, então limpar o cache não basta — a aba inteira passou a ser de
+ * outra pessoa, e recarregar é o que descarta tudo o que era da anterior.
+ * Rotação do token da mesma conta (refresh) não muda a identidade e não faz
+ * nada.
+ */
+function vigiarTrocaDeContaEmOutraAba(): void {
+  if (vigiandoOutraAba || typeof window === "undefined") return;
+  vigiandoOutraAba = true;
+  window.addEventListener("storage", () => {
+    const atual = identidadeDoToken(getAccessToken());
+    if (empresaEmCache === null || atual === null) return;
+    if (atual === identidadeDoCache) return;
+    limparCacheDaEmpresa();
+    location.reload();
+  });
+}
 
 /**
  * **Cacheada em memória, e de propósito.** O `TopAppBar` aparece em quatro
@@ -1604,7 +1650,14 @@ export async function getPrazosDoClube(): Promise<unknown> {
 }
 
 export async function getMinhaEmpresa(): Promise<MinhaEmpresa> {
-  empresaEmCache ??= authFetch("/me/company")
+  vigiarTrocaDeContaEmOutraAba();
+  const identidade = identidadeDoToken(getAccessToken());
+  if (empresaEmCache && identidade !== identidadeDoCache) {
+    limparCacheDaEmpresa();
+  }
+  if (empresaEmCache) return empresaEmCache;
+
+  const promessa: Promise<MinhaEmpresa> = authFetch("/me/company")
     .then(async (res) => {
       if (!res.ok) {
         throw await parseError(res, "Não foi possível carregar o clube");
@@ -1614,14 +1667,19 @@ export async function getMinhaEmpresa(): Promise<MinhaEmpresa> {
     .catch((erro: unknown) => {
       // Uma falha não pode envenenar o cache: sem isto, um erro de rede no
       // primeiro carregamento deixaria a logo ausente até recarregar a aba.
-      empresaEmCache = null;
+      // Só apaga se ainda for ESTA promessa: a de uma conta anterior, que
+      // falha depois do login da seguinte, não pode derrubar o cache novo.
+      if (empresaEmCache === promessa) limparCacheDaEmpresa();
       throw erro;
     });
-  return empresaEmCache;
+  empresaEmCache = promessa;
+  identidadeDoCache = identidade;
+  return promessa;
 }
 
 export function limparCacheDaEmpresa(): void {
   empresaEmCache = null;
+  identidadeDoCache = null;
 }
 
 // =====================================================================
