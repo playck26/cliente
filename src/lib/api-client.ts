@@ -1575,8 +1575,15 @@ export async function removerMinhaFoto(): Promise<void> {
 export type MinhaEmpresa = components["schemas"]["MinhaEmpresaResponseDto"];
 
 let empresaEmCache: Promise<MinhaEmpresa> | null = null;
-/** De quem é a empresa em cache: a identidade do token que a pediu. */
-let identidadeDoCache: string | null = null;
+/**
+ * De quem é ESTA aba: a primeira identidade que ela viu no token, e não a do
+ * último pedido de empresa. A diferença importa (PRD-090-R2-01): se a leitura
+ * de B acontece antes de o evento `storage` chegar, uma identidade amarrada
+ * ao cache já seria B quando o evento fosse tratado, e o cabeçalho montado
+ * com A ficaria na tela sem recarga. Só o "Sair" e o login desta aba a zeram,
+ * por `limparCacheDaEmpresa()`.
+ */
+let identidadeDaAba: string | null = null;
 let vigiandoOutraAba = false;
 
 /**
@@ -1614,12 +1621,27 @@ function vigiarTrocaDeContaEmOutraAba(): void {
   if (vigiandoOutraAba || typeof window === "undefined") return;
   vigiandoOutraAba = true;
   window.addEventListener("storage", () => {
-    const atual = identidadeDoToken(getAccessToken());
-    if (empresaEmCache === null || atual === null) return;
-    if (atual === identidadeDoCache) return;
-    limparCacheDaEmpresa();
-    location.reload();
+    conferirDonoDaAba(identidadeDoToken(getAccessToken()));
   });
+}
+
+/**
+ * Chamada pelo evento E pela leitura da empresa, porque a ordem entre os dois
+ * não é garantida. Token ausente não decide nada: pode ser um refresh por
+ * cookie em curso ou o "Sair" de outra aba, que o 401 seguinte já trata. A
+ * primeira identidade vista vira a da aba; uma diferente depois disso é outra
+ * conta, e a aba recarrega uma vez só, porque já passa a ser da nova.
+ */
+function conferirDonoDaAba(atual: string | null): void {
+  if (atual === null) return;
+  if (identidadeDaAba === null) {
+    identidadeDaAba = atual;
+    return;
+  }
+  if (atual === identidadeDaAba) return;
+  identidadeDaAba = atual;
+  empresaEmCache = null;
+  location.reload();
 }
 
 /**
@@ -1651,10 +1673,7 @@ export async function getPrazosDoClube(): Promise<unknown> {
 
 export async function getMinhaEmpresa(): Promise<MinhaEmpresa> {
   vigiarTrocaDeContaEmOutraAba();
-  const identidade = identidadeDoToken(getAccessToken());
-  if (empresaEmCache && identidade !== identidadeDoCache) {
-    limparCacheDaEmpresa();
-  }
+  conferirDonoDaAba(identidadeDoToken(getAccessToken()));
   if (empresaEmCache) return empresaEmCache;
 
   const promessa: Promise<MinhaEmpresa> = authFetch("/me/company")
@@ -1669,17 +1688,17 @@ export async function getMinhaEmpresa(): Promise<MinhaEmpresa> {
       // primeiro carregamento deixaria a logo ausente até recarregar a aba.
       // Só apaga se ainda for ESTA promessa: a de uma conta anterior, que
       // falha depois do login da seguinte, não pode derrubar o cache novo.
-      if (empresaEmCache === promessa) limparCacheDaEmpresa();
+      // Só o cache: falhar uma busca não muda de quem é a aba.
+      if (empresaEmCache === promessa) empresaEmCache = null;
       throw erro;
     });
   empresaEmCache = promessa;
-  identidadeDoCache = identidade;
   return promessa;
 }
 
 export function limparCacheDaEmpresa(): void {
   empresaEmCache = null;
-  identidadeDoCache = null;
+  identidadeDaAba = null;
 }
 
 // =====================================================================
