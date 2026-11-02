@@ -228,6 +228,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/students/exportar": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["StudentsController_exportar"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/students/{id}/senha-temporaria": {
         parameters: {
             query?: never;
@@ -2544,6 +2560,14 @@ export interface components {
             /** @example Ja existe uma conta com este e-mail. */
             mensagem: string;
         };
+        TurmaDaLinhaDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example Terça 19h */
+            nome: string;
+            /** @enum {string} */
+            coluna: "turma 1" | "turma 2" | "turma 3" | "turma 4" | "turma 5" | "turma 6" | "turma 7" | "turma 8" | "turma 9" | "turma 10";
+        };
         LinhaValidaDto: {
             /** @example 2 */
             linha: number;
@@ -2554,10 +2578,7 @@ export interface components {
             telefone: string | null;
             /** Format: uuid */
             nivelId: string | null;
-            /** Format: uuid */
-            turmaId: string | null;
-            /** @example Terça 19h */
-            turmaNome: string | null;
+            turmas: components["schemas"]["TurmaDaLinhaDto"][];
         };
         RelatorioDeImportacaoDto: {
             /**
@@ -2953,6 +2974,8 @@ export interface components {
              * @example 2
              */
             limiteTurmasPorAluno?: Record<string, never> | null;
+            /** @description SPEC-093 — liga (`true`) ou desliga (`false`) a restrição de nível: ligada, cada aluno só entra nas turmas do seu nível; desligada, o nível é só um rótulo. Vale para entrar, nunca para expulsar (SPEC-089/D2): ligar não tira ninguém de turma. */
+            nivelRestringeAcesso?: boolean;
         };
         LogoDaEmpresaResponseDto: {
             logoUrl: string | null;
@@ -4987,6 +5010,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AlunoComSenhaTemporariaResponseDto"];
+                };
+            };
+        };
+    };
+    StudentsController_exportar: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description CSV com BOM, `;` e CRLF: Nome;E-mail;Telefone;Nível;Turma 1…N;Status. O nome do arquivo vem em Content-Disposition (alunos-AAAA-MM-DD.csv). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
                 };
             };
         };
